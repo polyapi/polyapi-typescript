@@ -3,7 +3,7 @@ on:
   pull_request:
     types: [ closed ]
     paths:
-      - "packages/client/package.json"
+      - "package.json"
     branches:
       - develop
       - main
@@ -29,7 +29,7 @@ jobs:
 
     - name: Publish package
       run: |
-        VERSION=$(node -p "require('./packages/client/package.json').version")
+        VERSION=$(node -p "require('./package.json').version")
         VERSIONREMOTE=$(npm view polyapi --json | jq -r '.["dist-tags"].na1')
         VERSIONREMOTELATEST=$(npm view polyapi --json | jq -r '.["dist-tags"].latest')
         
@@ -66,7 +66,7 @@ jobs:
 
     - name: Publish package
       run: |
-        VERSION=$(node -p "require('./packages/client/package.json').version")
+        VERSION=$(node -p "require('./package.json').version")
         VERSIONREMOTE=$(npm view polyapi --json | jq -r '.["dist-tags"].develop')
 
         if [[ $VERSION == $VERSIONREMOTE ]]; then
@@ -96,7 +96,7 @@ jobs:
 
     - name: Publish package
       run: |
-        VERSION=$(node -p "require('./packages/client/package.json').version")
+        VERSION=$(node -p "require('./package.json').version")
         echo $VERSION
         REMOTEVERSION=$(npm view polyapi --json | jq -r '.["dist-tags"].na1')
         echo $REMOTEVERSION
