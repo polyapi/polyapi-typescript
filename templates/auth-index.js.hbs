@@ -1,0 +1,34 @@
+const axios = require('../axios');
+const set = require('lodash/set');
+const merge = require('lodash/merge');
+
+const getTokenFunctions = [
+{{#each getTokenFunctions}}
+  {{#if context}}
+    ['{{context}}.{{name}}', require('./{{context}}-{{name}}')],
+  {{else}}
+    ['{{name}}', require('./{{name}}')],
+  {{/if}}
+{{/each}}
+];
+const subResourceFunctions = [
+{{#each subResourceFunctions}}
+  {{#if context}}
+    ['{{context}}.{{name}}', '{{id}}/{{subResource}}'],
+  {{else}}
+    ['{{name}}', '{{id}}/{{subResource}}'],
+  {{/if}}
+{{/each}}
+];
+
+module.exports = (clientID, getSocket, getApiKey) => merge(
+  {},
+  getTokenFunctions.reduce(
+    (acc, [name, fn]) => set(acc, name, (...args) => fn(clientID, getSocket, getApiKey, ...args)),
+    {}
+  ),
+  subResourceFunctions.reduce(
+    (acc, [path, resource]) => set(acc, path, (token) => axios.post(`/auth-providers/${resource}`, { clientID, token }).then(({ data }) => data)),
+    {}
+  )
+);

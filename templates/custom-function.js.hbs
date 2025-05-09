@@ -1,0 +1,10 @@
+module.exports = function(poly, sendLocalErrorMessage, ...mainArgs) {
+  {{{code}}}
+
+  try {
+    return {{name}}.call(this, ...mainArgs);
+  } catch (e) {
+    sendLocalErrorMessage(e.message);
+    throw e;
+  }
+}

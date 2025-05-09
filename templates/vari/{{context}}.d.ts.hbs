@@ -1,0 +1,69 @@
+declare module vari {
+  interface {{interfaceName}}Values {
+    {{#each subContexts}}
+      {{name}}: {{interfaceName}}Values;
+    {{/each}}
+    {{#each variableDeclarations}}
+      {{#if secret}}
+      {{else}}
+      {{name}}: {{type}};
+      {{/if}}
+    {{/each}}
+  }
+
+  interface {{interfaceName}} {
+    {{#each subContexts}}
+      {{name}}: {{interfaceName}};
+    {{/each}}
+    {{#each variableDeclarations}}
+      {{#if comment}}
+      /**
+      {{{comment}}}
+      */
+      {{/if}}
+      {{name}}: {
+        /**
+         * Get the current value of the variable.
+         */
+        get: () => Promise<{{type}}>;
+        /**
+         * Set the current value of the variable.
+         */
+        update: (value: {{type}}) => Promise<VariableUpdateResponse<{{type}}>>;
+        /**
+         * Subscribe to changes to the variable. If the variable is secret, the callback won't be called.
+         */
+        onUpdate: (callback: (value: VariableChangeEvent<{{type}}>) => void) => UnregisterOnUpdateHandler;
+        /**
+         * Gets variable data.
+         * This is intended to be used in Poly functions, so the variable values are resolved on the server
+         * without fetching them from the client.
+         * @param path The JSON path to the property within the value, e.g. `vari.products.shop.inject('id')`
+         * @example
+         * await poly.products.addItem(vari.products.shopId.inject(), 'Toy car', 1)
+         */
+        {{#if secret}}
+          inject(): {{{type}}};
+          inject(path: string): any;
+        {{else}}
+          {{#if isObjectType}}
+          inject(): {{{type}}};
+          inject(path?: {{pathUnionType}}): any;
+          inject(path?: string): any;
+          {{else}}
+          inject(path?: string): {{{type}}};
+          {{/if}}
+        {{/if}}
+      }
+    {{/each}}
+    get: () => Promise<{{interfaceName}}Values>;
+  }
+
+  {{#each contextPaths}}
+    namespace {{this}} {
+  {{/each}}
+  {{{typeDeclarations}}}
+  {{#each contextPaths}}
+    }
+  {{/each}}
+}

@@ -1,0 +1,33 @@
+const set = require('lodash/set');
+const merge = require('lodash/merge');
+
+const MISSING_MODULE_ERROR_PATTERN = /Cannot find module '(.*)'/;
+
+const customFunctions = [
+{{#each specifications}}
+  {{#if context}}
+    ['{{id}}', '{{context}}.{{name}}', require('./{{context}}-{{name}}')],
+  {{else}}
+    ['{{id}}', '{{name}}', require('./{{name}}')],
+  {{/if}}
+{{/each}}
+];
+
+module.exports = (poly, sendLocalErrorEvent) => merge(
+  {},
+  customFunctions.reduce(
+    (acc, [id, name, fn]) => set(acc, name, (...args) => {
+      try {
+        return fn(poly, (message) => sendLocalErrorEvent(id, name, message), ...args);
+      } catch (e) {
+        const match = e.message.match(MISSING_MODULE_ERROR_PATTERN);
+        if (match) {
+          throw new Error(`Custom function '${name}' requires library '${match[1]}'. Install it with 'npm install ${match[1]}' or 'yarn add ${match[1]}'.`);
+        } else {
+          throw e;
+        }
+      }
+    }),
+    {}
+  )
+);

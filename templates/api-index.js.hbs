@@ -1,0 +1,47 @@
+const axios = require('../axios');
+const set = require('lodash/set');
+const merge = require('lodash/merge');
+
+const functions = [
+{{#each specifications}}
+  ['{{#if context}}{{context}}.{{/if}}{{name}}', '{{id}}',{{#each function.arguments}}'{{name}}',{{/each}}],
+{{/each}}
+];
+
+module.exports = (clientID, polyCustom) => merge(
+  {},
+  functions.reduce(
+    (acc, [path, id, ...argKeys]) => set(
+      acc,
+      path,
+      (...args) => {
+        const requestStartTime = Date.now();
+        const requestArgs = argKeys.reduce((acc, key, index) => ({ ...acc, [key]: args[index] }), {});
+        return axios.post(
+          `/functions/api/${id}/execute?clientId=${clientID}`,
+          {
+            ...requestArgs,
+          },
+          {
+            headers: {
+              'x-poly-execution-id': polyCustom.executionId,
+            }
+          }
+        ).then(({ headers, data }) => {
+          if (data && (data.status < 200 || data.status >= 300)) {
+            console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', data.data);
+          }
+          const serverExecutionTimeMs = Number(headers['x-poly-execution-duration']);
+          const roundTripNetworkLatencyMs = Date.now() - requestStartTime - serverExecutionTimeMs;
+          return {
+            ...data,
+            metrics: {
+              roundTripNetworkLatencyMs,
+              serverExecutionTimeMs,
+            }
+          };
+        });
+      }),
+    {}
+  )
+);

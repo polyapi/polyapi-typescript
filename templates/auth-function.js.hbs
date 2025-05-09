@@ -1,0 +1,68 @@
+const axios = require('../axios');
+
+module.exports = function(eventsClientId, getSocket, getApiKey, clientId, clientSecret, {{#if audienceRequired}}audience, scopes, callback, { callbackUrl, timeout = 120000, autoCloseOnToken = true, autoCloseOnUrl = false, userId } = {}{{else}}scopes, callback, { audience, callbackUrl, timeout = 120000, autoCloseOnToken = true, autoCloseOnUrl = false, userId } = {}{{/if}}) {
+  if (userId) {
+    eventsClientId = `${eventsClientId}-${userId}`;
+  }
+
+  let socket = null;
+  let timeoutID = null;
+
+  const closeEventHandler = () => {
+    if (!socket) {
+      return;
+    }
+    socket.off(`handleAuthFunctionEvent:{{id}}`);
+    socket.emit('unregisterAuthFunctionEventHandler', {
+      clientID: eventsClientId,
+      functionId: '{{id}}',
+      apiKey: getApiKey()
+    });
+    socket.close();
+    socket = null;
+    if (timeoutID) {
+      clearTimeout(timeoutID);
+    }
+  };
+
+  axios.post(`/auth-providers/{{id}}/execute`, { eventsClientId, clientId, clientSecret, scopes, audience, callbackUrl, userId })
+    .then(({ data }) => {
+      if (data.token) {
+        callback(data.token, data.url, data.error);
+        return;
+      }
+      if (data.url && autoCloseOnUrl) {
+        callback(null, data.url, null);
+        return;
+      }
+
+      socket = getSocket();
+      const handleEvent = ({ token, url, error }) => {
+        callback(token, url, error);
+        if (token && autoCloseOnToken) {
+          closeEventHandler();
+        }
+      };
+      socket.emit('registerAuthFunctionEventHandler', {
+        clientID: eventsClientId,
+        functionId: '{{id}}',
+        apiKey: getApiKey()
+      }, registered => {
+        if (registered) {
+          socket.on(`handleAuthFunctionEvent:{{id}}`, handleEvent);
+          callback(data.token, data.url, data.error);
+        }
+      });
+
+      if (timeout) {
+        timeoutID = setTimeout(() => {
+          closeEventHandler();
+          callback(null, null, { message: 'Timeout reached' });
+        }, timeout);
+      }
+    });
+
+  return {
+    close: closeEventHandler,
+  };
+}

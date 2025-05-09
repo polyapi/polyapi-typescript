@@ -1,0 +1,56 @@
+{{#each contexts}}
+/// <reference path="./{{fileName}}" />
+{{/each}}
+
+declare module vari {
+  type UnregisterOnUpdateHandler = () => void;
+  interface VariableChangeEvent<T> {
+    type: 'update' | 'delete';
+    secret: boolean;
+    id: string;
+    previousValue: T;
+    /**
+     * Updated value of the variable or null if the variable was deleted.
+     */
+    currentValue: T | null;
+    updateTime: number;
+    /**
+     * User ID or Application ID of the user or application that updated the variable.
+     */
+    updatedBy: string;
+    updatedFields: ('value' | 'secret')[];
+  };
+  interface VariableUpdateResponse<T> {
+    data: {
+      id: string;
+      context: string;
+      name: string;
+      description: string;
+      visibility: 'ENVIRONMENT' | 'TENANT' | 'PUBLIC';
+      secret: boolean;
+      value?: T
+    }
+    status: number;
+    headers: Record<string, string>;
+  }
+
+  type OnUpdateOptions = {
+    /**
+     * Filter updates by type of event
+     */
+    type?: 'update' | 'delete';
+    /**
+     * Filter updates by secret or non-secret variables
+     */
+    secret?: boolean;
+  };
+
+  interface Vari {
+    /**
+     * Creates update listener for the variables under given path.
+     * @param path context path to listen to (example: 'products' or 'products.shopId'). Can be '' to listen to all variables.
+     */
+    onUpdate: (path: string, callback: (event: VariableChangeEvent<any>) => void, options?: OnUpdateOptions) => UnregisterOnUpdateHandler;
+    readonly injectValue: unique symbol;
+  }
+}

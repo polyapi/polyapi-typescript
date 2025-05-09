@@ -1,0 +1,230 @@
+const axios = require('../axios');
+const set = require('lodash/set');
+const get = require('lodash/get');
+const merge = require('lodash/merge');
+
+const parts = Symbol('parts');
+const pathState = Symbol('pathState');
+const injectValue = Symbol('injectValue');
+
+function getStringPath(pathParts) {
+    const stringPaths = [];
+    for (let i = 0; i < pathParts.length; i++) {
+        let stringPath = '';
+        for (const part of pathParts[i]) {
+          const isString = typeof part === 'string';
+          const delimiter = (stringPath.length > 0 && isString) ? '.' : '';
+          if (isString) {
+            stringPath = `${stringPath}${delimiter}${part}`;
+          } else {
+            stringPath = `${stringPath}${delimiter}[${part}]`;
+          }
+        }
+        stringPaths.push(stringPath);
+    }
+    return stringPaths
+}
+
+const variables = [
+{{#each specifications}}
+  ['{{#if context}}{{context}}.{{/if}}{{name}}', '{{id}}', {{variable.secret}}],
+{{/each}}
+];
+
+const paths = {{{arrPaths}}};
+
+const contextPaths = [
+{{#each contextPaths}}
+  '{{this}}',
+{{/each}}
+];
+
+const getVariableHandlers = (clientID, getSocket, getApiKey) => {
+  const variableHandlers = {};
+  variables.forEach(([contextPath, id, secret]) => {
+    set(variableHandlers, contextPath, {
+      get: () => {
+        if (secret) {
+          throw new Error('Cannot access secret variable from client. Use .inject() instead within Poly function.');
+        } else {
+          return axios.get(
+            `/variables/${id}/value`
+          ).then(({data}) => data);
+        }
+      },
+      update: (value) => {
+        return axios.patch(
+          `/variables/${id}`,
+          { value }
+        ).then(response => {
+          return {
+            data: response.data,
+            status: response.status,
+            headers: response.headers,
+          };
+        });
+      },
+      onUpdate: (callback) => {
+        const socket = getSocket();
+        const unregisterEventHandler = () => {
+          socket.off(`handleVariableChangeEvent:${id}`);
+          socket.emit('unregisterVariableChangeEventHandler', {
+              clientID,
+              variableId: id,
+              apiKey: getApiKey(),
+          });
+        };
+        const handleEvent = (value) => {
+          callback(value);
+        };
+        socket.emit('registerVariableChangeEventHandler', {
+          clientID,
+          variableId: id,
+          apiKey: getApiKey(),
+        }, registered => {
+          if (registered) {
+            socket.on(`handleVariableChangeEvent:${id}`, handleEvent);
+          }
+        });
+
+        return unregisterEventHandler;
+      },
+      inject: (path) => {
+
+        if (typeof path !== 'undefined') {
+          return {
+            type: 'PolyVariable',
+            id,
+            path
+          };
+        }
+
+        return new Proxy({
+          [parts]: [],
+          [pathState]: getStringPath([[]])[0]
+        }, {
+          get(target, prop) {
+            
+            const pathParts = target[parts] ? [...target[parts]] : [];
+
+            if (prop === 'toJSON') {
+                return () => ({
+                    type: 'PolyVariable',
+                    id,
+                    path: target[pathState]
+                })
+            }
+
+            if (pathParts.length >= 20) {
+                throw new Error('Maximum path chain limit reached.');
+            }
+
+            if (prop === Symbol.toPrimitive) {
+              return (hint) => {
+                if (hint === "number") {
+                  return 1;
+                }
+                if (hint === "string") {
+                  return '[object Object]';
+                }
+                return true;
+              };
+            }
+
+            if (prop === Symbol.toStringTag) {
+              return '[object Object]';
+            }
+
+            if (prop === injectValue) {
+              return {
+                type: 'PolyVariable',
+                id,
+                path: getStringPath([pathParts])[0],
+              };
+            }
+
+            if (prop.match(/\d+/)) {
+
+                if (secret) {
+                  pathParts.push(Number(prop));
+                } else if (paths.find(currentPath => {
+                  const arrContextPath = contextPath.split('.');
+                  arrContextPath.pop();
+
+                  return currentPath.context === arrContextPath.join('.')
+
+                })?.paths?.find(currentPath => currentPath.includes(`${target[pathState]}[`))) {
+                    pathParts.push(Number(prop));
+                } else {
+                    pathParts.push(prop);
+                }
+
+            } else {
+                pathParts.push(prop);
+            }
+            
+
+            return new Proxy({
+                [parts]: pathParts,
+                [pathState]: getStringPath([pathParts])[0]
+            }, this);
+          }
+        });
+      },
+    });
+  });
+  return variableHandlers;
+};
+
+const getPathHandlers = () => {
+  const pathHandlers = {
+    get: () => {
+      return axios.get(
+        `/variables/context/values`
+      ).then(({data}) => data);
+    }
+  };
+  contextPaths.forEach(path => {
+    set(pathHandlers, path, {
+      get: () => {
+        return axios.get(
+          `/variables/context/${path}/values`
+        ).then(({data}) => data);
+      },
+    });
+  });
+  return pathHandlers;
+};
+
+module.exports = (clientID, getSocket, getApiKey) => merge(
+  getVariableHandlers(clientID, getSocket, getApiKey),
+  getPathHandlers(),
+  {
+    onUpdate: (path, callback, options = {}) => {
+      const socket = getSocket();
+      const unregisterEventHandler = () => {
+        socket.off(`handleVariablesChangeEvent:${path}`);
+        socket.emit('unregisterVariablesChangeEventHandler', {
+            clientID,
+            path,
+            apiKey: getApiKey(),
+            options
+        });
+      }
+
+      socket.emit('registerVariablesChangeEventHandler', {
+        clientID,
+        path,
+        options,
+        apiKey: getApiKey(),
+      }, registered => {
+        if (registered) {
+          socket.on(`handleVariablesChangeEvent:${path}`, callback);
+        }
+      });
+
+      return unregisterEventHandler;
+    },
+    injectValue
+  }
+);

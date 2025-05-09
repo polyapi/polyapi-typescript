@@ -1,0 +1,46 @@
+import poly = require("./index");
+
+declare module "./index" {
+  interface {{interfaceName}} {
+    {{#each subContexts}}
+      {{name}}: {{interfaceName}};
+    {{/each}}
+    {{#each functionDeclarations}}
+      {{#if comment}}
+      /**
+      {{{comment}}}
+      */
+      {{/if}}
+      {{#if deprecated}}
+      /**
+       * @deprecated
+       */
+      {{/if}}
+      {{name}}({{#each arguments}}{{name}}{{#unless required}}?{{/unless}}: {{{type}}}{{#unless @last}}, {{/unless}}{{/each}}):
+        {{#if synchronous}}
+          {{#if useResponseTypeWrapper}}
+            {{#if isGraphql}}GraphqlAPIFunctionResponse<{{returnType}}>{{else}}ApiFunctionResponse<{{{returnType}}}>{{/if}}
+            {{else}}{{{returnType}}}
+          {{/if}}
+        {{else}}Promise<{{#if useResponseTypeWrapper}}{{#if isGraphql}}GraphqlAPIFunctionResponse<{{returnType}}>{{else}}ApiFunctionResponse<{{{returnType}}}>{{/if}}{{else}}{{{returnType}}}{{/if}}>
+        {{/if}};
+    {{/each}}
+    {{#each schemaDeclarations}}
+      {{#if comment}}
+      /**
+      {{{comment}}}
+      */
+      {{/if}}
+      {{name}}: {{typeDeclaration}}
+    {{/each}}
+  }
+
+  {{#each contextPaths}}
+  namespace {{this}} {
+  {{/each}}
+  {{{typeDeclarations}}}
+  {{#each contextPaths}}
+  }
+  {{/each}}
+
+}
