@@ -32,6 +32,8 @@ import { DEFAULT_POLY_PATH } from '../../constants';
 import { generateFunctionsTSDeclarationFile, generateVariablesTSDeclarationFile, getGenerationErrors, setGenerationErrors } from './types';
 import { generateSchemaTSDeclarationFiles } from './schemaTypes';
 
+// Register the eq helper for equality comparison
+handlebars.registerHelper('eq', (a, b) => a === b);
 
 const fsWriteAsync = (file: PathOrFileDescriptor, data: string) =>
   new Promise<void>((resolve, reject) => {

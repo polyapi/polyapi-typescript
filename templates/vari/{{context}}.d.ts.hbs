@@ -4,7 +4,7 @@ declare module vari {
       {{name}}: {{interfaceName}}Values;
     {{/each}}
     {{#each variableDeclarations}}
-      {{#if secret}}
+      {{#if (eq secrecy 'SECRET')}}
       {{else}}
       {{name}}: {{type}};
       {{/if}}
@@ -42,7 +42,7 @@ declare module vari {
          * @example
          * await poly.products.addItem(vari.products.shopId.inject(), 'Toy car', 1)
          */
-        {{#if secret}}
+        {{#if (eq secrecy 'SECRET')}}
           inject(): {{{type}}};
           inject(path: string): any;
         {{else}}

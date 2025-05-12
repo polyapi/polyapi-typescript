@@ -378,7 +378,7 @@ const getSpecificationWithVariableComment = (specification: SpecificationWithVar
       .map((line) => `* ${line}`)
       .join('\n')
     : null;
-  const secretComment = specification.variable.secret
+  const secretComment = specification.variable.secrecy === 'SECRET'
     ? '* Note: The variable is secret and can be used only within Poly functions.'
     : null;
 
@@ -558,7 +558,7 @@ const generateTSContextDeclarationFile = async (
       name: specification.name.split('.').pop(),
       comment: getSpecificationWithVariableComment(specification),
       type,
-      secret: specification.variable.secret,
+      secrecy: specification.variable.secrecy,
       isObjectType: specification.variable.valueType.kind === 'object',
       pathUnionType: pathUnionType.join('.'),
     };

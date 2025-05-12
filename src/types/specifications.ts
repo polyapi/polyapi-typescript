@@ -132,7 +132,7 @@ export interface ServerVariableSpecification extends ISpecification {
 
 export interface VariableSpecification {
   environmentId: string;
-  secret: boolean;
+  secrecy: 'SECRET' | 'OBSCURED' | 'NONE'
   valueType: PropertyType;
   value?: ValueType;
 }
