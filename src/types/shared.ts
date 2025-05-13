@@ -1,4 +1,3 @@
-
 export enum Visibility {
   Environment = 'ENVIRONMENT',
   Tenant = 'TENANT',

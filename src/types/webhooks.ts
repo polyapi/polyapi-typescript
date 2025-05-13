@@ -1,4 +1,4 @@
-import { LifecycleState, Visibility } from "./shared";
+import { LifecycleState, Visibility } from './shared';
 
 export interface WebhookSecurityFunction {
   id: string;

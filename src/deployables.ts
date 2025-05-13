@@ -17,7 +17,7 @@ export type DeployableTypes =
 // | "webhook"
 // | "trigger";
 
-// NOTE: Make sure these names line up with the public types in `poly-alpha/packages/client/index.d.ts`
+// NOTE: Make sure these names line up with the public types in `src/index.d.ts`
 export type DeployableTypeNames =
   | 'PolyServerFunction'
   | 'PolyClientFunction'

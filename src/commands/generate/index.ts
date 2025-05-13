@@ -305,7 +305,7 @@ const showErrGeneratingFiles = (error: any) => {
   shell.exit(2);
 };
 
-const generateSingleCustomFunction = async (polyPath: string, functionId: string, updated: boolean, noTypes: boolean = false) => {
+const generateSingleCustomFunction = async (polyPath: string, functionId: string, updated: boolean, noTypes = false) => {
   shell.echo('-n', updated ? 'Regenerating TypeScript SDK...' : 'Generating TypeScript SDK...');
 
   const libPath = getPolyLibPath(polyPath);

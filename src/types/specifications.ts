@@ -1,7 +1,7 @@
-import { CreateApiFunctionDto } from "./functions";
-import { CreateSchemaDto } from "./schemas";
-import { LifecycleState, Visibility } from "./shared";
-import { CreateWebhookHandleDto } from "./webhooks";
+import { CreateApiFunctionDto } from './functions';
+import { CreateSchemaDto } from './schemas';
+import { LifecycleState, Visibility } from './shared';
+import { CreateWebhookHandleDto } from './webhooks';
 
 export type ValueType = string | number | boolean | object | null | any[];
 
@@ -143,7 +143,6 @@ export interface SnippetSpecification extends ISpecification{
   description: string;
 }
 
-
 export interface SchemaRef {
   publicNamespace?: string;
   path: string;
@@ -164,7 +163,6 @@ export type Specification =
   | ServerVariableSpecification
   | SnippetSpecification
   | SchemaSpecification;
-
 
 interface CreateWebhookHandleDtoForSpecificationInput extends CreateWebhookHandleDto {
   context: string;

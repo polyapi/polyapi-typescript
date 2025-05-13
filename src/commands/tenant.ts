@@ -2,7 +2,7 @@ import shell from 'shelljs';
 import { input, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { createTenantSignUp, resendVerificationCode, verifyTenantSignUp } from '../api';
-import { SignUpDto } from '../../../model/src/dto';
+import { SignUpDto } from '../types';
 import { saveConfig } from '../config';
 import { exec as execCommand } from 'child_process';
 import { promisify } from 'util';

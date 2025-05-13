@@ -1,4 +1,4 @@
-import { Visibility } from "./shared";
+import { Visibility } from './shared';
 
 export interface SnippetDetailsDto {
   id: string;

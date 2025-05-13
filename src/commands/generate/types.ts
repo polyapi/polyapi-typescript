@@ -28,7 +28,6 @@ import {
   toTypeDeclaration,
 } from '../../utils';
 
-
 interface Context {
   name: string;
   path: string;
