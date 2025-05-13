@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 const getPolyConfigDirPath = (polyPath: string) =>
   // If path does not start with `./` or `/` then we adjust!
-  /^\.?\/.*/.test(polyPath) ? polyPath : `${__dirname}/../../../../../${polyPath}`;
+  /^\.?\/.*/.test(polyPath) ? polyPath : `${__dirname}/../../../${polyPath}`;
 
 const getPolyConfigFilePath = (polyPath: string) =>
   `${getPolyConfigDirPath(polyPath)}/.config.env`;
