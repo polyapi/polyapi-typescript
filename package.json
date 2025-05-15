@@ -24,8 +24,8 @@
     "copy-templates": "copyfiles \"templates/**/*.hbs\" build",
     "format": "prettier --write \"src/**/*.ts\"",
     "lint": "eslint \"src/**/*.ts\" --fix",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm run lint",
+    "prepare": "husky install",
+    "prepublishOnly": "npm run lint && npm run build",
     "preversion": "npm run lint",
     "postversion": "git push && git push --tags",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
@@ -61,6 +61,7 @@
     "handlebars": "4.7.7",
     "http-proxy-agent": "7.0.0",
     "https-proxy-agent": "7.0.0",
+    "husky": "^8.0.3",
     "json-schema-to-typescript": "15.0.4",
     "jsonpath": "1.1.1",
     "lodash": "4.17.21",
