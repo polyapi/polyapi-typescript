@@ -49,8 +49,8 @@ export const addOrUpdateCustomFunction = async (
         const targetType = existingType === 'server' ? 'client' : 'server';
 
         shell.echo(
-          chalk.yellowBright(`ERROR: Function already exists as a ${existingType} function.`) + '\n' +
-          chalk.yellow(`Please delete it before deploying as a ${targetType} function.`),
+          chalk.redBright(`ERROR: Function already exists as a ${existingType} function.`) + '\n' +
+          chalk.red(`Please delete it before deploying as a ${targetType} function.`),
         );
         return;
       }
