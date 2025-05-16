@@ -15,6 +15,7 @@ export const addOrUpdateCustomFunction = async (
   name: string,
   description: string | null,
   file: string,
+  client: boolean | undefined,
   server: boolean | undefined,
   logsEnabled: boolean | undefined,
   generateContexts: string | undefined,
@@ -38,10 +39,21 @@ export const addOrUpdateCustomFunction = async (
     const specs = await getSpecs([context], [name]);
     const functionSpec = specs.find(spec => spec.name === name && spec.context === context);
     const updating = !!functionSpec;
-    if (server === undefined && updating) {
-      server = functionSpec.type === 'serverFunction';
-    } else {
-      server = server ?? false;
+    if (updating) {
+      const isConflictingType =
+        (client === true && functionSpec.type === 'serverFunction') ||
+        (server === true && functionSpec.type === 'customFunction');
+
+      if (isConflictingType) {
+        const existingType = functionSpec.type === 'serverFunction' ? 'server' : 'client';
+        const targetType = existingType === 'server' ? 'client' : 'server';
+
+        shell.echo(
+          chalk.redBright(`ERROR: Function already exists as a ${existingType} function.`) + '\n' +
+          chalk.red(`Please delete it before deploying as a ${targetType} function.`),
+        );
+        return;
+      }
     }
 
     const typeSchemas = generateTypeSchemas(file, tsConfigBaseUrl, DeployableTypeEntries.map(d => d[0]));
@@ -69,7 +81,9 @@ export const addOrUpdateCustomFunction = async (
       shell.echo(chalk.green('DEPLOYED'));
 
       shell.echo(`Function ID: ${customFunction.id}`);
-    } else {
+    }
+
+    if (client) {
       shell.echo('-n', `${updating ? 'Updating' : 'Adding'} Client Function to PolyAPI Catalog...`);
       customFunction = await createOrUpdateClientFunction(context, name, description, code, typeSchemas);
       shell.echo(chalk.green('DONE'));
