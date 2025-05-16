@@ -15,8 +15,8 @@ const unescapedSingleQuote = /\b'\b/gi;
 const wrapUnsafeNames = (name: string) => {
   if (!name.match(unsafeCharacters)) return name;
   if (name.includes('\'')) name = name.replaceAll(unescapedSingleQuote, '\'');
-  return `'${name}'`
-}
+  return `'${name}'`;
+};
 
 const formatName = (name: string, nested = false) => wrapUnsafeNames(nested ? name : toPascalCase(name));
 

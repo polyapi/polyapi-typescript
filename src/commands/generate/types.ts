@@ -14,6 +14,7 @@ import {
   SpecificationWithFunction,
   SpecificationWithVariable,
   ServerFunctionSpecification,
+  FunctionSpecification,
 } from '../../types';
 import {
   getContextData,
@@ -438,8 +439,8 @@ const getSpecificationsTypeDeclarations = async (namespacePath: string, specific
         'function' in spec &&
         (
           (spec.function.returnType.kind === 'object' &&
-           spec.function.returnType.schema &&
-           !isBinary(spec.function.returnType)) ||
+            spec.function.returnType.schema &&
+            !isBinary(spec.function.returnType)) ||
           (spec.type === 'serverFunction' && (spec as ServerFunctionSpecification).serverSideAsync === true)
         ),
       )
@@ -687,25 +688,29 @@ const generateTSIndexDeclarationFile = async (libPath: string, contexts: Context
 };
 
 export const generateFunctionsTSDeclarationFile = async (libPath: string, specs: Specification[]) => {
+  const assignUnresolvedRefsRecursive = (fn: FunctionSpecification) => {
+    for (const functionArg of fn.arguments) {
+      if (functionArg.type.kind === 'object' && functionArg.type.schema) {
+        assignUnresolvedRefsToPolySchemaRefObj(functionArg.type.schema, functionArg.type.unresolvedPolySchemaRefs);
+      } else if (functionArg.type.kind === 'object' && functionArg.type.properties) {
+        for (const property of functionArg.type.properties) {
+          if (property.type.kind === 'object') {
+            assignUnresolvedRefsToPolySchemaRefObj(property.type.schema, functionArg.type.unresolvedPolySchemaRefs);
+          }
+        }
+      } else if (functionArg.type.kind === 'function' && typeof functionArg.type.spec === 'object') {
+        assignUnresolvedRefsRecursive(functionArg.type.spec);
+      }
+    }
+    if (fn.returnType.kind === 'object' && fn.returnType.schema) {
+      assignUnresolvedRefsToPolySchemaRefObj(fn.returnType.schema, fn.returnType.unresolvedPolySchemaRefs);
+    }
+  };
+
   await generateTSDeclarationFiles(
     libPath,
     specs.filter(spec => 'function' in spec).map((spec: SpecificationWithFunction) => {
-      for (const functionArg of spec.function.arguments) {
-        if (functionArg.type.kind === 'object' && functionArg.type.schema) {
-          assignUnresolvedRefsToPolySchemaRefObj(functionArg.type.schema, functionArg.type.unresolvedPolySchemaRefs);
-        } else if (functionArg.type.kind === 'object' && functionArg.type.properties) {
-          for (const property of functionArg.type.properties) {
-            if (property.type.kind === 'object') {
-              assignUnresolvedRefsToPolySchemaRefObj(property.type.schema, functionArg.type.unresolvedPolySchemaRefs);
-            }
-          }
-        }
-      }
-
-      if (spec.function.returnType.kind === 'object' && spec.function.returnType.schema) {
-        assignUnresolvedRefsToPolySchemaRefObj(spec.function.returnType.schema, spec.function.returnType.unresolvedPolySchemaRefs);
-      }
-
+      assignUnresolvedRefsRecursive(spec.function);
       return spec;
     }),
     'Poly',
