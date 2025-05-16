@@ -9,10 +9,16 @@ import {
 import { echoGenerationError } from '../../utils';
 import { setGenerationErrors } from './types';
 
-const formatName = (name: string, nested = false) => {
-  if (nested) return name.includes('-') ? `'${name}'` : name;
-  return toPascalCase(name);
-};
+const unsafeCharacters = /(?:^\d)|[^0-9a-zA-Z_]/gi;
+const unescapedSingleQuote = /\b'\b/gi;
+
+const wrapUnsafeNames = (name: string) => {
+  if (!name.match(unsafeCharacters)) return name;
+  if (name.includes('\'')) name = name.replaceAll(unescapedSingleQuote, '\'');
+  return `'${name}'`
+}
+
+const formatName = (name: string, nested = false) => wrapUnsafeNames(nested ? name : toPascalCase(name));
 
 type JsonSchemaType =
   | 'string'
@@ -573,6 +579,7 @@ export const generateSchemaTSDeclarationFiles = async (libPath: string, specs: S
 };
 
 export const __test = {
+  formatName,
   printComment,
   printSchemaAsType,
   buildSchemaTree,

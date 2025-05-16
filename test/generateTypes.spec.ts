@@ -1,10 +1,20 @@
 import { EOL } from 'node:os';
 import { JsonSchema, SchemaSpec, __test } from '../src/commands/generate/schemaTypes';
 
-const { printSchemaAsType, printComment, buildSchemaTree, printSchemaSpecs } = __test;
+const {
+  formatName,
+  printSchemaAsType,
+  printComment,
+  buildSchemaTree,
+  printSchemaSpecs
+} = __test;
 
 // Utility to make creating multiline strings in more precise way than is possible with template literal strings
 const multiline = (...lines: string[]) => lines.join(EOL);
+
+type Foo = {
+  '123Abc': string;
+}
 
 describe('Generate types from specs', () => {
 
@@ -63,6 +73,27 @@ describe('Generate types from specs', () => {
       expect(printComment('This is a comment!\n\n  And here are more details!\n  And a few more where that came from!', 0, true)).toEqual(expected);
     });
   });
+
+  test.only('formatName', () => {
+    expect(formatName('Abc')).toBe('Abc');
+    expect(formatName('Abc', true)).toBe('Abc');
+    expect(formatName('AbcDef')).toBe('AbcDef');
+    expect(formatName('AbcDef', true)).toBe('AbcDef');
+    expect(formatName('abc')).toBe('Abc');
+    expect(formatName('abc', true)).toBe('abc');
+    expect(formatName('a b c')).toBe('ABC');
+    expect(formatName('a b c', true)).toBe('\'a b c\'');
+    expect(formatName('a-b-c')).toBe('ABC');
+    expect(formatName('a-b-c', true)).toBe('\'a-b-c\'');
+    expect(formatName('@abc')).toBe('Abc');
+    expect(formatName('@abc', true)).toBe('\'@abc\'');
+    expect(formatName('_abc')).toBe('Abc');
+    expect(formatName('_abc', true)).toBe('_abc');
+    expect(formatName('123abc')).toBe('\'123abc\'');
+    expect(formatName('123abc', true)).toBe('\'123abc\'');
+    expect(formatName('abc123')).toBe('Abc123');
+    expect(formatName('abc123', true)).toBe('abc123');
+  })
 
   describe('printSchemaAsType', () => {
 
