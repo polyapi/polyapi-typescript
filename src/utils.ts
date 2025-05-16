@@ -12,7 +12,7 @@ import { INSTANCE_URL_MAP } from './constants';
 
 export const getPolyLibPath = (polyPath: string) => polyPath.startsWith('/')
   ? `${polyPath}/lib`
-  : `${__dirname}/../../../../../${polyPath}/lib`;
+  : `${__dirname}/../../../${polyPath}/lib`;
 
 export const getContextDataFileContent = (libPath: string) => {
   try {
