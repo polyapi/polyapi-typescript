@@ -22,17 +22,25 @@ const functions = [
 ];
 
 // Create MTLS agent if paths are provided
-const createHttpsAgent = () => {
+let httpsAgent = undefined;
+const getHttpsAgent = () => {
+  if (httpsAgent) {
+    return httpsAgent;
+  }
+
   const { mtls } = env;
   if (!mtls.certPath || !mtls.keyPath || !mtls.caPath) {
     return undefined;
   }
-  return new https.Agent({
+
+  httpsAgent = new https.Agent({
     cert: fs.readFileSync(mtls.certPath),
     key: fs.readFileSync(mtls.keyPath),
     ca: fs.readFileSync(mtls.caPath),
     rejectUnauthorized: mtls.rejectUnauthorized,
   });
+
+  return httpsAgent;
 };
 
 module.exports = (clientID, polyCustom) => merge(
@@ -42,7 +50,7 @@ module.exports = (clientID, polyCustom) => merge(
       acc,
       path,
       (...args) => {
-        const requestStartTime = Date.now();
+        const requestServerStartTime = Date.now();
         const requestArgs = argKeys.reduce((acc, key, index) => ({ ...acc, [key]: args[index] }), {});
         
         // Check if direct execution is enabled
@@ -50,9 +58,11 @@ module.exports = (clientID, polyCustom) => merge(
         
         if (directExecute === true) {
           // Make direct API call
-          const httpsAgent = createHttpsAgent();
 
           let polyHeaders;
+          let serverPreperationTimeMs;
+          let roundTripServerNetworkLatencyMs;
+          let requestApiStartTime;
 
           return axios.post(
             `/functions/api/${id}/direct-execute?clientId=${clientID}`,
@@ -67,6 +77,13 @@ module.exports = (clientID, polyCustom) => merge(
             if (data && (data.status < 200 || data.status >= 300)) {
               console.error('Error getting direct execution data for api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', data.data);
             }
+
+            serverPreperationTimeMs = Number(polyHeaders['x-poly-execution-duration']);
+            roundTripServerNetworkLatencyMs = Date.now() - requestServerStartTime - serverPreperationTimeMs;
+
+            requestApiStartTime = Date.now();
+            const httpsAgent = getHttpsAgent();
+
             return axios({
               ...data,
               headers: {
@@ -78,15 +95,15 @@ module.exports = (clientID, polyCustom) => merge(
             if (status && (status < 200 || status >= 300)) {
               console.error('Error direct executing api function with id:', id, 'Status code:', status, 'Request data:', requestArgs, 'Response data:', data.data);
             }
-            const serverExecutionTimeMs = Number(polyHeaders['x-poly-execution-duration']);
-            const roundTripNetworkLatencyMs = Date.now() - requestStartTime - serverExecutionTimeMs;
+            const apiExecutionTimeMs = Date.now() - requestApiStartTime;
             return {
               data: data,
               status: status,
               headers: { ...headers },
               metrics: {
-                roundTripNetworkLatencyMs,
-                serverExecutionTimeMs,
+                roundTripServerNetworkLatencyMs,
+                serverPreperationTimeMs,
+                apiExecutionTimeMs,
               }
             };
           });
@@ -108,7 +125,7 @@ module.exports = (clientID, polyCustom) => merge(
             console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', data.data);
           }
           const serverExecutionTimeMs = Number(headers['x-poly-execution-duration']);
-          const roundTripNetworkLatencyMs = Date.now() - requestStartTime - serverExecutionTimeMs;
+          const roundTripNetworkLatencyMs = Date.now() - requestServerStartTime - serverExecutionTimeMs;
           return {
             ...data,
             metrics: {
