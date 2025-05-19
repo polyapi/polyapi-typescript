@@ -95,7 +95,9 @@ module.exports = (clientID, polyCustom) => merge(
         // default indirect execution
         return axios.post(
           `/functions/api/${id}/execute?clientId=${clientID}`,
-          requestArgs,
+          {
+            ...requestArgs,
+          },
           {
             headers: {
               'x-poly-execution-id': polyCustom.executionId,
