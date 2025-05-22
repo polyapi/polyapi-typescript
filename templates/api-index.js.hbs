@@ -32,7 +32,7 @@ module.exports = (clientID, polyCustom) => merge(
             let responseData = data.data;
             try {
               responseData = JSON.stringify(data.data);
-            }
+            } catch (err) {}
             console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', responseData);
           }
           const serverExecutionTimeMs = Number(headers['x-poly-execution-duration']);
