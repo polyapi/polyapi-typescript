@@ -73,7 +73,7 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
     ignoreMinAndMaxItems: true,
     unknownAny: options.unknownAny,
     customName(innerSchema, keyNameFromDefinition) {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
+       
       const ref = innerSchema['x-poly-ref'] as (SchemaRef & { 'x-unresolved'?: true }) | undefined;
 
       if (ref !== null && typeof ref === 'object' && !Array.isArray(ref)) {

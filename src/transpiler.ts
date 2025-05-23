@@ -2,9 +2,8 @@ import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
 import ts from 'typescript';
-import * as TJS from 'typescript-json-schema';
-import { SymbolRef } from 'typescript-json-schema';
 import path from 'path';
+import { createGenerator } from 'ts-json-schema-generator';
 import {
   DeployableRecord,
   DeployableTsTypeToName,
@@ -14,8 +13,6 @@ import {
   getDeployableFileRevision,
   ParsedDeployableConfig,
 } from './deployables';
-import os from 'os';
-import crypto from 'crypto';
 
 // NodeJS built-in libraries + polyapi
 // https://www.w3schools.com/nodejs/ref_modules.asp
@@ -67,11 +64,6 @@ export const getTSConfig = () => {
 };
 
 export const getTSBaseUrl = (config = getTSConfig()) => config.compilerOptions?.baseUrl || undefined;
-
-interface SchemaDef {
-  schema: Record<string, any>;
-  typeParameterVariations?: Record<string, string>[];
-}
 
 const loadTsSourceFile = (filePath: string): ts.SourceFile => {
   const fileContent = fs.readFileSync(filePath, 'utf8');
@@ -164,239 +156,6 @@ export const getDependencies = (code: string, fileName: string, baseUrl: string 
 
   return dependencies;
 };
-
-export const generateTypeSchemas = (fileName: string, baseUrl: string | undefined, ignoredTypeNames?: string[]): { [typeName: string]: any } => {
-  const compilerOptions: ts.CompilerOptions = {
-    allowJs: true,
-    lib: ['es2015'],
-    baseUrl,
-  };
-  const sourceFile = loadTsSourceFile(fileName);
-  const program = ts.createProgram(
-    [fileName],
-    compilerOptions,
-  );
-  const schemaDefs: { [typeName: string]: SchemaDef } = {};
-  const settings: TJS.PartialArgs = {
-    required: true,
-    noExtraProps: true,
-    ignoreErrors: true,
-    strictNullChecks: true,
-  };
-  const generator = TJS.buildGenerator(program, settings);
-
-  /**
-   * This functions looks for the type declaration by priority and replaces the data in generator,
-   * so the correct schema is generated.
-   *
-   * @param typeName
-   * @param symbolRefs
-   */
-  const consolidateGeneratorSymbolType = (typeName: string, symbolRefs: SymbolRef[]) => {
-    const tryConsolidationByFile = (fileName: string) => {
-      const symbolRef = symbolRefs.find(symbolRef => {
-        return symbolRef.symbol.declarations.some(declaration => declaration.getSourceFile().fileName.includes(fileName));
-      });
-
-      if (symbolRef) {
-        const declaredType = program.getTypeChecker().getDeclaredTypeOfSymbol(symbolRef.symbol);
-        if (declaredType) {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore hack to replace the symbol with the preferred one
-          generator.allSymbols[typeName] = declaredType;
-          return true;
-        }
-      }
-
-      return false;
-    };
-
-    if (tryConsolidationByFile(fileName)) {
-      return;
-    }
-
-    tryConsolidationByFile('/node_modules/.poly/');
-  };
-
-  const isInnerFunctionNode = (node: ts.Node) => {
-    let parent = node.parent;
-    let insideBlock = false;
-    while (parent) {
-      if (parent.kind === ts.SyntaxKind.Block) {
-        insideBlock = true;
-      } else if (parent.kind === ts.SyntaxKind.FunctionDeclaration && insideBlock) {
-        return true;
-      }
-      parent = parent.parent;
-    }
-    return false;
-  };
-
-  const visitor = (node: ts.Node) => {
-    if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
-      // create a temporary combined type to get the schema for the union/intersection
-      const combinedTypeName = 'CombinedTempType';
-      const typeName = node.getText();
-      if (ignoredTypeNames?.includes(typeName)) {
-        return;
-      }
-
-      const tempSource = `type ${combinedTypeName} = ${typeName};`;
-      const tempDir = os.tmpdir();
-      const tempFilePath = path.join(tempDir, `${crypto.randomBytes(16).toString('hex')}.ts`);
-      fs.writeFileSync(tempFilePath, tempSource);
-
-      try {
-        const tempCombinedTypeProgram = ts.createProgram(
-          [fileName, tempFilePath],
-          compilerOptions,
-        );
-
-        let schema = TJS.generateSchema(tempCombinedTypeProgram, combinedTypeName, settings, undefined, TJS.buildGenerator(tempCombinedTypeProgram, settings));
-        if (schema) {
-          const hasVoidType = node.types.some(type => type.getText() === 'void');
-          if (hasVoidType && ts.isUnionTypeNode(node)) {
-            // Check if the union contains 'void' type and if so, add nullable type to the schema
-            if (schema.anyOf) {
-              schema.anyOf.push({ type: 'null' });
-            } else {
-              schema = {
-                $schema: schema.$schema,
-                anyOf: [
-                  { ...schema, $schema: undefined },
-                  { type: 'null' },
-                ],
-              };
-            }
-          }
-
-          schemaDefs[typeName] = {
-            schema,
-            typeParameterVariations: [],
-          };
-        }
-      } finally {
-        fs.unlinkSync(tempFilePath);
-      }
-    }
-
-    if (ts.isTypeReferenceNode(node) && !isInnerFunctionNode(node)) {
-      const typeName = node.typeName.getText();
-
-      if (ignoredTypeNames?.includes(typeName)) {
-        return;
-      }
-
-      const symbolRefs = generator.getSymbols(typeName);
-      const isGenericType = node.typeArguments?.length > 0;
-      if (!symbolRefs.length) {
-        // not a reference to a type
-        return;
-      }
-
-      consolidateGeneratorSymbolType(typeName, symbolRefs);
-
-      const typeParameterVariations = schemaDefs[typeName]?.typeParameterVariations || [];
-
-      if (isGenericType) {
-        const symbolRef = symbolRefs[0];
-        const typeParameters = [];
-
-        if (typeParameters.length === 0 && symbolRef) {
-          // read type parameters from declaration
-          symbolRef.symbol.declarations.forEach(declaration => {
-            if (ts.isTypeAliasDeclaration(declaration) || ts.isInterfaceDeclaration(declaration) || ts.isClassDeclaration(declaration)) {
-              if (declaration.parent && ts.isSourceFile(declaration.parent) && declaration.parent.hasNoDefaultLib) {
-                // skipping, this is a default lib
-                return;
-              }
-              typeParameters.push(...declaration.typeParameters?.map(typeParameter => typeParameter.name.text) || []);
-            }
-          });
-        }
-
-        if (typeParameters.length) {
-          const parameterSchemaTypes: Record<string, string> = {};
-
-          typeParameters.forEach((typeParameter, index) => {
-            const typeArgument = node.typeArguments[index];
-            if (typeArgument) {
-              parameterSchemaTypes[typeParameter] = typeArgument.getText();
-            }
-          });
-
-          typeParameterVariations.push(parameterSchemaTypes);
-        }
-      }
-
-      const schema = schemaDefs[typeName]?.schema || TJS.generateSchema(program, typeName, settings, undefined, generator);
-      if (schema) {
-        schemaDefs[typeName] = {
-          schema,
-          typeParameterVariations,
-        };
-      }
-    }
-
-    ts.forEachChild(node, visitor);
-  };
-
-  ts.forEachChild(sourceFile, visitor);
-
-  enhanceWithParameterTypeSchemas(schemaDefs);
-
-  return extractSchemas(schemaDefs);
-};
-
-const enhanceWithParameterTypeSchemas = (schemaDefs: Record<string, SchemaDef>) => {
-  Object.keys(schemaDefs)
-    .forEach(typeName => {
-      const schemaDef = schemaDefs[typeName];
-      const typeVariations = schemaDef.typeParameterVariations;
-
-      if (!typeVariations.length) {
-        return;
-      }
-      typeVariations.forEach(typeVariation => {
-        const typeParameters = Object.keys(typeVariation); // e.g. <T, S>
-        if (!typeParameters.length) {
-          return;
-        }
-        const parameterTypes = `${Object.values(typeVariation).join(', ')}`;
-        const updatedDefinitions = {
-          ...schemaDef.schema.definitions,
-          ...typeParameters.reduce((acc, typeParameter) => {
-            const typeParameterSchemaDef = schemaDefs[typeVariation[typeParameter]];
-
-            return ({
-              ...acc,
-              ...typeParameterSchemaDef?.schema.definitions,
-              [typeParameter]: {
-                ...typeParameterSchemaDef?.schema,
-                $schema: undefined,
-                definitions: undefined,
-              },
-            });
-          }, {}),
-        };
-
-        schemaDefs[`${typeName}<${parameterTypes}>`] = {
-          schema: {
-            ...schemaDef.schema,
-            definitions: updatedDefinitions,
-          },
-        };
-      });
-    });
-};
-
-const extractSchemas = (schemaDefs: Record<string, SchemaDef>) => Object.keys(schemaDefs)
-  .reduce((acc, typeName) => {
-    return {
-      ...acc,
-      [typeName]: schemaDefs[typeName].schema,
-    };
-  }, {});
 
 export const parseDeployComment = (comment: string): Deployment => {
   // Poly deployed @ 2024-08-29T22:46:46.791Z - test.weeklyReport - https://develop-k8s.polyapi.io/canopy/polyui/collections/server-functions/f0630f95-eac8-4c7d-9d23-639d39034bb6 - e3b0c44
@@ -583,7 +342,7 @@ const parseDeployableFunction = (sourceFile: ts.SourceFile, polyConfig: ParsedDe
   const [deployments, deploymentCommentRanges] = getDeployComments(sourceFile);
   const functionDetails = getFunctionDetails(sourceFile, polyConfig.name);
   const dependencies = getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl);
-  const typeSchemas = generateTypeSchemas(sourceFile.fileName, baseUrl, DeployableTypeEntries.map(d => d[0]));
+  const typeSchemas = generateTypeSchemas(sourceFile.fileName, DeployableTypeEntries.map(d => d[0]));
   return {
     ...polyConfig,
     ...functionDetails,
@@ -628,4 +387,92 @@ export const parseDeployable = async (filePath: string, baseUrl: string, gitRevi
     console.error(`Prepared ${polyConfig.type.replaceAll('-', ' ')} ${polyConfig.context}.${polyConfig.name}: ERROR`);
     console.error(err);
   }
+};
+
+const getFunctionTypes = (filePath: string, functionName: string): {
+  argumentTypes: string[];
+  returnType: string | null;
+} => {
+  const program = ts.createProgram([filePath], {
+    target: ts.ScriptTarget.ESNext,
+    module: ts.ModuleKind.CommonJS,
+  });
+
+  const sourceFile = program.getSourceFile(filePath);
+  if (!sourceFile) throw new Error(`Could not load file: ${filePath}`);
+
+  const result = {
+    argumentTypes: [] as string[],
+    returnType: null as string | null,
+  };
+
+  const visit = (node: ts.Node) => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text) {
+      result.argumentTypes = node.parameters.map(param =>
+        param.type?.getText(sourceFile) ?? 'any'
+      );
+      if (node.type) {
+        result.returnType = node.type.getText(sourceFile);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return result;
+};
+
+const dereferenceRoot = (schema: any): any => {
+  if (!schema || !schema.$ref || !schema.definitions) return schema;
+
+  const match = schema.$ref.match(/^#\/definitions\/(.+)$/);
+  if (!match) return schema;
+
+  const defName = match[1];
+  const root = schema.definitions[defName];
+  if (!root) return schema;
+
+  const { definitions, $schema, ...rest } = schema;
+  return {
+    ...root,
+    definitions,
+    $schema,
+    ...rest,
+  };
+};
+
+export const generateTypeSchemas = (
+  filePath: string,
+  ignoredTypeNames: string[] = [],
+): Record<string, any> => {
+  const tsconfigPath = path.resolve('tsconfig.json');
+  const functionName = path.basename(filePath, '.ts');
+  const { argumentTypes, returnType } = getFunctionTypes(filePath, functionName);
+  const typeNames = [...argumentTypes, returnType].filter(Boolean) as string[];
+
+  const output: Record<string, any> = {};
+
+  for (const typeName of typeNames) {
+    if (ignoredTypeNames.includes(typeName)) continue;
+
+    try {
+      const generator = createGenerator({
+        path: filePath,
+        tsconfig: tsconfigPath,
+        type: typeName,
+        expose: 'all',
+        topRef: true,
+        skipTypeCheck: true,
+      });
+
+      const schema = generator.createSchema(typeName);
+      output[typeName] = dereferenceRoot(schema);
+    } catch (err: any) {
+      if (!/No root type.*found/.test(err.message)) {
+        console.warn(`⚠️ Error generating schema for "${typeName}":`, err.message);
+      }
+    }
+  }
+
+  return output;
 };

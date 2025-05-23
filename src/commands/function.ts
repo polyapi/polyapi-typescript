@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
+ 
 import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
@@ -56,7 +56,7 @@ export const addOrUpdateCustomFunction = async (
       }
     }
 
-    const typeSchemas = generateTypeSchemas(file, tsConfigBaseUrl, DeployableTypeEntries.map(d => d[0]));
+    const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]));
 
     if (server) {
       shell.echo('-n', `${updating ? 'Updating' : 'Adding'} custom server side function...`);
