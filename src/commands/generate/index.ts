@@ -66,6 +66,16 @@ const prepareDir = async (polyPath: string) => {
   }
 };
 
+const getExecutionConfig = () => ({
+  directExecute: process.env.API_FUNCTION_DIRECT_EXECUTE === 'true',
+  mtls: {
+    certPath: process.env.MTLS_CERT_PATH,
+    keyPath: process.env.MTLS_KEY_PATH,
+    caPath: process.env.MTLS_CA_PATH,
+    rejectUnauthorized: process.env.NODE_ENV !== 'development',
+  },
+});
+
 const generateRedirectIndexFiles = async (polyPath: string) => {
   const defaultPolyLib = getPolyLibPath(DEFAULT_POLY_PATH);
 
@@ -156,6 +166,7 @@ const generateApiFunctionJSFiles = async (libPath: string, specifications: ApiFu
     `${libPath}/api/index.js`,
     template({
       specifications,
+      executionConfig: getExecutionConfig(),
     }),
   );
 };
