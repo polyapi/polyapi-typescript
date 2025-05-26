@@ -14,7 +14,7 @@ import {
   WebhookHandleSpecification,
 } from '../../types';
 import { getSpecs } from '../../api';
-import { loadConfig } from '../../config';
+import { loadConfig, addOrUpdateConfig } from '../../config';
 import {
   generateContextDataFile,
   getContextDataFileContent,
@@ -393,6 +393,9 @@ const generate = async ({
 
   try {
     specs = await getSpecs(contexts, names, functionIds, noTypes);
+    if (contexts) {
+      addOrUpdateConfig(polyPath, 'LAST_GENERATE_CONTEXTS_USED', contexts?.join(','));
+    }
   } catch (error) {
     showErrGettingSpecs(error);
     return;
