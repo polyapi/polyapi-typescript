@@ -40,11 +40,7 @@ export default [
     rules: {
       ...tseslint.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_'
-      }],
+      '@typescript-eslint/no-unused-vars': 'off',
       'no-var': 'warn',
       'object-shorthand': ['warn', 'properties'],
       'accessor-pairs': ['error', { setWithoutGet: true, enforceForClassMembers: true }],
@@ -219,6 +215,67 @@ export default [
       'no-with': 'error',
       'object-curly-newline': ['error', { multiline: true, consistent: true }],
       'object-curly-spacing': ['error', 'always'],
+      'object-property-newline': ['error', { allowMultiplePropertiesPerLine: true }],
+      'one-var': ['error', { initialized: 'never' }],
+      'operator-linebreak': ['error', 'after', { overrides: { '?': 'before', ':': 'before', '|>': 'before' } }],
+      'padded-blocks': ['error', { blocks: 'never', switches: 'never', classes: 'never' }],
+      'prefer-const': ['error', { destructuring: 'all' }],
+      'prefer-promise-reject-errors': 'error',
+      'prefer-regex-literals': ['error', { disallowRedundantWrapping: true }],
+      'quote-props': ['error', 'as-needed'],
+      'quotes': ['error', 'single', { avoidEscape: true, allowTemplateLiterals: false }],
+      'rest-spread-spacing': ['error', 'never'],
+      'semi': ['error', 'always'],
+      'semi-spacing': ['error', { before: false, after: true }],
+      'space-before-blocks': ['error', 'always'],
+      'space-before-function-paren': ['error', {
+        'anonymous': 'always',
+        'named': 'never',
+        'asyncArrow': 'always',
+      }],
+      'space-in-parens': ['error', 'never'],
+      'space-infix-ops': 'error',
+      'space-unary-ops': ['error', { words: true, nonwords: false }],
+      'spaced-comment': ['error', 'always', {
+        line: { markers: ['*package', '!', '/', ',', '='] },
+        block: { balanced: true, markers: ['*package', '!', ',', ':', '::', 'flow-include'], exceptions: ['*'] },
+      }],
+      'symbol-description': 'error',
+      'template-curly-spacing': ['error', 'never'],
+      'template-tag-spacing': ['error', 'never'],
+      'unicode-bom': ['error', 'never'],
+      'use-isnan': ['error', {
+        enforceForSwitchCase: true,
+        enforceForIndexOf: true,
+      }],
+      'valid-typeof': ['error', { requireStringLiterals: true }],
+      'wrap-iife': ['error', 'any', { functionPrototypeMethods: true }],
+      'yield-star-spacing': ['error', 'both'],
+      '@typescript-eslint/interface-name-prefix': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/naming-convention': [
+        'error',
+        {
+          'selector': [
+            'classProperty',
+            'typeProperty',
+            'classMethod',
+            'objectLiteralMethod',
+            'typeMethod',
+            'accessor',
+            'enumMember'
+          ],
+          'format': ['strictCamelCase'],
+          'modifiers': ['requiresQuotes'],
+          'filter': {
+            'regex': '^(x-poly-ref|x-unresolved)$',
+            'match': false
+          }
+        }
+      ],
+
     },
     settings: {},
   },
