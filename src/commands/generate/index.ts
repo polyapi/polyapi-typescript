@@ -393,9 +393,14 @@ const generate = async ({
 
   try {
     specs = await getSpecs(contexts, names, functionIds, noTypes);
+
+    let lastUsedContexts = '';
+
     if (contexts) {
-      addOrUpdateConfig(polyPath, 'LAST_GENERATE_CONTEXTS_USED', contexts?.join(','));
+      lastUsedContexts = contexts?.join(',');
     }
+
+    addOrUpdateConfig(polyPath, 'LAST_GENERATE_CONTEXTS_USED', lastUsedContexts);
   } catch (error) {
     showErrGettingSpecs(error);
     return;
