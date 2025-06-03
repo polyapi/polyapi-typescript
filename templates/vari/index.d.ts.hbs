@@ -6,7 +6,7 @@ declare module vari {
   type UnregisterOnUpdateHandler = () => void;
   interface VariableChangeEvent<T> {
     type: 'update' | 'delete';
-    secret: boolean;
+    secrecy: 'SECRET' | 'OBSCURED' | 'NONE';
     id: string;
     previousValue: T;
     /**
@@ -18,7 +18,7 @@ declare module vari {
      * User ID or Application ID of the user or application that updated the variable.
      */
     updatedBy: string;
-    updatedFields: ('value' | 'secret')[];
+    updatedFields: ('value' | 'secrecy')[];
   };
   interface VariableUpdateResponse<T> {
     data: {
@@ -27,7 +27,7 @@ declare module vari {
       name: string;
       description: string;
       visibility: 'ENVIRONMENT' | 'TENANT' | 'PUBLIC';
-      secret: boolean;
+      secrecy: 'SECRET' | 'OBSCURED' | 'NONE';
       value?: T
     }
     status: number;
@@ -40,9 +40,9 @@ declare module vari {
      */
     type?: 'update' | 'delete';
     /**
-     * Filter updates by secret or non-secret variables
+     * Filter updates by secrecy level
      */
-    secret?: boolean;
+    secrecy?: 'SECRET' | 'OBSCURED' | 'NONE';
   };
 
   interface Vari {

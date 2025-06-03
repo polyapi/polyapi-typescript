@@ -230,7 +230,7 @@ void yargs
           return;
         }
         const { addOrUpdateCustomFunction } = await import('./commands/function');
-        await addOrUpdateCustomFunction(DEFAULT_POLY_PATH, context, name, description, file, server, logsEnabled, generateContexts, executionApiKey);
+        await addOrUpdateCustomFunction(DEFAULT_POLY_PATH, context, name, description, file, client, server, logsEnabled, generateContexts, executionApiKey);
       },
     );
   })

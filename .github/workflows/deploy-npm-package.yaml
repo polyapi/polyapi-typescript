@@ -1,0 +1,51 @@
+name: Docker Image & NPM publish CI/CD
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  develop:
+    name: Build and deploy NPM package.
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      packages: write
+
+    if: ${{ github.ref == 'refs/heads/develop' }}
+
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # 4.0.2
+      with:
+        node-version: '20'
+        registry-url: 'https://registry.npmjs.org'
+        cache: 'npm'
+
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          client:
+            - 'package.json'
+
+    - if: steps.changes.outputs.client == 'true'
+      name: Publish package
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        echo $VERSION
+        REMOTEVERSION=$(npm view polyapi --json | jq -r '.["dist-tags"].develop')
+        echo $REMOTEVERSION
+
+        if [[ "$VERSION" == "$REMOTEVERSION" ]]; then
+          echo "Local NPM version is the same as remote"
+        else
+          npm install --include=dev
+          npm publish --tag develop
+        fi

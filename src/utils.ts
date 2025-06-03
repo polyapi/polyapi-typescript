@@ -12,7 +12,7 @@ import { INSTANCE_URL_MAP } from './constants';
 
 export const getPolyLibPath = (polyPath: string) => polyPath.startsWith('/')
   ? `${polyPath}/lib`
-  : `${__dirname}/../../../../../${polyPath}/lib`;
+  : `${__dirname}/../../../${polyPath}/lib`;
 
 export const getContextDataFileContent = (libPath: string) => {
   try {
@@ -260,7 +260,7 @@ export const iterateRefs = (schema: any, cb: (schema: any) => any, refIdentifier
 
 export const getContextData = (
   specs: Specification[] | Record<string, unknown>,
-  collectTypesUnder?: Partial<Record<SpecificationType, string>>
+  collectTypesUnder?: Partial<Record<SpecificationType, string>>,
 ) => {
   const contextData = {} as Record<string, any>;
 
@@ -278,7 +278,6 @@ export const getContextData = (
 };
 
 export const toTypeDeclaration = (type: PropertyType, synchronous = true) => {
-
   const wrapInPromiseIfNeeded = (code: string) => (synchronous ? code : `Promise<${code}>`);
   switch (type.kind) {
     case 'plain':

@@ -73,3 +73,25 @@ You should see "HELLO WORLD" at the bottom of the README!
 ## Conclusion
 
 That's it! Happy hacking!
+
+# PolyAPI TypeScript/JavaScript Client
+
+## Adding a new kind of deployable for `poly prepare` and `poly sync`
+
+1. Update user-facing typedef exports in `types.ts` to add a new type and any custom configuration it might have. Follow the existing naming convention: `PolyThing`.
+
+2. Update typedefs in `src/deployments.ts`.
+
+   a. Add type to DeployableTypes (matching collection id as used in canopy collection url).
+
+   b. Add type to DeployableTypeNames matching the type added in the `types.ts` file.
+
+   c. Add entry to DeployableTypeEntries mapping the new DeployableTypeName to the new DeployableType
+
+3. Update transpiler to support the new type and add a function if you need to parse more than the type and config object. See `parseDeployable` in `src/transpiler.ts`.
+
+4. Add function to write this new type of deployable back to its source file. See `writeUpdatedDeployable` in `src/deployments.ts`.
+
+5. Update poly prepare to support filling in missing details for this new type. See `fillInMissingDetails` in `src/commands/prepare.ts`.
+
+6. Update poly sync to support syncing and removing this new type. See `syncDeployableAndGetId` and `removeDeployable`  in `src/commands/sync.ts`.

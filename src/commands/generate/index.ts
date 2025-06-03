@@ -14,7 +14,7 @@ import {
   WebhookHandleSpecification,
 } from '../../types';
 import { getSpecs } from '../../api';
-import { loadConfig } from '../../config';
+import { loadConfig, addOrUpdateConfig } from '../../config';
 import {
   generateContextDataFile,
   getContextDataFileContent,
@@ -32,6 +32,8 @@ import { DEFAULT_POLY_PATH } from '../../constants';
 import { generateFunctionsTSDeclarationFile, generateVariablesTSDeclarationFile, getGenerationErrors, setGenerationErrors } from './types';
 import { generateSchemaTSDeclarationFiles } from './schemaTypes';
 
+// Register the eq helper for equality comparison
+handlebars.registerHelper('eq', (a, b) => a === b);
 
 const fsWriteAsync = (file: PathOrFileDescriptor, data: string) =>
   new Promise<void>((resolve, reject) => {
@@ -63,6 +65,16 @@ const prepareDir = async (polyPath: string) => {
     }
   }
 };
+
+const getExecutionConfig = () => ({
+  directExecute: process.env.API_FUNCTION_DIRECT_EXECUTE === 'true',
+  mtls: {
+    certPath: process.env.MTLS_CERT_PATH,
+    keyPath: process.env.MTLS_KEY_PATH,
+    caPath: process.env.MTLS_CA_PATH,
+    rejectUnauthorized: process.env.NODE_ENV !== 'development',
+  },
+});
 
 const generateRedirectIndexFiles = async (polyPath: string) => {
   const defaultPolyLib = getPolyLibPath(DEFAULT_POLY_PATH);
@@ -154,6 +166,7 @@ const generateApiFunctionJSFiles = async (libPath: string, specifications: ApiFu
     `${libPath}/api/index.js`,
     template({
       specifications,
+      executionConfig: getExecutionConfig(),
     }),
   );
 };
@@ -303,7 +316,7 @@ const showErrGeneratingFiles = (error: any) => {
   shell.exit(2);
 };
 
-const generateSingleCustomFunction = async (polyPath: string, functionId: string, updated: boolean, noTypes: boolean = false) => {
+const generateSingleCustomFunction = async (polyPath: string, functionId: string, updated: boolean, noTypes = false) => {
   shell.echo('-n', updated ? 'Regenerating TypeScript SDK...' : 'Generating TypeScript SDK...');
 
   const libPath = getPolyLibPath(polyPath);
@@ -380,6 +393,14 @@ const generate = async ({
 
   try {
     specs = await getSpecs(contexts, names, functionIds, noTypes);
+
+    let lastUsedContexts = '';
+
+    if (contexts) {
+      lastUsedContexts = contexts?.join(',');
+    }
+
+    addOrUpdateConfig(polyPath, 'LAST_GENERATE_CONTEXTS_USED', lastUsedContexts);
   } catch (error) {
     showErrGettingSpecs(error);
     return;

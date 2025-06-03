@@ -1,5 +1,5 @@
-import { LifecycleState, Visibility } from "./shared";
-import { SchemaRef } from "./specifications";
+import { LifecycleState, Visibility } from './shared';
+import { SchemaRef } from './specifications';
 
 export interface FunctionBasicDto {
   id: string;
@@ -44,7 +44,7 @@ export interface FunctionArgument {
   unresolvedPolySchemaRefs?: SchemaRef[];
 }
 
-export interface FunctionArgumentDto extends Omit<FunctionArgument, 'location' | 'typeObject'> {};
+export type FunctionArgumentDto = Omit<FunctionArgument, 'location' | 'typeObject'>;
 
 export interface FunctionDetailsDto extends FunctionBasicDto {
   ownerUserId?: string | null;
@@ -57,7 +57,6 @@ export interface FunctionDetailsDto extends FunctionBasicDto {
    */
   unresolvedReturnTypePolySchemaRefs?: SchemaRef[];
 }
-
 
 export interface EntrySource {
   key: string;
@@ -150,11 +149,6 @@ export interface ApiFunctionDetailsDto extends FunctionDetailsDto {
   enabledRedirect: boolean;
 }
 
-export interface ArgumentSerializationDto {
-  style?: string;
-  explode?: boolean;
-}
-
 export interface ArgumentsMetadataDto {
     name: string;
     description?: string;
@@ -185,7 +179,6 @@ export interface CreateApiFunctionDto {
   ownerUserId?: string;
 }
 
-
 export interface ApiFunctionDescriptionGenerationDto {
   name: string;
   context: string;
@@ -207,7 +200,6 @@ export interface ExecuteApiFunctionDescriptionGenerationDto {
   arguments: ArgumentsMetadataDto[];
   source: CreateSourceDto;
 }
-
 
 export interface CreateServerCustomFunctionResponseDto extends FunctionDetailsDto {
   traceId?: string;

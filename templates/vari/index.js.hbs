@@ -27,7 +27,7 @@ function getStringPath(pathParts) {
 
 const variables = [
 {{#each specifications}}
-  ['{{#if context}}{{context}}.{{/if}}{{name}}', '{{id}}', {{variable.secret}}],
+  ['{{#if context}}{{context}}.{{/if}}{{name}}', '{{id}}', '{{variable.secrecy}}'],
 {{/each}}
 ];
 
@@ -41,10 +41,10 @@ const contextPaths = [
 
 const getVariableHandlers = (clientID, getSocket, getApiKey) => {
   const variableHandlers = {};
-  variables.forEach(([contextPath, id, secret]) => {
+  variables.forEach(([contextPath, id, secrecy]) => {
     set(variableHandlers, contextPath, {
       get: () => {
-        if (secret) {
+        if (secrecy === 'SECRET') {
           throw new Error('Cannot access secret variable from client. Use .inject() instead within Poly function.');
         } else {
           return axios.get(
@@ -145,7 +145,7 @@ const getVariableHandlers = (clientID, getSocket, getApiKey) => {
 
             if (prop.match(/\d+/)) {
 
-                if (secret) {
+                if (secrecy === 'SECRECY') {
                   pathParts.push(Number(prop));
                 } else if (paths.find(currentPath => {
                   const arrContextPath = contextPath.split('.');
