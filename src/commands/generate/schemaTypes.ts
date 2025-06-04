@@ -18,7 +18,10 @@ const wrapUnsafeNames = (name: string) => {
   return `'${name}'`;
 };
 
-const formatName = (name: string, nested = false) => wrapUnsafeNames(nested ? name : toPascalCase(name));
+const formatName = (name: string, nested = false) =>
+  name === '[k: string]'
+    ? name
+    : wrapUnsafeNames(nested ? name : toPascalCase(name));
 
 type JsonSchemaType =
   | 'string'
@@ -62,6 +65,7 @@ export type JsonSchema = {
   nullable?: boolean;
   enum?: ConstValueT[];
   const?: ConstValueT;
+  definitions?: Record<string, JsonSchema>;
   [k: string]: unknown;
 };
 
@@ -390,7 +394,7 @@ const normalizeSchema = <S extends SchemaSpec | JsonSchema>(schema: S): S => {
   }
   if (schema.type === 'object' || (Array.isArray(schema.type) && schema.type.includes('object'))) {
     if (schema.additionalProperties == null) {
-      schema.additionalProperties = {};
+      schema.additionalProperties = false;
     }
     if (!Array.isArray(schema.required)) {
       schema.required = [];
@@ -484,22 +488,83 @@ const fillInUnresolvedSchemas = (specs: SchemaSpec[]): SchemaSpec[] => {
   return Array.from(schemas.values());
 };
 
+const replaceJsonSchemasWithPolyAPISchemas = (schema: JsonSchema, mapping: Map<string, string>): void => {
+  if (schema['$ref'] && mapping.has(schema['$ref'])) {
+    schema['x-poly-ref'] = {
+      path: mapping.get(schema['$ref']),
+    };
+    delete schema['$ref'];
+  }
+  let toSearch = [];
+  if (schema.schemas) toSearch = toSearch.concat(Object.values(schema.schemas));
+  if (schema.properties) toSearch = toSearch.concat(Object.values(schema.properties));
+  if (schema.patternProperties) toSearch = toSearch.concat(Object.values(schema.patternProperties));
+  if (schema.items) {
+    if (Array.isArray(schema.items)) {
+      toSearch = toSearch.concat(schema.items);
+    } else {
+      toSearch.push(schema.items);
+    }
+  }
+  if (typeof schema.additionalItems === 'object') toSearch.push(schema.items);
+  if (typeof schema.additionalProperties === 'object') toSearch.push(schema.additionalProperties);
+  if (Array.isArray(schema.allOf)) toSearch = toSearch.concat(schema.allOf);
+  if (Array.isArray(schema.anyOf)) toSearch = toSearch.concat(schema.anyOf);
+  for (const s of toSearch) replaceJsonSchemasWithPolyAPISchemas(s, mapping);
+};
+
+const flattenDefinitions = (specs: SchemaSpec[]): SchemaSpec[] => {
+  // Schemas can $refs defined with their definition being inline within the body of the schema itself
+  // This function will convert them into PolyAPI Schemas and `x-poly-ref`s
+  const flattened: SchemaSpec[] = [];
+  const names = new Set();
+  for (const spec of specs) {
+    flattened.push(spec);
+    names.add(spec.contextName);
+    if (!spec.definition.definitions) continue;
+    // Pull out all the definitions as PolyAPI Schemas
+    const mapping = new Map<string, string>();
+    for (const [name, definition] of Object.entries(spec.definition.definitions)) {
+      // Make sure contextName is unique
+      let contextName = '';
+      let i = -1;
+      do {
+        i++;
+        contextName = `${spec.context}${spec.context ? '.' : ''}${name}${i || ''}`;
+      } while (names.has(contextName));
+      mapping.set(`#/definitions/${name}`, contextName);
+      flattened.push({
+        id: '',
+        type: 'schema',
+        name: `${name}${i || ''}`,
+        context: spec.context,
+        contextName,
+        definition,
+        visibilityMetadata: {
+          // @ts-expect-error - it's fine
+          visibility: 'ENVIRONMENT',
+        },
+      });
+    }
+    delete spec.definition.definitions;
+    replaceJsonSchemasWithPolyAPISchemas(spec.definition, mapping);
+  }
+  return flattened;
+};
+
 type SchemaRoot = {
   path: string;
   interfaceName: string;
-  interfaces: Record<string, string>;
   namespaces: SchemaTree;
-  hasTypes: boolean;
 };
 
 const printSchemaRoot = (root: SchemaRoot): string => {
   // print the interfaces
-  let result = `declare namespace schemas {${EOL}${ws(1)}interface ${root.interfaceName} {${Object.entries(root.interfaces).map(([k, v]) => `${EOL}${ws(2)}${k}: ${v};`).join('')
-    }${EOL}${ws(1)}}`;
+  let result = 'declare namespace schemas {';
   // print the namespaces
   for (const [key, tree] of Object.entries(root.namespaces)) {
     const types = 'type' in tree && tree.type === 'schema'
-      ? printSchemaAsType(tree as JsonSchema, key, 1)
+      ? printSchemaAsType(tree.definition as JsonSchema, key, 1)
       : printSchemaTreeAsTypes(tree as SchemaTree, toPascalCase(key), 1);
     result = `${result}${EOL}${types}`;
   }
@@ -509,51 +574,27 @@ const printSchemaRoot = (root: SchemaRoot): string => {
 };
 
 const buildSchemaTree = (specs: SchemaSpec[]): SchemaRoot[] => {
-  const schemas: Record<string, SchemaRoot> = {
-    default: {
-      path: 'default',
-      interfaceName: 'Schemas',
-      interfaces: {},
-      namespaces: {},
-      hasTypes: false,
-    },
-  };
+  const schemas: Record<string, SchemaRoot> = {};
   for (const spec of specs) {
-    if (!spec.context) {
-      schemas.default.interfaces[spec.name] = spec.name;
-      schemas.default.namespaces[spec.name] = spec;
-      schemas.default.hasTypes = true;
-      continue;
-    }
-    const specInterfaceName = toPascalCase(spec.context);
-    const contextParts = spec.context.split('.');
-    const last = contextParts.length - 1;
-    for (let i = 0; i <= last; i++) {
-      const name = contextParts[i];
-      const interfaceName = i === last ? specInterfaceName : toPascalCase(contextParts[i]);
-      const path = contextParts.slice(0, i + 1).join('.');
-      const parent = i ? contextParts.slice(0, i).join('.') : 'default';
-      if (schemas[path]) continue;
-      schemas[path] = {
-        path,
-        interfaceName,
-        interfaces: {},
-        namespaces: {},
-        hasTypes: false,
-      };
-      schemas[parent].interfaces[name] = interfaceName;
-      set(schemas[parent].namespaces, path, {});
-    }
-    set(schemas[spec.context].namespaces, spec.contextName, spec);
-    schemas[spec.context].interfaces[spec.name] = spec.contextName.split('.').map(v => toPascalCase(v)).join('.');
-    schemas[spec.context].hasTypes = true;
+    const context = spec.context || 'default';
+    const interfaceName = spec.context ? toPascalCase(spec.context) : 'Schemas';
+    schemas[context] = schemas[context] || {
+      path: context,
+      interfaceName,
+      namespaces: {},
+    };
+    set(schemas[context].namespaces, spec.contextName, spec);
   }
   return Array.from(Object.values(schemas));
 };
 
 const printSchemaSpecs = (specs: SchemaSpec[]): Record<string, string> => {
-  // first normalize the schemas and fill in unresolved ones
-  const normalized = fillInUnresolvedSchemas(specs.map(schema => normalizeSchema(schema)));
+  // first normalize the schemas, flatten inline schema definitions and fill in unresolved ones
+  const normalized = fillInUnresolvedSchemas(
+    flattenDefinitions(
+      specs.map(schema => normalizeSchema(schema)),
+    ),
+  );
   // then build schema trees
   const trees = buildSchemaTree(normalized);
   // then print all the schema types as strings ready to be saved to disk
