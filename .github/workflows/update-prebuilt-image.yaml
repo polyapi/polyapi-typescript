@@ -1,0 +1,21 @@
+name: Update pre-built node docker image
+on:
+  workflow_dispatch:
+
+jobs:
+  manual:
+    name: Manual Pre-built Development Image
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    environment: dev
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Hit endpoint and build from scratch pre-built image
+        run: |
+          curl --fail-with-body -X POST \
+          https://dev.polyapi.io/functions/server/prebuilt-base-image \
+          -H "Authorization: Bearer ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{}'
