@@ -114,7 +114,7 @@ describe('Generate types from specs', () => {
             publicNamespace: 'OOB'
           }
         };
-        const expected = 'type Foo = OOB.Polyapi.Adyen.Capital.AccountBalance;';
+        const expected = 'type Foo = Oob.Polyapi.Adyen.Capital.AccountBalance;';
         expect(printSchemaAsType(schema, 'foo', 0)).toEqual(expected);
       });
       test('unresolved poly schema', () => {

@@ -5,14 +5,21 @@ import prettier from 'prettier';
 import chalk from 'chalk';
 import shell from 'shelljs';
 
-import { ObjectPropertyType, PropertySpecification, PropertyType, Specification, SpecificationType } from './types';
+import {
+  ObjectPropertyType,
+  PropertySpecification,
+  PropertyType,
+  Specification,
+  SpecificationType,
+} from './types';
 
 import { getSpecs } from './api';
 import { INSTANCE_URL_MAP } from './constants';
 
-export const getPolyLibPath = (polyPath: string) => polyPath.startsWith('/')
-  ? `${polyPath}/lib`
-  : `${__dirname}/../../../${polyPath}/lib`;
+export const getPolyLibPath = (polyPath: string) =>
+  polyPath.startsWith('/')
+    ? `${polyPath}/lib`
+    : `${__dirname}/../../../${polyPath}/lib`;
 
 export const getContextDataFileContent = (libPath: string) => {
   try {
@@ -42,9 +49,9 @@ export const getSpecsFromContextData = (contextData) => {
 };
 
 export type GenerationError = {
-  specification: Specification
-  stack: string
-}
+  specification: Specification;
+  stack: string;
+};
 
 export const echoGenerationError = (specification: Specification) => {
   const typeMap = {
@@ -61,11 +68,16 @@ export const echoGenerationError = (specification: Specification) => {
   const type = typeMap[specification.type];
 
   shell.echo(
-    chalk.red(`\nError encountered while processing ${type} '${specification.contextName}' (id: '${specification.id}'). ${type} is unavailable.`),
+    chalk.red(
+      `\nError encountered while processing ${type} '${specification.contextName}' (id: '${specification.id}'). ${type} is unavailable.`,
+    ),
   );
 };
 
-export const loadTemplate = (fileName: string) => fs.readFileSync(`${__dirname}/templates/${fileName}`, 'utf8');
+export const templateUrl = (fileName: string): string => `${__dirname}/templates/${fileName}`;
+
+export const loadTemplate = (fileName: string) =>
+  fs.readFileSync(templateUrl(fileName), 'utf8');
 
 export const prettyPrint = (code: string, parser = 'typescript') =>
   prettier.format(code, {
@@ -76,32 +88,57 @@ export const prettyPrint = (code: string, parser = 'typescript') =>
 
 export const showErrGettingSpecs = (error: any) => {
   shell.echo(chalk.red('ERROR'));
-  shell.echo('Error while getting data from Poly server. Make sure the version of library/server is up to date.');
-  shell.echo(chalk.red(error.message), chalk.red(JSON.stringify(error.response?.data)));
+  shell.echo(
+    'Error while getting data from Poly server. Make sure the version of library/server is up to date.',
+  );
+  shell.echo(
+    chalk.red(error.message),
+    chalk.red(JSON.stringify(error.response?.data)),
+  );
   shell.exit(1);
 };
 
-export const generateContextDataFile = (libPath: string, specs: Specification[]) => {
-  fs.writeFileSync(`${libPath}/specs.json`, JSON.stringify(specs.filter(spec => {
-    if (spec.type === 'snippet') {
-      return spec.language === 'javascript';
-    }
-    if (spec.type === 'customFunction') {
-      return spec.language === 'javascript';
-    }
+export const generateContextDataFile = (
+  libPath: string,
+  specs: Specification[],
+) => {
+  fs.writeFileSync(
+    `${libPath}/specs.json`,
+    JSON.stringify(
+      specs.filter((spec) => {
+        if (spec.type === 'snippet') {
+          return spec.language === 'javascript';
+        }
+        if (spec.type === 'customFunction') {
+          return spec.language === 'javascript';
+        }
 
-    return true;
-  }), null, 2));
+        return true;
+      }),
+      null,
+      2,
+    ),
+  );
 };
 
-export const upsertResourceInSpec = async (polyPath: string, {
-  resourceId,
-  resourceName,
-  updated,
-}: {
-  resourceId: string, resourceName: string, updated: boolean
-}) => {
-  shell.echo('-n', updated ? `Updating ${resourceName} in specs...` : `Adding ${resourceName} to SDK...`);
+export const upsertResourceInSpec = async (
+  polyPath: string,
+  {
+    resourceId,
+    resourceName,
+    updated,
+  }: {
+    resourceId: string;
+    resourceName: string;
+    updated: boolean;
+  },
+) => {
+  shell.echo(
+    '-n',
+    updated
+      ? `Updating ${resourceName} in specs...`
+      : `Adding ${resourceName} to SDK...`,
+  );
 
   let contextData: Record<string, any> = {};
 
@@ -154,7 +191,7 @@ export const getStringPaths = (data: Record<string, any> | any[]) => {
     let stringPath = '';
     for (const part of paths[i]) {
       const isString = typeof part === 'string';
-      const delimiter = (stringPath.length > 0 && isString) ? '.' : '';
+      const delimiter = stringPath.length > 0 && isString ? '.' : '';
       if (isString) {
         stringPath = `${stringPath}${delimiter}${part}`;
       } else {
@@ -167,7 +204,8 @@ export const getStringPaths = (data: Record<string, any> | any[]) => {
   return stringPaths;
 };
 
-export const firstLetterToUppercase = (value: string) => `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+export const firstLetterToUppercase = (value: string) =>
+  `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 
 export const isValidHttpUrl = (url: any) => {
   try {
@@ -185,7 +223,8 @@ const sanitizeUrl = (url: any) => {
   return url;
 };
 
-export const URL_REGEX = /^(https?:\/\/)?(?:w{1,3}\.)?((localhost|(\d{1,3}(\.\d{1,3}){3})|[^\s.]+\.[a-z]{2,})(?:\.[a-z]{2,})?)(:\d+)?(\/[^\s]*)?(?![^<]*(?:<\/\w+>|\/?>))$/;
+export const URL_REGEX =
+  /^(https?:\/\/)?(?:w{1,3}\.)?((localhost|(\d{1,3}(\.\d{1,3}){3})|[^\s.]+\.[a-z]{2,})(?:\.[a-z]{2,})?)(:\d+)?(\/[^\s]*)?(?![^<]*(?:<\/\w+>|\/?>))$/;
 
 export const validateBaseUrl = (url: any): string => {
   const sanitizedUrl = sanitizeUrl(url);
@@ -232,7 +271,8 @@ export const isPlainObjectPredicate = (value: unknown): value is object => {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 };
 
-export const isBinary = (type: ObjectPropertyType) => type.schema?.type === 'string' && type.schema?.format === 'binary';
+export const isBinary = (type: ObjectPropertyType) =>
+  type.schema?.type === 'string' && type.schema?.format === 'binary';
 
 /**
  * Iterate all schemas that contain `$ref` key and pass them to {@link cb}, {@link cb} return value will replace current schema being iterated.
@@ -240,7 +280,11 @@ export const isBinary = (type: ObjectPropertyType) => type.schema?.type === 'str
  * If you want to iterate over refs defined in an [annotation](https://json-schema.org/blog/posts/custom-annotations-will-continue#how-did-we-arrive-at-as-the-prefix-of-choice)
  * you can specify the annotation name through {@link refIdentifier} option which by default is `$ref`.
  */
-export const iterateRefs = (schema: any, cb: (schema: any) => any, refIdentifier = '$ref') => {
+export const iterateRefs = (
+  schema: any,
+  cb: (schema: any) => any,
+  refIdentifier = '$ref',
+) => {
   if (isPlainObjectPredicate(schema)) {
     if (typeof schema[refIdentifier] !== 'undefined') {
       return cb(schema);
@@ -278,7 +322,8 @@ export const getContextData = (
 };
 
 export const toTypeDeclaration = (type: PropertyType, synchronous = true) => {
-  const wrapInPromiseIfNeeded = (code: string) => (synchronous ? code : `Promise<${code}>`);
+  const wrapInPromiseIfNeeded = (code: string) =>
+    synchronous ? code : `Promise<${code}>`;
   switch (type.kind) {
     case 'plain':
       return type.value;
@@ -289,13 +334,17 @@ export const toTypeDeclaration = (type: PropertyType, synchronous = true) => {
     case 'array':
       return wrapInPromiseIfNeeded(`${toTypeDeclaration(type.items)}[]`);
     case 'object':
-
       if (type.typeName && !isBinary(type)) {
         return wrapInPromiseIfNeeded(type.typeName);
       } else if (type.properties) {
         return wrapInPromiseIfNeeded(
           `{ ${type.properties
-            .map((prop) => `'${prop.name}'${prop.required === false ? '?' : ''}: ${toTypeDeclaration(prop.type)}`)
+            .map(
+              (prop) =>
+                `'${prop.name}'${
+                  prop.required === false ? '?' : ''
+                }: ${toTypeDeclaration(prop.type)}`,
+            )
             .join(';\n')} }`,
         );
       } else {
@@ -306,11 +355,13 @@ export const toTypeDeclaration = (type: PropertyType, synchronous = true) => {
         return type.name;
       }
       const toArgument = (arg: PropertySpecification) =>
-        `${arg.name}${arg.required === false ? '?' : ''}: ${toTypeDeclaration(arg.type)}${
-          arg.nullable === true ? ' | null' : ''
-        }`;
+        `${arg.name}${arg.required === false ? '?' : ''}: ${toTypeDeclaration(
+          arg.type,
+        )}${arg.nullable === true ? ' | null' : ''}`;
 
-      return `(${type.spec.arguments.map(toArgument).join(', ')}) => ${toTypeDeclaration(
+      return `(${type.spec.arguments
+        .map(toArgument)
+        .join(', ')}) => ${toTypeDeclaration(
         type.spec.returnType,
         type.spec.synchronous === true,
       )}`;

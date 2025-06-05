@@ -1,0 +1,11 @@
+module.exports = {
+  handles: [
+  {{#each specifications}}
+    {{#if context}}
+      ['{{context}}.{{name}}', '{{id}}'],
+    {{else}}
+      ['{{name}}', '{{id}}'],
+    {{/if}}
+  {{/each}}
+  ];
+}

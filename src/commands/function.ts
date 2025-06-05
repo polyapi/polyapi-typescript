@@ -2,11 +2,22 @@
 import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
-import { CreateServerCustomFunctionResponseDto, FunctionDetailsDto } from '../types';
-import { createOrUpdateClientFunction, createOrUpdateServerFunction, getSpecs } from '../api';
+import {
+  CreateServerCustomFunctionResponseDto,
+  FunctionDetailsDto,
+} from '../types';
+import {
+  createOrUpdateClientFunction,
+  createOrUpdateServerFunction,
+  getSpecs,
+} from '../api';
 import { loadConfig } from '../config';
 import { generateSingleCustomFunction } from './generate';
-import { generateTypeSchemas, getDependencies, getTSBaseUrl } from '../transpiler';
+import {
+  generateTypeSchemas,
+  getDependencies,
+  getTSBaseUrl,
+} from '../transpiler';
 import { DeployableTypeEntries } from '../deployables';
 
 export const addOrUpdateCustomFunction = async (
@@ -19,7 +30,8 @@ export const addOrUpdateCustomFunction = async (
   server: boolean | undefined,
   logsEnabled: boolean | undefined,
   generateContexts: string | undefined,
-  executionApiKey: string | null | undefined) => {
+  executionApiKey: string | null | undefined,
+) => {
   loadConfig(polyPath);
 
   let code = '';
@@ -37,7 +49,9 @@ export const addOrUpdateCustomFunction = async (
     let customFunction: FunctionDetailsDto;
 
     const specs = await getSpecs([context], [name]);
-    const functionSpec = specs.find(spec => spec.name === name && spec.context === context);
+    const functionSpec = specs.find(
+      (spec) => spec.name === name && spec.context === context,
+    );
     const updating = !!functionSpec;
     if (updating) {
       const isConflictingType =
@@ -45,37 +59,69 @@ export const addOrUpdateCustomFunction = async (
         (server === true && functionSpec.type === 'customFunction');
 
       if (isConflictingType) {
-        const existingType = functionSpec.type === 'serverFunction' ? 'server' : 'client';
+        const existingType =
+          functionSpec.type === 'serverFunction' ? 'server' : 'client';
         const targetType = existingType === 'server' ? 'client' : 'server';
 
         shell.echo(
-          chalk.redBright(`ERROR: Function already exists as a ${existingType} function.`) + '\n' +
-          chalk.red(`Please delete it before deploying as a ${targetType} function.`),
+          chalk.redBright(
+            `ERROR: Function already exists as a ${existingType} function.`,
+          ) +
+            '\n' +
+            chalk.red(
+              `Please delete it before deploying as a ${targetType} function.`,
+            ),
         );
         return;
       }
     }
 
-    const typeSchemas = generateTypeSchemas(file, tsConfigBaseUrl, DeployableTypeEntries.map(d => d[0]));
+    const typeSchemas = generateTypeSchemas(
+      file,
+      tsConfigBaseUrl,
+      DeployableTypeEntries.map((d) => d[0]),
+    );
 
     if (server) {
-      shell.echo('-n', `${updating ? 'Updating' : 'Adding'} custom server side function...`);
+      shell.echo(
+        '-n',
+        `${updating ? 'Updating' : 'Adding'} custom server side function...`,
+      );
 
       const dependencies = getDependencies(code, file, tsConfigBaseUrl);
       if (dependencies.length) {
-        shell.echo(chalk.yellow('Please note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi.'));
+        shell.echo(
+          chalk.yellow(
+            'Please note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi.',
+          ),
+        );
       }
 
       const other: Record<string, any> = {};
-      if (generateContexts) other.generateContexts = generateContexts.split(',');
+      if (generateContexts) { other.generateContexts = generateContexts.split(','); }
       if (logsEnabled !== undefined) other.logsEnabled = logsEnabled;
 
-      customFunction = await createOrUpdateServerFunction(context, name, description, code, typeSchemas, dependencies, other, executionApiKey);
+      customFunction = await createOrUpdateServerFunction(
+        context,
+        name,
+        description,
+        code,
+        typeSchemas,
+        dependencies,
+        other,
+        executionApiKey,
+      );
 
-      const traceId: string | undefined = (customFunction as CreateServerCustomFunctionResponseDto).traceId;
+      const traceId: string | undefined = (
+        customFunction as CreateServerCustomFunctionResponseDto
+      ).traceId;
 
       if (traceId) {
-        shell.echo(chalk.yellow('\nWarning:'), 'Failed to generate descriptions while deploying the server function, trace id:', chalk.bold(traceId));
+        shell.echo(
+          chalk.yellow('\nWarning:'),
+          'Failed to generate descriptions while deploying the server function, trace id:',
+          chalk.bold(traceId),
+        );
       }
 
       shell.echo(chalk.green('DEPLOYED'));
@@ -84,8 +130,19 @@ export const addOrUpdateCustomFunction = async (
     }
 
     if (client) {
-      shell.echo('-n', `${updating ? 'Updating' : 'Adding'} Client Function to PolyAPI Catalog...`);
-      customFunction = await createOrUpdateClientFunction(context, name, description, code, typeSchemas);
+      shell.echo(
+        '-n',
+        `${
+          updating ? 'Updating' : 'Adding'
+        } Client Function to PolyAPI Catalog...`,
+      );
+      customFunction = await createOrUpdateClientFunction(
+        context,
+        name,
+        description,
+        code,
+        typeSchemas,
+      );
       shell.echo(chalk.green('DONE'));
       shell.echo(`Client Function ID: ${customFunction.id}`);
     }

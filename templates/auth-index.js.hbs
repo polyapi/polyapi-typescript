@@ -1,4 +1,4 @@
-const axios = require('../axios');
+const { axios, scrubKeys } = require('../axios');
 const set = require('lodash/set');
 const merge = require('lodash/merge');
 
@@ -28,7 +28,14 @@ module.exports = (clientID, getSocket, getApiKey) => merge(
     {}
   ),
   subResourceFunctions.reduce(
-    (acc, [path, resource]) => set(acc, path, (token) => axios.post(`/auth-providers/${resource}`, { clientID, token }).then(({ data }) => data)),
+    (acc, [path, resource]) => set(
+      acc,
+      path,
+      (token) =>
+        axios.post(`/auth-providers/${resource}`, { clientID, token })
+          .then(({ data }) => data)
+          .catch(scrubKeys)
+    ),
     {}
   )
 );

@@ -45,19 +45,26 @@ export const setGenerationErrors = (value: boolean) => {
 
 export const getGenerationErrors = () => generationErrors;
 
-const schemaToDeclarations = async (namespace: string, typeName: string, schema: Record<string, any>, value?: any | undefined, options: {
-  unknownAny: boolean
-} = {
-  unknownAny: true,
-}) => {
-  const wrapToNamespace = (code: string) => `namespace ${namespace} {\n  ${code}\n}`;
+const schemaToDeclarations = async (
+  namespace: string,
+  typeName: string,
+  schema: Record<string, any>,
+  value?: any | undefined,
+  options: {
+    unknownAny: boolean;
+  } = {
+    unknownAny: true,
+  },
+) => {
+  const wrapToNamespace = (code: string) =>
+    `namespace ${namespace} {\n  ${code}\n}`;
 
   const appendPathUnionType = (code: string, value: any) => {
     if (Array.isArray(value) || isPlainObjectPredicate(value)) {
-      const unionPath = getStringPaths(value).map(value => `'${value}'`);
+      const unionPath = getStringPaths(value).map((value) => `'${value}'`);
       // If the value is an empty array or object we naturally can't get any property paths
       // So we fallback to an empty string as the type
-      const pathValue = unionPath.join(' | ') || '\'\'';
+      const pathValue = unionPath.join(' | ') || "''";
       return `${code}\nexport type PathValue = ${pathValue}`;
     }
 
@@ -73,8 +80,10 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
     ignoreMinAndMaxItems: true,
     unknownAny: options.unknownAny,
     customName(innerSchema, keyNameFromDefinition) {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      const ref = innerSchema['x-poly-ref'] as (SchemaRef & { 'x-unresolved'?: true }) | undefined;
+      const ref = innerSchema['x-poly-ref'] as
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        | (SchemaRef & { 'x-unresolved'?: true })
+        | undefined;
 
       if (ref !== null && typeof ref === 'object' && !Array.isArray(ref)) {
         const schemaTypeNameParts = ['$PolySchema'];
@@ -110,17 +119,29 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
     },
   });
 
-  const sourceFile = ts.createSourceFile('x.ts', result, ts.ScriptTarget.Latest);
+  const sourceFile = ts.createSourceFile(
+    'x.ts',
+    result,
+    ts.ScriptTarget.Latest,
+  );
 
   const polySchemaTypeReferenceSet = new Set(); // used to dedupe references to same schema
-  const polySchemaTypeReferenceList: { name: string, path: string, replacement: string }[] = [];
-  const polySchemaInterfaceDeclarationList: { name: string, code: string }[] = [];
+  const polySchemaTypeReferenceList: {
+    name: string;
+    path: string;
+    replacement: string;
+  }[] = [];
+  const polySchemaInterfaceDeclarationList: { name: string; code: string }[] =
+    [];
 
   const visitor = (node: ts.Node) => {
     if (ts.isTypeReferenceNode(node)) {
       const name = node.getFullText(sourceFile).trim();
 
-      if (name.match(/^\$PolySchema\$\$\$/) && !polySchemaTypeReferenceSet.has(name)) {
+      if (
+        name.match(/^\$PolySchema\$\$\$/) &&
+        !polySchemaTypeReferenceSet.has(name)
+      ) {
         polySchemaTypeReferenceSet.add(name);
         polySchemaTypeReferenceList.push({
           name,
@@ -132,14 +153,20 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
 
     if (ts.isInterfaceDeclaration(node)) {
       const children = node.getChildren(sourceFile);
-      const possibleIdentifier = children.find(node => node.kind === ts.SyntaxKind.Identifier);
+      const possibleIdentifier = children.find(
+        (node) => node.kind === ts.SyntaxKind.Identifier,
+      );
 
       if (possibleIdentifier) {
         const name = possibleIdentifier.getFullText(sourceFile).trim();
 
         const code = node.getFullText(sourceFile);
 
-        if (name.match(/^\$PolySchema\$\$\$/) || (['Argument', 'ReturnType'].includes(name) && code.match(/<path>.+?<\/path>/))) {
+        if (
+          name.match(/^\$PolySchema\$\$\$/) ||
+          (['Argument', 'ReturnType'].includes(name) &&
+            code.match(/<path>.+?<\/path>/))
+        ) {
           polySchemaInterfaceDeclarationList.push({
             name,
             code,
@@ -153,15 +180,24 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
 
   ts.forEachChild(sourceFile, visitor);
 
-  const visitedPaths: { path: string, typeName: string }[] = [];
+  const visitedPaths: { path: string; typeName: string }[] = [];
 
   const getUnresolvedSchemaArg = (path: string, isPublic: boolean): string => {
-    return isPublic ? `Unresolved public schema \`${path}\`.` : `Unresolved schema, please add schema \`${path}\` to complete it.`;
+    return isPublic
+      ? `Unresolved public schema \`${path}\`.`
+      : `Unresolved schema, please add schema \`${path}\` to complete it.`;
   };
 
-  type PolySchemaTypeParts = [prefix: '$PolySchema', argOrReturnType: '$Argument' | '$ReturnType' | '___', visibilityStatus: '$Public' | '___', resolvedStatus: '$Resolved' | '$Unresolved', ...realContextParts: string[]];
+  type PolySchemaTypeParts = [
+    prefix: '$PolySchema',
+    argOrReturnType: '$Argument' | '$ReturnType' | '___',
+    visibilityStatus: '$Public' | '___',
+    resolvedStatus: '$Resolved' | '$Unresolved',
+    ...realContextParts: string[],
+  ];
 
-  const getPolySchemaTypeParts = (typeName: string): PolySchemaTypeParts => typeName.split(typeNameContextDelimiter) as PolySchemaTypeParts;
+  const getPolySchemaTypeParts = (typeName: string): PolySchemaTypeParts =>
+    typeName.split(typeNameContextDelimiter) as PolySchemaTypeParts;
 
   /*
     1. Remove interfaces from resolved schemas that belong to some object property, also track them to fix each type that point to removed interfaces.
@@ -169,12 +205,19 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
     3. Replace interfaces from argument/return type that are linked to an unresolved schemas for an `any` type.
   */
   for (const polySchemaInterfaceDeclaration of polySchemaInterfaceDeclarationList) {
-    const [, argumentOrReturnType, visibilityStatus, resolvedStatus, ...realContextParts] = getPolySchemaTypeParts(polySchemaInterfaceDeclaration.name);
+    const [
+      ,
+      argumentOrReturnType,
+      visibilityStatus,
+      resolvedStatus,
+      ...realContextParts
+    ] = getPolySchemaTypeParts(polySchemaInterfaceDeclaration.name);
 
     const isResolved = resolvedStatus === '$Resolved';
     const isPublic = visibilityStatus === '$Public';
 
-    const matchPathNameCommentInCode = polySchemaInterfaceDeclaration.code.match(/<path>(.+?)<\/path>/);
+    const matchPathNameCommentInCode =
+      polySchemaInterfaceDeclaration.code.match(/<path>(.+?)<\/path>/);
 
     if (matchPathNameCommentInCode === null) {
       continue;
@@ -184,14 +227,35 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
 
     if (['$ReturnType', '$Argument'].includes(argumentOrReturnType)) {
       if (isResolved) {
-        const typePath = `schemas.${path.split('.').map(toPascalCase).join('.')}`;
+        const typePath = `schemas.${path
+          .split('.')
+          .map(toPascalCase)
+          .join('.')}`;
 
-        result = result.replace(polySchemaInterfaceDeclaration.code, `export interface ${argumentOrReturnType.replace('$', '')} extends ${typePath} {}`);
+        result = result.replace(
+          polySchemaInterfaceDeclaration.code,
+          `export interface ${argumentOrReturnType.replace(
+            '$',
+            '',
+          )} extends ${typePath} {}`,
+        );
       } else {
-        result = result.replace(polySchemaInterfaceDeclaration.code, `/**\n    * ${getUnresolvedSchemaArg(path, isPublic)}\n    */\n    export type ${argumentOrReturnType.replace('$', '')} = any;`);
+        result = result.replace(
+          polySchemaInterfaceDeclaration.code,
+          `/**\n    * ${getUnresolvedSchemaArg(
+            path,
+            isPublic,
+          )}\n    */\n    export type ${argumentOrReturnType.replace(
+            '$',
+            '',
+          )} = any;`,
+        );
       }
     } else {
-      const polySchemaTypeReference = polySchemaTypeReferenceList.find(polySchemaTypeReference => polySchemaTypeReference.name === polySchemaInterfaceDeclaration.name);
+      const polySchemaTypeReference = polySchemaTypeReferenceList.find(
+        (polySchemaTypeReference) =>
+          polySchemaTypeReference.name === polySchemaInterfaceDeclaration.name,
+      );
 
       if (polySchemaTypeReference) {
         polySchemaTypeReference.path = path;
@@ -200,7 +264,9 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
       if (isResolved) {
         result = result.replace(polySchemaInterfaceDeclaration.code, '');
       } else {
-        const schemaPathVisited = visitedPaths.find(visitedPath => visitedPath.path === path);
+        const schemaPathVisited = visitedPaths.find(
+          (visitedPath) => visitedPath.path === path,
+        );
 
         if (!schemaPathVisited) {
           visitedPaths.push({
@@ -208,7 +274,15 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
             typeName: polySchemaInterfaceDeclaration.name,
           });
 
-          result = result.replace(polySchemaInterfaceDeclaration.code, `/**\n    * ${getUnresolvedSchemaArg(path, isPublic)}\n    */\n    type ${[...realContextParts, 'Schema'].join('$')} = any`);
+          result = result.replace(
+            polySchemaInterfaceDeclaration.code,
+            `/**\n    * ${getUnresolvedSchemaArg(
+              path,
+              isPublic,
+            )}\n    */\n    type ${[...realContextParts, 'Schema'].join(
+              '$',
+            )} = any`,
+          );
         } else {
           polySchemaTypeReference.replacement = schemaPathVisited.typeName;
 
@@ -222,16 +296,23 @@ const schemaToDeclarations = async (namespace: string, typeName: string, schema:
    * Iterate over all removed interfaces and replace each type reference with proper schema reference.
    */
   for (const polySchemaTypeReference of polySchemaTypeReferenceList) {
-    const polySchemaTypeReferenceParts = getPolySchemaTypeParts(polySchemaTypeReference.name);
+    const polySchemaTypeReferenceParts = getPolySchemaTypeParts(
+      polySchemaTypeReference.name,
+    );
 
     const [, , , resolvedStatus] = polySchemaTypeReferenceParts;
 
     const isResolved = resolvedStatus === '$Resolved';
 
     if (isResolved) {
-      const realPathParts = polySchemaTypeReference.path.split('.').map(toPascalCase);
+      const realPathParts = polySchemaTypeReference.path
+        .split('.')
+        .map(toPascalCase);
 
-      result = result.replace(polySchemaTypeReference.name, `schemas.${realPathParts.join('.')}`);
+      result = result.replace(
+        polySchemaTypeReference.name,
+        `schemas.${realPathParts.join('.')}`,
+      );
     } else {
       result = result.replace(polySchemaTypeReference.name, 'unknown');
     }
@@ -246,10 +327,16 @@ const getObjectTypeDeclarations = async (
   objectProperty: ObjectPropertyType,
   typeName: string,
 ): Promise<string> => {
-  const declarations = await schemaToDeclarations(namespace, typeName, objectProperty.schema);
+  const declarations = await schemaToDeclarations(
+    namespace,
+    typeName,
+    objectProperty.schema,
+  );
 
   // setting typeName to be used when generating return type
-  objectProperty.typeName = `${namespacePath ? `${namespacePath}.` : ''}${namespace}.${typeName}`;
+  objectProperty.typeName = `${
+    namespacePath ? `${namespacePath}.` : ''
+  }${namespace}.${typeName}`;
   return declarations;
 };
 
@@ -260,17 +347,25 @@ const getArgumentsTypeDeclarations = async (
   typeName = 'Argument',
 ) => {
   const typeDeclarations: string[] = [];
-  const objectProperties = properties.filter((property) => property.type.kind === 'object');
-  const functionProperties = properties.filter((property) => property.type.kind === 'function');
+  const objectProperties = properties.filter(
+    (property) => property.type.kind === 'object',
+  );
+  const functionProperties = properties.filter(
+    (property) => property.type.kind === 'function',
+  );
 
   for (const property of objectProperties) {
     const objectProperty = property.type as ObjectPropertyType;
     if (objectProperty.schema) {
       const namespace = `${parentType}$${toPascalCase(property.name)}`;
       // setting typeName to be used when generating arguments type
-      objectProperty.typeName = `${namespacePath ? `${namespacePath}.` : ''}${namespace}.${typeName}`;
+      objectProperty.typeName = `${
+        namespacePath ? `${namespacePath}.` : ''
+      }${namespace}.${typeName}`;
 
-      typeDeclarations.push(await schemaToDeclarations(namespace, typeName, objectProperty.schema));
+      typeDeclarations.push(
+        await schemaToDeclarations(namespace, typeName, objectProperty.schema),
+      );
     } else if (objectProperty.properties) {
       typeDeclarations.push(
         ...(await getArgumentsTypeDeclarations(
@@ -293,10 +388,15 @@ const getArgumentsTypeDeclarations = async (
       ...(await getArgumentsTypeDeclarations(
         namespacePath,
         `${parentType}$${toPascalCase(property.name)}`,
-        functionProperty.spec.arguments.filter((arg) => arg.type.kind === 'object'),
+        functionProperty.spec.arguments.filter(
+          (arg) => arg.type.kind === 'object',
+        ),
       )),
     );
-    if (functionProperty.spec.returnType.kind === 'object' && functionProperty.spec.returnType.schema) {
+    if (
+      functionProperty.spec.returnType.kind === 'object' &&
+      functionProperty.spec.returnType.schema
+    ) {
       typeDeclarations.push(
         await getObjectTypeDeclarations(
           namespacePath,
@@ -340,7 +440,9 @@ const getAdditionalComments = (specification: Specification) => {
   }
 };
 
-const getSpecificationWithFunctionComment = (specification: SpecificationWithFunction) => {
+const getSpecificationWithFunctionComment = (
+  specification: SpecificationWithFunction,
+) => {
   const descriptionComment = specification.description
     ? specification.description
       .split('\n')
@@ -348,9 +450,15 @@ const getSpecificationWithFunctionComment = (specification: SpecificationWithFun
       .join('\n')
     : null;
   const toArgumentComment = (arg: PropertySpecification, prefix = '') => {
-    if (arg.name === 'payload' && arg.type.kind === 'object' && arg.type.properties) {
+    if (
+      arg.name === 'payload' &&
+      arg.type.kind === 'object' &&
+      arg.type.properties
+    ) {
       return arg.type.properties
-        .map(payloadProperty => toArgumentComment(payloadProperty, 'payload.'))
+        .map((payloadProperty) =>
+          toArgumentComment(payloadProperty, 'payload.'),
+        )
         .filter(Boolean)
         .join('\n');
     }
@@ -362,29 +470,38 @@ const getSpecificationWithFunctionComment = (specification: SpecificationWithFun
   };
 
   const argumentsComment = specification.function.arguments
-    .map(arg => toArgumentComment(arg))
+    .map((arg) => toArgumentComment(arg))
     .filter(Boolean)
     .join('\n');
   const additionalComments = getAdditionalComments(specification);
   const idComment = getIDComment(specification);
 
-  return `${descriptionComment ? `${descriptionComment}\n` : ''}${argumentsComment ? `${argumentsComment}\n` : ''}${additionalComments ? `${additionalComments}\n` : ''}${idComment ? `*\n${idComment}\n` : ''}`.trim();
+  return `${descriptionComment ? `${descriptionComment}\n` : ''}${
+    argumentsComment ? `${argumentsComment}\n` : ''
+  }${additionalComments ? `${additionalComments}\n` : ''}${
+    idComment ? `*\n${idComment}\n` : ''
+  }`.trim();
 };
 
-const getSpecificationWithVariableComment = (specification: SpecificationWithVariable) => {
+const getSpecificationWithVariableComment = (
+  specification: SpecificationWithVariable,
+) => {
   const descriptionComment = specification.description
     ? specification.description
       .split('\n')
       .map((line) => `* ${line}`)
       .join('\n')
     : null;
-  const secretComment = specification.variable.secrecy === 'SECRET'
-    ? '* Note: The variable is secret and can be used only within Poly functions.'
-    : null;
+  const secretComment =
+    specification.variable.secrecy === 'SECRET'
+      ? '* Note: The variable is secret and can be used only within Poly functions.'
+      : null;
 
   const idComment = `* Variable ID: ${specification.id}`;
 
-  return `${descriptionComment ? `${descriptionComment}\n` : ''}${secretComment ? `${secretComment}\n` : ''}${idComment ? `*\n${idComment}` : ''}`.trim();
+  return `${descriptionComment ? `${descriptionComment}\n` : ''}${
+    secretComment ? `${secretComment}\n` : ''
+  }${idComment ? `*\n${idComment}` : ''}`.trim();
 };
 
 const getVariableValueTypeDeclarations = async (
@@ -393,17 +510,28 @@ const getVariableValueTypeDeclarations = async (
   objectProperty: ObjectPropertyType,
   value: any,
 ): Promise<string> => {
-  const declarations = await schemaToDeclarations(namespace, 'ValueType', objectProperty.schema, value, {
-    unknownAny: false,
-  });
+  const declarations = await schemaToDeclarations(
+    namespace,
+    'ValueType',
+    objectProperty.schema,
+    value,
+    {
+      unknownAny: false,
+    },
+  );
 
   // setting typeName to be used when generating variable value type
-  objectProperty.typeName = `${namespacePath ? `${namespacePath}.` : ''}${namespace}.ValueType`;
+  objectProperty.typeName = `${
+    namespacePath ? `${namespacePath}.` : ''
+  }${namespace}.ValueType`;
 
   return declarations;
 };
 
-const getSpecificationsTypeDeclarations = async (namespacePath: string, specifications: Specification[]): Promise<string> => {
+const getSpecificationsTypeDeclarations = async (
+  namespacePath: string,
+  specifications: Specification[],
+): Promise<string> => {
   const errors: GenerationError[] = [];
   const getDeclarationOrHandleError = async (
     getDeclaration: () => Promise<string[] | string>,
@@ -427,7 +555,12 @@ const getSpecificationsTypeDeclarations = async (namespacePath: string, specific
         .map((spec) => spec as SpecificationWithFunction)
         .map((spec) =>
           getDeclarationOrHandleError(
-            () => getArgumentsTypeDeclarations(namespacePath, toPascalCase(spec.name), spec.function.arguments),
+            () =>
+              getArgumentsTypeDeclarations(
+                namespacePath,
+                toPascalCase(spec.name),
+                spec.function.arguments,
+              ),
             spec,
           ),
         ),
@@ -435,18 +568,21 @@ const getSpecificationsTypeDeclarations = async (namespacePath: string, specific
   ).flat();
   const returnTypeDeclarations = await Promise.all(
     specifications
-      .filter((spec) =>
-        'function' in spec &&
-        (
-          (spec.function.returnType.kind === 'object' &&
+      .filter(
+        (spec) =>
+          'function' in spec &&
+          ((spec.function.returnType.kind === 'object' &&
             spec.function.returnType.schema &&
             !isBinary(spec.function.returnType)) ||
-          (spec.type === 'serverFunction' && (spec as ServerFunctionSpecification).serverSideAsync === true)
-        ),
+            (spec.type === 'serverFunction' &&
+              (spec as ServerFunctionSpecification).serverSideAsync === true)),
       )
       .map((spec) => spec as SpecificationWithFunction)
       .map((spec) => {
-        if (spec.type === 'serverFunction' && (spec as ServerFunctionSpecification).serverSideAsync === true) {
+        if (
+          spec.type === 'serverFunction' &&
+          (spec as ServerFunctionSpecification).serverSideAsync === true
+        ) {
           const ns = toPascalCase(spec.name);
           return Promise.resolve(
             `namespace ${ns} {\n  export type ReturnType = { executionId: string };\n}`,
@@ -468,25 +604,46 @@ const getSpecificationsTypeDeclarations = async (namespacePath: string, specific
 
   const variableValueDeclarations = await Promise.all(
     specifications
-      .filter((spec) => 'variable' in spec && spec.variable.valueType.kind === 'object' && spec.variable.valueType.schema)
+      .filter(
+        (spec) =>
+          'variable' in spec &&
+          spec.variable.valueType.kind === 'object' &&
+          spec.variable.valueType.schema,
+      )
       .map((spec) => spec as SpecificationWithVariable)
-      .map((spec) =>
-        getDeclarationOrHandleError(
-          () => getVariableValueTypeDeclarations(namespacePath, toPascalCase(spec.name), spec.variable.valueType as ObjectPropertyType, spec.variable.value),
-          spec,
-        ) as Promise<string>,
+      .map(
+        (spec) =>
+          getDeclarationOrHandleError(
+            () =>
+              getVariableValueTypeDeclarations(
+                namespacePath,
+                toPascalCase(spec.name),
+                spec.variable.valueType as ObjectPropertyType,
+                spec.variable.value,
+              ),
+            spec,
+          ) as Promise<string>,
       ),
   );
 
   const schemaDeclarations = await Promise.all(
-    specifications.filter(specification => specification.type === 'schema')
-      .map(spec => getDeclarationOrHandleError(
-        () => getObjectTypeDeclarations(namespacePath, toPascalCase(spec.name), {
-          schema: (spec as SchemaSpecification).definition as any,
-          kind: 'object',
-        }, 'Schema'),
-        spec,
-      )),
+    specifications
+      .filter((specification) => specification.type === 'schema')
+      .map((spec) =>
+        getDeclarationOrHandleError(
+          () =>
+            getObjectTypeDeclarations(
+              namespacePath,
+              toPascalCase(spec.name),
+              {
+                schema: (spec as SchemaSpecification).definition as any,
+                kind: 'object',
+              },
+              'Schema',
+            ),
+          spec,
+        ),
+      ),
   );
 
   if (errors.length) {
@@ -495,7 +652,12 @@ const getSpecificationsTypeDeclarations = async (namespacePath: string, specific
     });
   }
 
-  return [...argumentsTypeDeclarations, ...returnTypeDeclarations, ...variableValueDeclarations, ...schemaDeclarations].join('\n');
+  return [
+    ...argumentsTypeDeclarations,
+    ...returnTypeDeclarations,
+    ...variableValueDeclarations,
+    ...schemaDeclarations,
+  ].join('\n');
 };
 
 const generateTSContextDeclarationFile = async (
@@ -505,10 +667,16 @@ const generateTSContextDeclarationFile = async (
   subContexts: Context[],
   pathPrefix: string,
 ) => {
-  const template = handlebars.compile(loadTemplate(`${pathPrefix}/{{context}}.d.ts.hbs`));
-  const contextPaths = context.path === '' ? [] : context.path.split('.').map(toPascalCase);
+  const template = handlebars.compile(
+    loadTemplate(`${pathPrefix}/{{context}}.d.ts.hbs`),
+  );
+  const contextPaths =
+    context.path === '' ? [] : context.path.split('.').map(toPascalCase);
 
-  const typeDeclarations = await getSpecificationsTypeDeclarations(contextPaths.join('.'), specifications);
+  const typeDeclarations = await getSpecificationsTypeDeclarations(
+    contextPaths.join('.'),
+    specifications,
+  );
 
   const toFunctionDeclaration = (specification: SpecificationWithFunction) => {
     const toArgumentDeclaration = (arg: PropertySpecification) => ({
@@ -523,7 +691,9 @@ const generateTSContextDeclarationFile = async (
             ? `GraphqlAPIFunctionResponse<${returnType}>`
             : `ApiFunctionResponse<${returnType}>`;
         case 'authFunction':
-          return specification.name === 'getToken' ? returnType : `AuthFunctionResponse<${returnType}>`;
+          return specification.name === 'getToken'
+            ? returnType
+            : `AuthFunctionResponse<${returnType}>`;
       }
       return returnType;
     };
@@ -533,7 +703,9 @@ const generateTSContextDeclarationFile = async (
       specification.type === 'serverFunction' &&
       (specification as ServerFunctionSpecification).serverSideAsync === true
     ) {
-      computedReturnType = `${context.interfaceName}.${toPascalCase(specification.name)}.ReturnType`;
+      computedReturnType = `${context.interfaceName}.${toPascalCase(
+        specification.name,
+      )}.ReturnType`;
     } else {
       computedReturnType = toTypeDeclaration(specification.function.returnType);
     }
@@ -544,7 +716,10 @@ const generateTSContextDeclarationFile = async (
       deprecated: specification.state === 'DEPRECATED',
       arguments: specification.function.arguments.map(toArgumentDeclaration),
       returnType: wrapInResponseType(computedReturnType),
-      synchronous: specification.type === 'serverFunction' ? false : specification.function.synchronous === true,
+      synchronous:
+        specification.type === 'serverFunction'
+          ? false
+          : specification.function.synchronous === true,
     };
   };
 
@@ -565,11 +740,16 @@ const generateTSContextDeclarationFile = async (
   };
 
   const toSchemaDeclaration = (specification: SchemaSpecification) => {
-    const contextParts = specification.context.split('.').filter(v => v);
+    const contextParts = specification.context.split('.').filter((v) => v);
 
     return {
       name: specification.name.split('.').pop(),
-      typeDeclaration: contextParts.length ? `${specification.context.split('.').map(toPascalCase).join('.')}.${toPascalCase(specification.name)}` : `${toPascalCase(specification.name)}`,
+      typeDeclaration: contextParts.length
+        ? `${specification.context
+            .split('.')
+            .map(toPascalCase)
+            .join('.')}.${toPascalCase(specification.name)}`
+        : `${toPascalCase(specification.name)}`,
     };
   };
 
@@ -587,7 +767,9 @@ const generateTSContextDeclarationFile = async (
         variableDeclarations: specifications
           .filter((spec) => 'variable' in spec)
           .map(toVariableDeclaration),
-        schemaDeclarations: specifications.filter(spec => spec.type === 'schema').map(toSchemaDeclaration),
+        schemaDeclarations: specifications
+          .filter((spec) => spec.type === 'schema')
+          .map(toSchemaDeclaration),
         subContexts,
       }),
     ),
@@ -619,7 +801,13 @@ const generateTSDeclarationFilesForContext = async (
       };
     });
 
-  await generateTSContextDeclarationFile(libPath, context, contextDataSpecifications, contextDataSubContexts, pathPrefix);
+  await generateTSContextDeclarationFile(
+    libPath,
+    context,
+    contextDataSpecifications,
+    contextDataSubContexts,
+    pathPrefix,
+  );
   contextCollector = [...contextCollector, context];
 
   for await (const subContext of contextDataSubContexts) {
@@ -635,25 +823,43 @@ const generateTSDeclarationFilesForContext = async (
   return contextCollector;
 };
 
-const assignUnresolvedRefsToPolySchemaRefObj = (schemaDefinition: any, unresolvedPolySchemaRefs: SchemaRef[] = []) => {
-  iterateRefs(schemaDefinition, schema => {
-    const ref = schema['x-poly-ref'] as SchemaRef;
+const assignUnresolvedRefsToPolySchemaRefObj = (
+  schemaDefinition: any,
+  unresolvedPolySchemaRefs: SchemaRef[] = [],
+) => {
+  iterateRefs(
+    schemaDefinition,
+    (schema) => {
+      const ref = schema['x-poly-ref'] as SchemaRef;
 
-    if (ref !== null && typeof ref === 'object' && !Array.isArray(ref)) {
-      const foundUnresolved = unresolvedPolySchemaRefs.find(unresolvedPolySchemaRef => unresolvedPolySchemaRef.path === ref.path && unresolvedPolySchemaRef.publicNamespace === ref.publicNamespace);
+      if (ref !== null && typeof ref === 'object' && !Array.isArray(ref)) {
+        const foundUnresolved = unresolvedPolySchemaRefs.find(
+          (unresolvedPolySchemaRef) =>
+            unresolvedPolySchemaRef.path === ref.path &&
+            unresolvedPolySchemaRef.publicNamespace === ref.publicNamespace,
+        );
 
-      if (foundUnresolved) {
-        schema['x-poly-ref']['x-unresolved'] = true;
+        if (foundUnresolved) {
+          schema['x-poly-ref']['x-unresolved'] = true;
+        }
+
+        schema.description = `<path>${
+          ref.publicNamespace ? `${ref.publicNamespace}.${ref.path}` : ref.path
+        }</path>`;
       }
 
-      schema.description = `<path>${ref.publicNamespace ? `${ref.publicNamespace}.${ref.path}` : ref.path}</path>`;
-    }
-
-    return schema;
-  }, 'x-poly-ref');
+      return schema;
+    },
+    'x-poly-ref',
+  );
 };
 
-const generateTSDeclarationFiles = async (libPath: string, specs: Specification[], interfaceName: string, pathPrefix: string) => {
+const generateTSDeclarationFiles = async (
+  libPath: string,
+  specs: Specification[],
+  interfaceName: string,
+  pathPrefix: string,
+) => {
   const contextData = getContextData(specs);
 
   const contexts = await generateTSDeclarationFilesForContext(
@@ -672,8 +878,14 @@ const generateTSDeclarationFiles = async (libPath: string, specs: Specification[
   await generateTSIndexDeclarationFile(libPath, contexts, pathPrefix);
 };
 
-const generateTSIndexDeclarationFile = async (libPath: string, contexts: Context[], pathPrefix: string) => {
-  const template = handlebars.compile(loadTemplate(`${pathPrefix}/index.d.ts.hbs`));
+const generateTSIndexDeclarationFile = async (
+  libPath: string,
+  contexts: Context[],
+  pathPrefix: string,
+) => {
+  const template = handlebars.compile(
+    loadTemplate(`${pathPrefix}/index.d.ts.hbs`),
+  );
   fs.writeFileSync(
     `${libPath}/${pathPrefix}/index.d.ts`,
     await prettyPrint(
@@ -687,41 +899,64 @@ const generateTSIndexDeclarationFile = async (libPath: string, contexts: Context
   );
 };
 
-export const generateFunctionsTSDeclarationFile = async (libPath: string, specs: Specification[]) => {
+export const generateFunctionsTSDeclarationFile = async (
+  libPath: string,
+  specs: Specification[],
+) => {
   const assignUnresolvedRefsRecursive = (fn: FunctionSpecification) => {
     for (const functionArg of fn.arguments) {
       if (functionArg.type.kind === 'object' && functionArg.type.schema) {
-        assignUnresolvedRefsToPolySchemaRefObj(functionArg.type.schema, functionArg.type.unresolvedPolySchemaRefs);
-      } else if (functionArg.type.kind === 'object' && functionArg.type.properties) {
+        assignUnresolvedRefsToPolySchemaRefObj(
+          functionArg.type.schema,
+          functionArg.type.unresolvedPolySchemaRefs,
+        );
+      } else if (
+        functionArg.type.kind === 'object' &&
+        functionArg.type.properties
+      ) {
         for (const property of functionArg.type.properties) {
           if (property.type.kind === 'object') {
-            assignUnresolvedRefsToPolySchemaRefObj(property.type.schema, functionArg.type.unresolvedPolySchemaRefs);
+            assignUnresolvedRefsToPolySchemaRefObj(
+              property.type.schema,
+              functionArg.type.unresolvedPolySchemaRefs,
+            );
           }
         }
-      } else if (functionArg.type.kind === 'function' && typeof functionArg.type.spec === 'object') {
+      } else if (
+        functionArg.type.kind === 'function' &&
+        typeof functionArg.type.spec === 'object'
+      ) {
         assignUnresolvedRefsRecursive(functionArg.type.spec);
       }
     }
     if (fn.returnType.kind === 'object' && fn.returnType.schema) {
-      assignUnresolvedRefsToPolySchemaRefObj(fn.returnType.schema, fn.returnType.unresolvedPolySchemaRefs);
+      assignUnresolvedRefsToPolySchemaRefObj(
+        fn.returnType.schema,
+        fn.returnType.unresolvedPolySchemaRefs,
+      );
     }
   };
 
   await generateTSDeclarationFiles(
     libPath,
-    specs.filter(spec => 'function' in spec).map((spec: SpecificationWithFunction) => {
-      assignUnresolvedRefsRecursive(spec.function);
-      return spec;
-    }),
+    specs
+      .filter((spec) => 'function' in spec)
+      .map((spec: SpecificationWithFunction) => {
+        assignUnresolvedRefsRecursive(spec.function);
+        return spec;
+      }),
     'Poly',
     '.',
   );
 };
 
-export const generateVariablesTSDeclarationFile = async (libPath: string, specs: Specification[]) =>
+export const generateVariablesTSDeclarationFile = async (
+  libPath: string,
+  specs: Specification[],
+) =>
   await generateTSDeclarationFiles(
     libPath,
-    specs.filter(spec => 'variable' in spec),
+    specs.filter((spec) => 'variable' in spec),
     'Vari',
     'vari',
   );

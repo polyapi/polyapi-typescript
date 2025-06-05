@@ -1,7 +1,7 @@
 export enum Visibility {
   Environment = 'ENVIRONMENT',
   Tenant = 'TENANT',
-  Public = 'PUBLIC'
+  Public = 'PUBLIC',
 }
 
 export enum LifecycleState {
