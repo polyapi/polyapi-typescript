@@ -370,6 +370,16 @@ const generateSingleCustomFunction = async (polyPath: string, functionId: string
   }
 };
 
+const updateLocalConfig = (polyPath: string, contexts?: string[], names?: string[], functionIds?: string[], noTypes?: boolean) => {
+  addOrUpdateConfig(polyPath, 'LAST_GENERATE_CONTEXTS_USED', contexts ? contexts.join(',') : '');
+
+  addOrUpdateConfig(polyPath, 'LAST_GENERATE_NAMES_USED', names ? names.join(',') : '');
+
+  addOrUpdateConfig(polyPath, 'LAST_GENERATE_FUNCTION_IDS_USED', functionIds ? functionIds.join(',') : '');
+
+  addOrUpdateConfig(polyPath, 'LAST_GENERATE_NO_TYPES_USED', noTypes ? 'YES' : 'NO');
+};
+
 const generate = async ({
   polyPath,
   contexts,
@@ -394,13 +404,7 @@ const generate = async ({
   try {
     specs = await getSpecs(contexts, names, functionIds, noTypes);
 
-    let lastUsedContexts = '';
-
-    if (contexts) {
-      lastUsedContexts = contexts?.join(',');
-    }
-
-    addOrUpdateConfig(polyPath, 'LAST_GENERATE_CONTEXTS_USED', lastUsedContexts);
+    updateLocalConfig(polyPath, contexts, names, functionIds, noTypes);
   } catch (error) {
     showErrGettingSpecs(error);
     return;
