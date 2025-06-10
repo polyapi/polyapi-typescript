@@ -63,15 +63,26 @@ export const getTSConfig = () => {
   return {};
 };
 
-export const getTSBaseUrl = (config = getTSConfig()) => config.compilerOptions?.baseUrl || undefined;
+export const getTSBaseUrl = (config = getTSConfig()) =>
+  config.compilerOptions?.baseUrl || undefined;
 
 const loadTsSourceFile = (filePath: string): ts.SourceFile => {
   const fileContent = fs.readFileSync(filePath, 'utf8');
-  const sourceFile = ts.createSourceFile(filePath, fileContent, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    fileContent,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
   return sourceFile;
 };
 
-export const getDependencies = (code: string, fileName: string, baseUrl: string | undefined) => {
+export const getDependencies = (
+  code: string,
+  fileName: string,
+  baseUrl: string | undefined,
+) => {
   const importedLibraries = new Set<string>();
 
   const compilerOptions = {
@@ -90,8 +101,14 @@ export const getDependencies = (code: string, fileName: string, baseUrl: string 
           return (sourceFile) => {
             const visitor = (node: ts.Node): ts.Node => {
               if (ts.isImportDeclaration(node)) {
-                const moduleName = (node.moduleSpecifier as ts.StringLiteral).text;
-                const resolvedModule = ts.resolveModuleName(moduleName, fileName, compilerOptions, compilerHost);
+                const moduleName = (node.moduleSpecifier as ts.StringLiteral)
+                  .text;
+                const resolvedModule = ts.resolveModuleName(
+                  moduleName,
+                  fileName,
+                  compilerOptions,
+                  compilerHost,
+                );
 
                 if (resolvedModule.resolvedModule) {
                   if (resolvedModule.resolvedModule.isExternalLibraryImport) {
@@ -113,23 +130,33 @@ export const getDependencies = (code: string, fileName: string, baseUrl: string 
     },
   });
 
-  let dependencies = Array.from(importedLibraries)
-    .filter(library => !EXCLUDED_REQUIREMENTS.includes(library));
+  let dependencies = Array.from(importedLibraries).filter(
+    (library) => !EXCLUDED_REQUIREMENTS.includes(library),
+  );
 
   if (dependencies.length) {
-    let packageJson: any = fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8');
+    let packageJson: any = fs.readFileSync(
+      path.join(process.cwd(), 'package.json'),
+      'utf-8',
+    );
 
     try {
       packageJson = JSON.parse(packageJson);
     } catch (error) {
-      shell.echo(chalk.yellow('\nWarning:'), 'Failed to parse package.json file in order to read dependencies, there could be issues with some dependencies at the time of deploying the server function.');
+      shell.echo(
+        chalk.yellow('\nWarning:'),
+        'Failed to parse package.json file in order to read dependencies, there could be issues with some dependencies at the time of deploying the server function.',
+      );
     }
 
     const packageJsonDependencies = packageJson.dependencies || {};
     const packageJsonDevDependencies = packageJson.devDependencies || {};
 
     for (const dependency of dependencies) {
-      if (packageJsonDependencies[dependency] || packageJsonDevDependencies[dependency]) {
+      if (
+        packageJsonDependencies[dependency] ||
+        packageJsonDevDependencies[dependency]
+      ) {
         continue;
       }
 
@@ -140,8 +167,11 @@ export const getDependencies = (code: string, fileName: string, baseUrl: string 
 
         const newDependencyPath = dependencyParts.join('/');
 
-        if (packageJsonDependencies[newDependencyPath] || packageJsonDevDependencies[newDependencyPath]) {
-          dependencies = dependencies.map(currentDependency => {
+        if (
+          packageJsonDependencies[newDependencyPath] ||
+          packageJsonDevDependencies[newDependencyPath]
+        ) {
+          dependencies = dependencies.map((currentDependency) => {
             if (currentDependency === dependency) {
               return dependencyParts.join('/');
             }
@@ -159,7 +189,9 @@ export const getDependencies = (code: string, fileName: string, baseUrl: string 
 
 export const parseDeployComment = (comment: string): Deployment => {
   // Poly deployed @ 2024-08-29T22:46:46.791Z - test.weeklyReport - https://develop-k8s.polyapi.io/canopy/polyui/collections/server-functions/f0630f95-eac8-4c7d-9d23-639d39034bb6 - e3b0c44
-  const match = comment.match(/^\s*(?:\/\/\s*)*Poly deployed @ (\S+) - (\S+)\.([^.]+) - (https?:\/\/[^/]+)\/\S+\/(\S+)s\/(\S+) - (\S+)$/);
+  const match = comment.match(
+    /^\s*(?:\/\/\s*)*Poly deployed @ (\S+) - (\S+)\.([^.]+) - (https?:\/\/[^/]+)\/\S+\/(\S+)s\/(\S+) - (\S+)$/,
+  );
   if (!match) return null;
   const [, deployed, context, name, instance, type, id, fileRevision] = match;
   return {
@@ -170,14 +202,18 @@ export const parseDeployComment = (comment: string): Deployment => {
     deployed,
     fileRevision,
     // Local development puts canopy on a different port than the poly-server
-    instance: instance.endsWith('localhost:3000') ? instance.replace(':3000', ':8000') : instance,
+    instance: instance.endsWith('localhost:3000')
+      ? instance.replace(':3000', ':8000')
+      : instance,
   };
 };
 
 type Ranges = Array<[start: number, end: number]>;
 
 // Function to extract leading comments from the source file
-const getDeployComments = (sourceFile: ts.SourceFile): [Deployment[], Ranges] => {
+const getDeployComments = (
+  sourceFile: ts.SourceFile,
+): [Deployment[], Ranges] => {
   const text = sourceFile.getFullText();
   const matches: Deployment[] = [];
   const ranges = [] as Ranges;
@@ -188,7 +224,10 @@ const getDeployComments = (sourceFile: ts.SourceFile): [Deployment[], Ranges] =>
       const match = parseDeployComment(comment.trim());
       if (match) {
         matches.push(match);
-        ranges.push([range.pos, range.end + (range.hasTrailingNewLine ? 1 : 0)]);
+        ranges.push([
+          range.pos,
+          range.end + (range.hasTrailingNewLine ? 1 : 0),
+        ]);
       }
     }
   }
@@ -241,14 +280,17 @@ const parseJSDoc = (node: ts.FunctionDeclaration): any => {
       },
     };
     const firstJsDoc = jsDoc[0];
-    jsDocTags.description = firstJsDoc.comment ? ts.getTextOfJSDocComment(firstJsDoc.comment) : '';
-    firstJsDoc.tags?.forEach(tag => {
+    jsDocTags.description = firstJsDoc.comment
+      ? ts.getTextOfJSDocComment(firstJsDoc.comment)
+      : '';
+    firstJsDoc.tags?.forEach((tag) => {
       const tagName = tag.tagName.text;
       const tagComment = ts.getTextOfJSDocComment(tag.comment) || '';
       if (tagName === 'param' && ts.isJSDocParameterTag(tag)) {
         const paramDetails = tagComment.split(/[\s-]+/);
         const paramName = tag.name.getText();
-        const paramType = tag.typeExpression?.getText().replace(/^{|}$/g, '') || '';
+        const paramType =
+          tag.typeExpression?.getText().replace(/^{|}$/g, '') || '';
         const paramDescription = paramDetails.join(' ').trim();
 
         jsDocTags.params.push({
@@ -270,11 +312,18 @@ const parseJSDoc = (node: ts.FunctionDeclaration): any => {
   return jsDocTags;
 };
 
-const parseTSTypes = (node: ts.FunctionDeclaration, sourceFile: ts.SourceFile): any => {
-  const params = node.parameters.map(param => {
+const parseTSTypes = (
+  node: ts.FunctionDeclaration,
+  sourceFile: ts.SourceFile,
+): any => {
+  const params = node.parameters.map((param) => {
     const name = param.name.getText(sourceFile);
     const type = param.type?.getText(sourceFile);
-    if (!type) throw new Error(`Missing type for function argument '${name}' in file '${sourceFile.fileName}'.`);
+    if (!type) {
+      throw new Error(
+        `Missing type for function argument '${name}' in file '${sourceFile.fileName}'.`,
+      );
+    }
     return {
       name,
       type,
@@ -283,7 +332,11 @@ const parseTSTypes = (node: ts.FunctionDeclaration, sourceFile: ts.SourceFile): 
   });
 
   const type = node.type?.getText(sourceFile);
-  if (!type) throw new Error(`Missing return type for function in file '${sourceFile.fileName}'. Use 'void' if no return type.`);
+  if (!type) {
+    throw new Error(
+      `Missing return type for function in file '${sourceFile.fileName}'. Use 'void' if no return type.`,
+    );
+  }
   const returns = {
     type,
     description: '',
@@ -296,16 +349,28 @@ const parseTSTypes = (node: ts.FunctionDeclaration, sourceFile: ts.SourceFile): 
 };
 
 // Function to extract function details including JSDoc, arguments, and return type
-const getFunctionDetails = (sourceFile: ts.SourceFile, functionName: string) => {
-  let functionDetails: null | Pick<DeployableRecord, 'types' | 'docStartIndex' | 'docEndIndex' | 'dirty'> = null;
+const getFunctionDetails = (
+  sourceFile: ts.SourceFile,
+  functionName: string,
+) => {
+  let functionDetails: null | Pick<
+    DeployableRecord,
+    'types' | 'docStartIndex' | 'docEndIndex' | 'dirty'
+  > = null;
   let dirty = false; // Dirty means that something needs fixed in the file
   const visit = (node: ts.Node) => {
-    if (ts.isFunctionDeclaration(node) && node.name?.getText(sourceFile) === functionName) {
+    if (
+      ts.isFunctionDeclaration(node) &&
+      node.name?.getText(sourceFile) === functionName
+    ) {
       const jsDoc = parseJSDoc(node);
       const types = parseTSTypes(node, sourceFile);
       if (
         jsDoc &&
-        types.params.every((p, i) => p.type === jsDoc.params[i].type && p.name === jsDoc.params[i].name) &&
+        types.params.every(
+          (p, i) =>
+            p.type === jsDoc.params[i].type && p.name === jsDoc.params[i].name,
+        ) &&
         types.returns.type === jsDoc.returns.type
       ) {
         // Try to preserve JSDoc descriptions if things haven't changed
@@ -314,7 +379,10 @@ const getFunctionDetails = (sourceFile: ts.SourceFile, functionName: string) => 
         });
         types.returns.description = jsDoc.returns.description;
         types.description = jsDoc.description;
-        dirty = types.params.some((p, i) => p.type !== jsDoc.params[i].type || p.name !== jsDoc.params[i].name);
+        dirty = types.params.some(
+          (p, i) =>
+            p.type !== jsDoc.params[i].type || p.name !== jsDoc.params[i].name,
+        );
       } else {
         dirty = true;
       }
@@ -334,11 +402,21 @@ const getFunctionDetails = (sourceFile: ts.SourceFile, functionName: string) => 
   };
 
   visit(sourceFile);
-  if (!functionDetails) throw new Error(`Failed to find a function named '${functionName}' within file '${sourceFile.fileName}'. Verify that your polyConfig name matches a valid function declared within the same file.`);
+  if (!functionDetails) {
+    throw new Error(
+      `Failed to find a function named '${functionName}' within file '${sourceFile.fileName}'. Verify that your polyConfig name matches a valid function declared within the same file.`,
+    );
+  }
   return functionDetails;
 };
 
-const parseDeployableFunction = (sourceFile: ts.SourceFile, polyConfig: ParsedDeployableConfig, baseUrl: string, fileRevision: string, gitRevision: string): DeployableRecord => {
+const parseDeployableFunction = (
+  sourceFile: ts.SourceFile,
+  polyConfig: ParsedDeployableConfig,
+  baseUrl: string,
+  fileRevision: string,
+  gitRevision: string,
+): DeployableRecord => {
   const [deployments, deploymentCommentRanges] = getDeployComments(sourceFile);
   const functionDetails = getFunctionDetails(sourceFile, polyConfig.name);
   const dependencies = getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl);
@@ -356,7 +434,13 @@ const parseDeployableFunction = (sourceFile: ts.SourceFile, polyConfig: ParsedDe
   };
 };
 
-const parseWebhook = (sourceFile: ts.SourceFile, polyConfig: ParsedDeployableConfig, baseUrl: string, fileRevision: string, gitRevision: string): DeployableRecord => {
+const parseWebhook = (
+  sourceFile: ts.SourceFile,
+  polyConfig: ParsedDeployableConfig,
+  baseUrl: string,
+  fileRevision: string,
+  gitRevision: string,
+): DeployableRecord => {
   const [deployments] = getDeployComments(sourceFile);
   return {
     ...polyConfig,
@@ -367,10 +451,17 @@ const parseWebhook = (sourceFile: ts.SourceFile, polyConfig: ParsedDeployableCon
   };
 };
 
-export const parseDeployable = async (filePath: string, baseUrl: string, gitRevision: string): Promise<[DeployableRecord, string]> => {
+export const parseDeployable = async (
+  filePath: string,
+  baseUrl: string,
+  gitRevision: string,
+): Promise<[DeployableRecord, string]> => {
   const sourceFile = await loadTsSourceFile(filePath);
 
-  const polyConfig = getPolyConfig(DeployableTypeEntries.map(e => e[0]), sourceFile);
+  const polyConfig = getPolyConfig(
+    DeployableTypeEntries.map((e) => e[0]),
+    sourceFile,
+  );
   polyConfig.type = DeployableTsTypeToName[polyConfig.type];
   const fileContents = sourceFile.getFullText();
   const fileRevision = getDeployableFileRevision(fileContents);
@@ -378,13 +469,35 @@ export const parseDeployable = async (filePath: string, baseUrl: string, gitRevi
     switch (polyConfig.type) {
       case 'server-function':
       case 'client-function':
-        return [parseDeployableFunction(sourceFile, polyConfig, baseUrl, fileRevision, gitRevision), fileContents];
+        return [
+          parseDeployableFunction(
+            sourceFile,
+            polyConfig,
+            baseUrl,
+            fileRevision,
+            gitRevision,
+          ),
+          fileContents,
+        ];
       case 'webhook':
-        return [parseWebhook(sourceFile, polyConfig, baseUrl, fileRevision, gitRevision), fileContents];
+        return [
+          parseWebhook(
+            sourceFile,
+            polyConfig,
+            baseUrl,
+            fileRevision,
+            gitRevision,
+          ),
+          fileContents,
+        ];
     }
     throw new Error('Invalid Poly deployment with unsupported type');
   } catch (err) {
-    console.error(`Prepared ${polyConfig.type.replaceAll('-', ' ')} ${polyConfig.context}.${polyConfig.name}: ERROR`);
+    console.error(
+      `Prepared ${polyConfig.type.replaceAll('-', ' ')} ${polyConfig.context}.${
+        polyConfig.name
+      }: ERROR`,
+    );
     console.error(err);
   }
 };

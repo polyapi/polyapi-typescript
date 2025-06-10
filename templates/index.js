@@ -1,4 +1,3 @@
-const set = require('lodash/set');
 const merge = require('lodash/merge');
 const { io } = require('socket.io-client');
 const apiFunctions = require('./api');
@@ -9,8 +8,8 @@ const serverFunctions = require('./server');
 const vari = require('./vari');
 const polyCustom = require('./poly-custom');
 const { createErrorHandler, sendLocalErrorEvent } = require('./error-handler');
+const { CLIENT_ID, API_KEY, API_BASE_URL } = require('./constants');
 
-const clientID = '{{clientID}}';
 const nodeEnv = process.env.NODE_ENV;
 const isDevEnv = nodeEnv === 'development';
 
@@ -18,7 +17,7 @@ let socket = null;
 let listenersCount = 0;
 
 const getSocket = () => {
-  let apiBaseUrl = '{{apiBaseUrl}}';
+  let apiBaseUrl = API_BASE_URL;
   if (!isDevEnv) {
     apiBaseUrl = apiBaseUrl.replace(/^http:/, 'https:');
   }
@@ -58,20 +57,20 @@ const getSocket = () => {
     }
   });
 };
-const getApiKey = () => polyCustom.executionApiKey || '{{apiKey}}';
+const getApiKey = () => polyCustom.executionApiKey || API_KEY;
 const poly = {};
 
 merge(
   poly,
-  apiFunctions(clientID, polyCustom),
+  apiFunctions(CLIENT_ID, polyCustom),
   clientFunctions(poly, sendLocalErrorEvent),
-  serverFunctions(clientID, polyCustom),
-  authFunctions(clientID, getSocket, getApiKey),
-  webhooks(clientID, getSocket, getApiKey),
+  serverFunctions(CLIENT_ID, polyCustom),
+  authFunctions(CLIENT_ID, getSocket, getApiKey),
+  webhooks(CLIENT_ID, getSocket, getApiKey),
 ),
 module.exports = {
   ...poly,
   errorHandler: createErrorHandler(getApiKey, getSocket),
-  vari: vari(clientID, getSocket, getApiKey),
+  vari: vari(CLIENT_ID, getSocket, getApiKey),
   polyCustom,
 };

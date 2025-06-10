@@ -1,6 +1,6 @@
 {
   "name": "polyapi",
-  "version": "0.23.16",
+  "version": "0.23.21",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
@@ -21,7 +21,7 @@
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "prebuild": "rimraf build",
     "postbuild": "npm run copy-templates",
-    "copy-templates": "copyfiles \"templates/**/*.hbs\" build",
+    "copy-templates": "copyfiles \"templates/**/*\" build",
     "format": "prettier --write \"src/**/*.ts\"",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "prepare": "husky install",

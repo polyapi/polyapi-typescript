@@ -12,12 +12,12 @@ export interface WebhookHandleXmlParserOptions {
   /**
    * If is enabled, it will send webhook xml request body as a json object to server functions and webhook listeners, otherwise it will send it as string.
    * Default: `true`.
-  */
+   */
   enabled?: boolean;
   /**
    * Always put child nodes in an array if true; otherwise an array is created only if there is more than one.
    * Default: `false`.
-  */
+   */
   explicitArray?: boolean;
   /**
    * Trim the whitespace at the beginning and end of text nodes.

@@ -74,7 +74,7 @@ describe('Generate types from specs', () => {
     });
   });
 
-  test.only('formatName', () => {
+  test('formatName', () => {
     expect(formatName('Abc')).toBe('Abc');
     expect(formatName('Abc', true)).toBe('Abc');
     expect(formatName('AbcDef')).toBe('AbcDef');
@@ -114,7 +114,7 @@ describe('Generate types from specs', () => {
             publicNamespace: 'OOB'
           }
         };
-        const expected = 'type Foo = OOB.Polyapi.Adyen.Capital.AccountBalance;';
+        const expected = 'type Foo = Oob.Polyapi.Adyen.Capital.AccountBalance;';
         expect(printSchemaAsType(schema, 'foo', 0)).toEqual(expected);
       });
       test('unresolved poly schema', () => {
@@ -1559,42 +1559,8 @@ describe('Generate types from specs', () => {
     const specs = [specA, specB, specC, specD, specE] as SchemaSpec[];
     const expected = [
       {
-        path: 'default',
-        interfaceName: 'Schemas',
-        interfaces: {
-          aaron: 'Aaron',
-          foo: 'Foo',
-          Goody: 'Goody',
-        },
-        namespaces: {
-          aaron: {},
-          foo: {},
-          Goody: specE
-        },
-        hasTypes: true,
-      },
-      {
-        path: 'aaron',
-        interfaceName: 'Aaron',
-        interfaces: {
-          testing: 'AaronTesting',
-          AnotherThing: 'Aaron.AnotherThing',
-        },
-        namespaces: {
-          aaron: {
-            testing: {},
-            AnotherThing: specC
-          }
-        },
-        hasTypes: true,
-      },
-      {
         path: 'aaron.testing',
         interfaceName: 'AaronTesting',
-        interfaces: {
-          ProjectApiKeyDeleteResponse: 'Aaron.Testing.ProjectApiKeyDeleteResponse',
-          SomethingElse: 'Aaron.Testing.SomethingElse',
-        },
         namespaces: {
           aaron: {
             testing: {
@@ -1603,25 +1569,19 @@ describe('Generate types from specs', () => {
             }
           }
         },
-        hasTypes: true,
       },
       {
-        path: 'foo',
-        interfaceName: 'Foo',
-        interfaces: { bar: 'FooBar' },
+        path: 'aaron',
+        interfaceName: 'Aaron',
         namespaces: {
-          foo: {
-            bar: {}
+          aaron: {
+            AnotherThing: specC
           }
         },
-        hasTypes: false,
       },
       {
         path: 'foo.bar',
         interfaceName: 'FooBar',
-        interfaces: {
-          Baz: 'Foo.Bar.Baz'
-        },
         namespaces: {
           foo: {
             bar: {
@@ -1629,7 +1589,13 @@ describe('Generate types from specs', () => {
             }
           }
         },
-        hasTypes: true,
+      },
+      {
+        path: 'default',
+        interfaceName: 'Schemas',
+        namespaces: {
+          Goody: specE
+        },
       },
     ]
     // Stringify and using jest's `toEqual` to make sure that we match strictly
@@ -1683,41 +1649,12 @@ describe('Generate types from specs', () => {
 
       expect(result['index.d.ts']).toEqual(
         multiline(
-          '/// <reference path="./default.d.ts" />',
-          '/// <reference path="./aaron.d.ts" />',
           '/// <reference path="./aaron.testing.d.ts" />',
-        )
-      );
-      expect(result['default.d.ts']).toEqual(
-        multiline(
-          'declare namespace schemas {',
-          '  interface Schemas {',
-          '    aaron: Aaron;',
-          '  }',
-          '  namespace Aaron {',
-          '  }',
-          '}',
-        )
-      );
-      expect(result['aaron.d.ts']).toEqual(
-        multiline(
-          'declare namespace schemas {',
-          '  interface Aaron {',
-          '    testing: AaronTesting;',
-          '  }',
-          '  namespace Aaron {',
-          '    namespace Testing {',
-          '    }',
-          '  }',
-          '}',
         )
       );
       expect(result['aaron.testing.d.ts']).toEqual(
         multiline(
           'declare namespace schemas {',
-          '  interface AaronTesting {',
-          '    ProjectApiKeyDeleteResponse: Aaron.Testing.ProjectApiKeyDeleteResponse;',
-          '  }',
           '  namespace Aaron {',
           '    namespace Testing {',
           '      type ProjectApiKeyDeleteResponse = {',
@@ -1727,6 +1664,144 @@ describe('Generate types from specs', () => {
           '      };',
           '    }',
           '  }',
+          '}',
+        )
+      );
+    });
+
+    test('single spec with nested definitions', () => {
+      const specs: SchemaSpec[] = [
+        {
+          'id': 'ad5edb98-9eeb-4bb5-8122-32f9a6f6b512',
+          'name': 'ProjectApiKeyDeleteResponse',
+          'context': 'aaron.testing',
+          'contextName': 'aaron.testing.ProjectApiKeyDeleteResponse',
+          'type': 'schema',
+          'definition': {
+            'type': 'object',
+            'properties': {
+              'object': {
+                '$ref': '#/definitions/ProjectApiKeyDeleteResponse'
+              },
+              'id': {
+                '$ref': '#/definitions/Id'
+              },
+              'deleted': {
+                '$ref': '#/definitions/Deleted'
+              }
+            },
+            'required': [
+              'object',
+              'id',
+              'deleted'
+            ],
+            'additionalProperties': false,
+            '$schema': 'http://json-schema.org/draft-06/schema#',
+            'title': 'Schema',
+            'definitions': {
+              'ProjectApiKeyDeleteResponse': {
+                'type': 'string',
+                'enum': [
+                  'organization.project.api_key.deleted'
+                ]
+              },
+              'Id': {
+                'type': 'string'
+              },
+              'Deleted': {
+                'type': 'boolean'
+              }
+            }
+          },
+          'visibilityMetadata': {
+            'visibility': 'ENVIRONMENT'
+          },
+          'unresolvedPolySchemaRefs': []
+        } as SchemaSpec
+      ];
+
+      const result = printSchemaSpecs(specs);
+
+      expect(result['index.d.ts']).toEqual(
+        multiline(
+          '/// <reference path="./aaron.testing.d.ts" />',
+        )
+      );
+      expect(result['aaron.testing.d.ts']).toEqual(
+        multiline(
+          'declare namespace schemas {',
+          '  namespace Aaron {',
+          '    namespace Testing {',
+          '      type ProjectApiKeyDeleteResponse = {',
+          '        object: Aaron.Testing.ProjectApiKeyDeleteResponse1;',
+          '        id: Aaron.Testing.Id;',
+          '        deleted: Aaron.Testing.Deleted;',
+          '      };',
+          '      type ProjectApiKeyDeleteResponse1 = \'organization.project.api_key.deleted\';',
+          '      type Id = string;',
+          '      type Deleted = boolean;',
+          '    }',
+          '  }',
+          '}',
+        )
+      );
+    });
+
+    test('single spec with no context', () => {
+      const specs: SchemaSpec[] = [
+        {
+          'id': 'ad5edb98-9eeb-4bb5-8122-32f9a6f6b512',
+          'name': 'ProjectApiKeyDeleteResponse',
+          'context': '',
+          'contextName': 'ProjectApiKeyDeleteResponse',
+          'type': 'schema',
+          'definition': {
+            'type': 'object',
+            'properties': {
+              'object': {
+                'type': 'string',
+                'enum': [
+                  'organization.project.api_key.deleted'
+                ]
+              },
+              'id': {
+                'type': 'string'
+              },
+              'deleted': {
+                'type': 'boolean'
+              }
+            },
+            'required': [
+              'object',
+              'id',
+              'deleted'
+            ],
+            'additionalProperties': false,
+            '$schema': 'http://json-schema.org/draft-06/schema#',
+            'title': 'Schema'
+          },
+          'visibilityMetadata': {
+            'visibility': 'ENVIRONMENT'
+          },
+          'unresolvedPolySchemaRefs': []
+        } as SchemaSpec
+      ];
+
+      const result = printSchemaSpecs(specs);
+
+      expect(result['index.d.ts']).toEqual(
+        multiline(
+          '/// <reference path="./default.d.ts" />',
+        )
+      );
+      expect(result['default.d.ts']).toEqual(
+        multiline(
+          'declare namespace schemas {',
+          '  type ProjectApiKeyDeleteResponse = {',
+          '    object: \'organization.project.api_key.deleted\';',
+          '    id: string;',
+          '    deleted: boolean;',
+          '  };',
           '}',
         )
       );
@@ -1832,39 +1907,23 @@ describe('Generate types from specs', () => {
 
       expect(result['index.d.ts']).toEqual(
         multiline(
-          '/// <reference path="./default.d.ts" />',
-          '/// <reference path="./aaron.d.ts" />',
           '/// <reference path="./aaron.testing.d.ts" />',
-          '/// <reference path="./foo.d.ts" />',
+          '/// <reference path="./aaron.d.ts" />',
           '/// <reference path="./foo.bar.d.ts" />',
+          '/// <reference path="./default.d.ts" />',
         )
       );
       expect(result['default.d.ts']).toEqual(
         multiline(
           'declare namespace schemas {',
-          '  interface Schemas {',
-          '    aaron: Aaron;',
-          '    foo: Foo;',
-          '    Goody: Goody;',
-          '  }',
-          '  namespace Aaron {',
-          '  }',
-          '  namespace Foo {',
-          '  }',
-          '  type Goody = unknown;',
+          '  type Goody = number;',
           '}',
         )
       );
       expect(result['aaron.d.ts']).toEqual(
         multiline(
           'declare namespace schemas {',
-          '  interface Aaron {',
-          '    testing: AaronTesting;',
-          '    AnotherThing: Aaron.AnotherThing;',
-          '  }',
           '  namespace Aaron {',
-          '    namespace Testing {',
-          '    }',
           '    type AnotherThing = number;',
           '  }',
           '}',
@@ -1873,10 +1932,6 @@ describe('Generate types from specs', () => {
       expect(result['aaron.testing.d.ts']).toEqual(
         multiline(
           'declare namespace schemas {',
-          '  interface AaronTesting {',
-          '    ProjectApiKeyDeleteResponse: Aaron.Testing.ProjectApiKeyDeleteResponse;',
-          '    SomethingElse: Aaron.Testing.SomethingElse;',
-          '  }',
           '  namespace Aaron {',
           '    namespace Testing {',
           '      type ProjectApiKeyDeleteResponse = {',
@@ -1885,6 +1940,18 @@ describe('Generate types from specs', () => {
           '        deleted: boolean;',
           '      };',
           '      type SomethingElse = string;',
+          '    }',
+          '  }',
+          '}',
+        )
+      );
+
+      expect(result['foo.bar.d.ts']).toEqual(
+        multiline(
+          'declare namespace schemas {',
+          '  namespace Foo {',
+          '    namespace Bar {',
+          '      type Baz = number;',
           '    }',
           '  }',
           '}',
@@ -1950,52 +2017,14 @@ describe('Generate types from specs', () => {
 
       expect(result['index.d.ts']).toEqual(
         multiline(
-          '/// <reference path="./default.d.ts" />',
-          '/// <reference path="./aaron.d.ts" />',
           '/// <reference path="./aaron.testing.d.ts" />',
-          '/// <reference path="./other.d.ts" />',
           '/// <reference path="./other.foober.d.ts" />',
-          '/// <reference path="./polyapi.d.ts" />',
-          '/// <reference path="./polyapi.adyen.d.ts" />',
           '/// <reference path="./polyapi.adyen.capital.d.ts" />',
-        )
-      );
-      expect(result['default.d.ts']).toEqual(
-        multiline(
-          'declare namespace schemas {',
-          '  interface Schemas {',
-          '    aaron: Aaron;',
-          '    other: Other;',
-          '    polyapi: Polyapi;',
-          '  }',
-          '  namespace Aaron {',
-          '  }',
-          '  namespace Other {',
-          '  }',
-          '  namespace Polyapi {',
-          '  }',
-          '}',
-        )
-      );
-      expect(result['aaron.d.ts']).toEqual(
-        multiline(
-          'declare namespace schemas {',
-          '  interface Aaron {',
-          '    testing: AaronTesting;',
-          '  }',
-          '  namespace Aaron {',
-          '    namespace Testing {',
-          '    }',
-          '  }',
-          '}',
         )
       );
       expect(result['aaron.testing.d.ts']).toEqual(
         multiline(
           'declare namespace schemas {',
-          '  interface AaronTesting {',
-          '    ProjectApiKeyDeleteResponse: Aaron.Testing.ProjectApiKeyDeleteResponse;',
-          '  }',
           '  namespace Aaron {',
           '    namespace Testing {',
           '      type ProjectApiKeyDeleteResponse = {',
@@ -2010,40 +2039,9 @@ describe('Generate types from specs', () => {
           '}',
         )
       );
-      expect(result['polyapi.d.ts']).toEqual(
-        multiline(
-          'declare namespace schemas {',
-          '  interface Polyapi {',
-          '    adyen: Adyen;',
-          '  }',
-          '  namespace Polyapi {',
-          '    namespace Adyen {',
-          '    }',
-          '  }',
-          '}',
-        )
-      );
-      expect(result['polyapi.adyen.d.ts']).toEqual(
-        multiline(
-          'declare namespace schemas {',
-          '  interface Adyen {',
-          '    capital: PolyapiAdyenCapital;',
-          '  }',
-          '  namespace Polyapi {',
-          '    namespace Adyen {',
-          '      namespace Capital {',
-          '      }',
-          '    }',
-          '  }',
-          '}',
-        )
-      );
       expect(result['polyapi.adyen.capital.d.ts']).toEqual(
         multiline(
           'declare namespace schemas {',
-          '  interface PolyapiAdyenCapital {',
-          '    OtherOptions: Polyapi.Adyen.Capital.OtherOptions;',
-          '  }',
           '  namespace Polyapi {',
           '    namespace Adyen {',
           '      namespace Capital {',
@@ -2057,25 +2055,9 @@ describe('Generate types from specs', () => {
           '}',
         )
       );
-      expect(result['other.d.ts']).toEqual(
-        multiline(
-          'declare namespace schemas {',
-          '  interface Other {',
-          '    foober: OtherFoober;',
-          '  }',
-          '  namespace Other {',
-          '    namespace Foober {',
-          '    }',
-          '  }',
-          '}',
-        )
-      );
       expect(result['other.foober.d.ts']).toEqual(
         multiline(
           'declare namespace schemas {',
-          '  interface OtherFoober {',
-          '    Headers: Other.Foober.Headers;',
-          '  }',
           '  namespace Other {',
           '    namespace Foober {',
           '      /**',
@@ -2274,21 +2256,12 @@ describe('Generate types from specs', () => {
 
       expect(result['index.d.ts']).toEqual(
         multiline(
-          '/// <reference path="./default.d.ts" />',
-          '/// <reference path="./adyen.d.ts" />',
           '/// <reference path="./adyen.capital.d.ts" />',
         )
       );
       expect(result['adyen.capital.d.ts']).toEqual(
         multiline(
           'declare namespace schemas {',
-          '  interface AdyenCapital {',
-          '    BankAccountIdentification: Adyen.Capital.BankAccountIdentification;',
-          '    IbanAccountIdentification: Adyen.Capital.IbanAccountIdentification;',
-          '    NumberAndBicAccountIdentification: Adyen.Capital.NumberAndBicAccountIdentification;',
-          '    AdditionalBankIdentification: Adyen.Capital.AdditionalBankIdentification;',
-          '    AULocalAccountIdentification: Adyen.Capital.AuLocalAccountIdentification;',
-          '  }',
           '  namespace Adyen {',
           '    namespace Capital {',
           '      type BankAccountIdentification = {',

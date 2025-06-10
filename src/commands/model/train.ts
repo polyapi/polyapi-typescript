@@ -7,7 +7,11 @@ import dotenv from 'dotenv';
 import { chunk } from 'lodash';
 
 import { SpecificationInputDto } from '../../types';
-import { upsertApiFunction, upsertSchema, upsertWebhookHandle } from '../../api';
+import {
+  upsertApiFunction,
+  upsertSchema,
+  upsertWebhookHandle,
+} from '../../api';
 import { firstLetterToUppercase } from '../../utils';
 
 const readFile = promisify(fs.readFile);
@@ -18,13 +22,13 @@ dotenv.config();
 type BaseResource = {
   name: string;
   context: string;
-}
+};
 
 type BaseResult = {
   id: string;
   name: string;
   context: string;
-}
+};
 
 const generateClientCode = async (polyPath: string) => {
   try {
@@ -47,9 +51,9 @@ const executeTraining = async <T extends BaseResource, V extends BaseResult>({
   resourceName,
   upsertFn,
 }: {
-  resources: T[],
-  resourceName: string,
-  upsertFn(resource: T): Promise<V>
+  resources: T[];
+  resourceName: string;
+  upsertFn(resource: T): Promise<V>;
 }) => {
   const chunkSize = 5;
 
@@ -64,7 +68,15 @@ const executeTraining = async <T extends BaseResource, V extends BaseResult>({
 
     const lastResourceNumberInChunk = chunkSize * (chunkIterations + 1);
 
-    shell.echo(`Training from ${resourceName} number ${(chunkSize * chunkIterations) + 1} to ${resourceName} number ${lastResourceNumberInChunk <= resources.length ? lastResourceNumberInChunk : resources.length} out of ${resources.length}`);
+    shell.echo(
+      `Training from ${resourceName} number ${
+        chunkSize * chunkIterations + 1
+      } to ${resourceName} number ${
+        lastResourceNumberInChunk <= resources.length
+          ? lastResourceNumberInChunk
+          : resources.length
+      } out of ${resources.length}`,
+    );
 
     for (const resource of resourceChunk) {
       calls.push(upsertFn(resource));
@@ -74,7 +86,10 @@ const executeTraining = async <T extends BaseResource, V extends BaseResult>({
     results.push(...(await Promise.allSettled(calls)));
   }
 
-  const failedResources: (typeof resources[number] & { index: number, reason?: string })[] = [];
+  const failedResources: ((typeof resources)[number] & {
+    index: number;
+    reason?: string;
+  })[] = [];
   const createdResources: V[] = [];
 
   for (let i = 0; i < results.length; i++) {
@@ -89,7 +104,9 @@ const executeTraining = async <T extends BaseResource, V extends BaseResult>({
       let message = 'Request failure';
 
       if (httpStatusCode) {
-        message = `${message} with status code ${chalk.redBright(httpStatusCode)}`;
+        message = `${message} with status code ${chalk.redBright(
+          httpStatusCode,
+        )}`;
       }
 
       if (errMessage) {
@@ -112,16 +129,35 @@ const executeTraining = async <T extends BaseResource, V extends BaseResult>({
     shell.echo('\n');
     shell.echo(chalk.green('Success:'), `Trained ${resourceName}s:`);
     shell.echo('\n');
-    shell.echo(createdResources.map(({ id, name, context }, index) => chalk.blueBright(`${index + 1}. ${context ? context + '.' : ''}${name} - ${id}`)).join('\n'));
+    shell.echo(
+      createdResources
+        .map(({ id, name, context }, index) =>
+          chalk.blueBright(
+            `${index + 1}. ${context ? context + '.' : ''}${name} - ${id}`,
+          ),
+        )
+        .join('\n'),
+    );
     shell.echo('\n');
   }
 
   if (failedResources.length) {
     shell.echo('\n');
-    shell.echo(chalk.redBright('Danger:'), `Failed to train ${resourceName}s for:`);
+    shell.echo(
+      chalk.redBright('Danger:'),
+      `Failed to train ${resourceName}s for:`,
+    );
     shell.echo('\n');
     for (const failedResource of failedResources) {
-      shell.echo(`${firstLetterToUppercase(resourceName)} with context`, `"${failedResource.context || ''}" and`, 'name', `"${failedResource.name || ''}"`, 'at index:', chalk.yellow(`${failedResource.index}`), `- Reason: ${failedResource.reason}`);
+      shell.echo(
+        `${firstLetterToUppercase(resourceName)} with context`,
+        `"${failedResource.context || ''}" and`,
+        'name',
+        `"${failedResource.name || ''}"`,
+        'at index:',
+        chalk.yellow(`${failedResource.index}`),
+        `- Reason: ${failedResource.reason}`,
+      );
     }
     shell.echo('\n');
   }
@@ -141,7 +177,9 @@ export const train = async (polyPath: string, path: string) => {
   }
 
   try {
-    const specificationInput: SpecificationInputDto = JSON.parse(contents) as SpecificationInputDto;
+    const specificationInput: SpecificationInputDto = JSON.parse(
+      contents,
+    ) as SpecificationInputDto;
 
     const createdApiFunctionsCount = await executeTraining({
       resources: specificationInput.functions,
@@ -167,7 +205,11 @@ export const train = async (polyPath: string, path: string) => {
       },
     });
 
-    if (createdApiFunctionsCount > 0 || createdWebhooksCount > 0 || createdSchemasCount > 0) {
+    if (
+      createdApiFunctionsCount > 0 ||
+      createdWebhooksCount > 0 ||
+      createdSchemasCount > 0
+    ) {
       await generateClientCode(polyPath);
     }
   } catch (error) {
