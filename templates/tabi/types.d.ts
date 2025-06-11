@@ -61,14 +61,9 @@ type PolyInsertManyQuery<T extends Record<string, unknown>> = Clean<{
   data: OptionalPolyColumns<T>[];
 }>;
 
-type PolyUpdateOneQuery<T extends Record<string, unknown>> = Clean<{
+type PolyUpdateQuery<T extends Record<string, unknown>> = Clean<{
   where: Where<T>;
   data: Subset<T>;
-}>;
-
-type PolyUpdateManyQuery<T extends Record<string, unknown>> = Clean<{
-  where: Where<T>;
-  data: Subset<T>[];
 }>;
 
 type PolyQueryResults<T extends Record<string, unknown>> = Clean<{

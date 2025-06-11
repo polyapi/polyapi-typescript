@@ -63,12 +63,10 @@ class Table {
   }
 
   updateMany(query) {
-    if (query.data.length > 1000) throw Error(`Cannot update more than 1000 rows at a time.`);
     return executeQuery(this.id, 'update', query, this.clientID, this.polyCustom);
   }
 
   updateOne(query) {
-    query.data = [query.data];
     return executeQuery(this.id, 'update', query, this.clientID, this.polyCustom).then(firstResult)
   }
 
