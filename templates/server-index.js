@@ -14,6 +14,6 @@ module.exports = (clientID, polyCustom) => functions.reduce(
           'x-poly-execution-id': polyCustom.executionId,
         }
       }
-    ).then(({ data }) => data)).catch(scrubKeys),
+    ).then(({ data }) => data).catch(scrubKeys)),
   {}
 );
