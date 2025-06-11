@@ -62,7 +62,7 @@ type PolyInsertManyQuery<T extends Record<string, unknown>> = Clean<{
 }>;
 
 type PolyUpdateQuery<T extends Record<string, unknown>> = Clean<{
-  where: Where<T>;
+  where?: Where<T>;
   data: Subset<T>;
 }>;
 
