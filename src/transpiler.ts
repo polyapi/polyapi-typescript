@@ -420,7 +420,7 @@ const parseDeployableFunction = (
   const [deployments, deploymentCommentRanges] = getDeployComments(sourceFile);
   const functionDetails = getFunctionDetails(sourceFile, polyConfig.name);
   const dependencies = getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl);
-  const typeSchemas = generateTypeSchemas(sourceFile.fileName, DeployableTypeEntries.map(d => d[0]));
+  const typeSchemas = generateTypeSchemas(sourceFile.fileName, DeployableTypeEntries.map(d => d[0]), polyConfig.name);
   return {
     ...polyConfig,
     ...functionDetails,
@@ -502,10 +502,162 @@ export const parseDeployable = async (
   }
 };
 
-const getFunctionTypes = (filePath: string, functionName: string): {
-  argumentTypes: string[];
-  returnType: string | null;
-} => {
+const dereferenceSchema = (obj: any, definitions: any, visited: Set<string> = new Set()): any => {
+  if (!obj || typeof obj !== 'object') return obj;
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => dereferenceSchema(item, definitions, visited));
+  }
+  
+  const result: any = {};
+  
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === '$ref' && typeof value === 'string') {
+      const match = value.match(/^#\/definitions\/(.+)$/);
+      if (match) {
+        const defName = match[1];
+        
+        // Prevent infinite recursion
+        if (visited.has(defName)) {
+          return { $ref: value };
+        }
+        
+        const definition = definitions[defName];
+        if (definition) {
+          // Inspired by old flattenDefinitions logic: Check if this looks like a "real" type 
+          // vs a utility type by examining the definition structure
+          const shouldInline = isInlineableDefinition(definition, defName);
+          
+          if (shouldInline) {
+            // Inline the definition
+            visited.add(defName);
+            const { definitions: _, ...inlinedDef } = definition;
+            const result = dereferenceSchema(inlinedDef, definitions, visited);
+            visited.delete(defName);
+            return result;
+          } else {
+            // Keep as reference (utility types, complex mapped types, etc.)
+            return { $ref: value };
+          }
+        }
+      }
+      return { $ref: value };
+    } else {
+      result[key] = dereferenceSchema(value, definitions, visited);
+    }
+  }
+  
+  return result;
+};
+
+const isInlineableDefinition = (definition: any, defName: string): boolean => {
+  const decodedDefName = decodeURIComponent(defName);
+  
+  // If it has "real" object properties, it's probably a real interface that should be inlined
+  if (definition.type === 'object' && definition.properties && 
+      Object.keys(definition.properties).length > 0) {
+    return true;
+  }
+  
+  // If it has array items with concrete structure, inline it
+  if (definition.type === 'array' && definition.items && 
+      typeof definition.items === 'object' && definition.items.type) {
+    return true;
+  }
+  
+  // If it's a simple type (string, number, boolean), inline it
+  if (['string', 'number', 'boolean', 'integer'].includes(definition.type)) {
+    return true;
+  }
+  
+  // If it has enum values, it's a real type, inline it
+  if (definition.enum && definition.enum.length > 0) {
+    return true;
+  }
+  
+  // If it's a union/intersection of concrete types, inline it
+  if ((definition.anyOf || definition.allOf) && !decodedDefName.includes('<')) {
+    return true;
+  }
+  
+  // Keep as reference if it looks like a utility type (contains < > or other TypeScript operators)
+  if (decodedDefName.includes('<') || decodedDefName.includes('>') || 
+      decodedDefName.includes('|') || decodedDefName.includes('&')) {
+    return false;
+  }
+  
+  // If we can't determine, err on the side of inlining for "normal" looking names
+  return !/[<>%|&]/.test(decodedDefName);
+};
+
+const dereferenceRoot = (schema: any): any => {
+  if (!schema || !schema.definitions) return schema;
+
+  // If schema has a root $ref, dereference it first
+  let rootSchema = schema;
+  if (schema.$ref) {
+    const match = schema.$ref.match(/^#\/definitions\/(.+)$/);
+    if (match) {
+      const defName = match[1];
+      const root = schema.definitions[defName];
+      if (root) {
+        const { definitions, $schema, $ref, ...rest } = schema;
+        rootSchema = {
+          ...root,
+          definitions,
+          $schema,
+          ...rest,
+        };
+      }
+    }
+  }
+
+  // Now recursively dereference based on intelligent heuristics
+  const { definitions, $schema, ...rest } = rootSchema;
+  const dereferencedRest = dereferenceSchema(rest, definitions);
+  
+  // Collect remaining references that weren't inlined
+  const filteredDefinitions: any = {};
+  const findReferences = (obj: any, visited: Set<string> = new Set()): void => {
+    if (!obj || typeof obj !== 'object') return;
+    if (Array.isArray(obj)) {
+      obj.forEach(item => findReferences(item, visited));
+      return;
+    }
+    for (const [key, value] of Object.entries(obj)) {
+      if (key === '$ref' && typeof value === 'string') {
+        const match = value.match(/^#\/definitions\/(.+)$/);
+        if (match) {
+          const encodedDefName = match[1];
+          const decodedDefName = decodeURIComponent(encodedDefName);
+          
+          // Try both encoded and decoded versions
+          const actualDefName = definitions[encodedDefName] ? encodedDefName : 
+                               definitions[decodedDefName] ? decodedDefName : null;
+          
+          if (actualDefName && !visited.has(actualDefName)) {
+            visited.add(actualDefName);
+            filteredDefinitions[actualDefName] = definitions[actualDefName];
+            // Also recursively find references within this definition
+            findReferences(definitions[actualDefName], visited);
+          }
+        }
+      } else {
+        findReferences(value, visited);
+      }
+    }
+  };
+  
+  findReferences(dereferencedRest);
+  
+  return {
+    ...dereferencedRest,
+    ...(Object.keys(filteredDefinitions).length > 0 && { definitions: filteredDefinitions }),
+    $schema,
+  };
+};
+
+export const extractTypesFromAST = (filePath: string, functionName: string): string[] => {
   const program = ts.createProgram([filePath], {
     target: ts.ScriptTarget.ESNext,
     module: ts.ModuleKind.CommonJS,
@@ -514,54 +666,69 @@ const getFunctionTypes = (filePath: string, functionName: string): {
   const sourceFile = program.getSourceFile(filePath);
   if (!sourceFile) throw new Error(`Could not load file: ${filePath}`);
 
-  const result = {
-    argumentTypes: [] as string[],
-    returnType: null as string | null,
+  const extractedTypes: Set<string> = new Set();
+  
+  const extractFromTypeNode = (typeNode: ts.TypeNode) => {
+    if (ts.isTypeReferenceNode(typeNode)) {
+      const typeName = typeNode.typeName.getText(sourceFile);
+      
+      // Skip primitive and built-in types
+      const primitives = ['Promise', 'Array', 'Record', 'string', 'number', 'boolean', 'void', 'any', 'unknown', 'object', 'undefined', 'null'];
+      if (!primitives.includes(typeName)) {
+        extractedTypes.add(typeName);
+      }
+      
+      // Extract type arguments from generics (like Promise<T> -> extract T)
+      if (typeNode.typeArguments) {
+        for (const typeArg of typeNode.typeArguments) {
+          extractFromTypeNode(typeArg);
+        }
+      }
+    } else if (ts.isUnionTypeNode(typeNode) || ts.isIntersectionTypeNode(typeNode)) {
+      // Handle union/intersection types
+      for (const type of typeNode.types) {
+        extractFromTypeNode(type);
+      }
+    }
   };
 
   const visit = (node: ts.Node) => {
-    if (ts.isFunctionDeclaration(node) && node.name?.text) {
-      result.argumentTypes = node.parameters.map(param =>
-        param.type?.getText(sourceFile) ?? 'any'
-      );
+    if (ts.isFunctionDeclaration(node) && node.name?.text === functionName) {
+      // Extract types from parameters
+      for (const param of node.parameters) {
+        if (param.type) {
+          extractFromTypeNode(param.type);
+        }
+      }
+      
+      // Extract types from return type
       if (node.type) {
-        result.returnType = node.type.getText(sourceFile);
+        extractFromTypeNode(node.type);
       }
     }
     ts.forEachChild(node, visit);
   };
 
   visit(sourceFile);
-  return result;
-};
-
-const dereferenceRoot = (schema: any): any => {
-  if (!schema || !schema.$ref || !schema.definitions) return schema;
-
-  const match = schema.$ref.match(/^#\/definitions\/(.+)$/);
-  if (!match) return schema;
-
-  const defName = match[1];
-  const root = schema.definitions[defName];
-  if (!root) return schema;
-
-  const { definitions, $schema, ...rest } = schema;
-  return {
-    ...root,
-    definitions,
-    $schema,
-    ...rest,
-  };
+  return Array.from(extractedTypes);
 };
 
 export const generateTypeSchemas = (
   filePath: string,
   ignoredTypeNames: string[] = [],
+  functionName?: string,
 ): Record<string, any> => {
   const tsconfigPath = path.resolve('tsconfig.json');
-  const functionName = path.basename(filePath, '.ts');
-  const { argumentTypes, returnType } = getFunctionTypes(filePath, functionName);
-  const typeNames = [...argumentTypes, returnType].filter(Boolean) as string[];
+  // Use provided function name or default to filename
+  const actualFunctionName = functionName || path.basename(filePath, '.ts');
+  
+  // FIXED: Use AST-based type extraction instead of string manipulation
+  const extractedTypes = extractTypesFromAST(filePath, actualFunctionName);
+  
+  // Filter ignored types
+  const typeNames = extractedTypes.filter(typeName => 
+    !ignoredTypeNames.includes(typeName)
+  );
 
   const output: Record<string, any> = {};
 

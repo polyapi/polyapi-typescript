@@ -76,7 +76,7 @@ export const addOrUpdateCustomFunction = async (
       }
     }
 
-    const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]));
+    const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]), name);
 
     if (server) {
       shell.echo(
