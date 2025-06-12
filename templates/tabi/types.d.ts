@@ -20,7 +20,7 @@ type ColumnFilter<C extends any, Single extends string, Many extends string> = C
 } & {
   [K in Many]?: C[];
 } & {
-  not?: ColumnFilter<C, Single, Many> | C;
+  not?: C | ColumnFilter<C, Single, Many>;
 }>
 
 type Filter<C extends any> = C extends string
@@ -50,7 +50,7 @@ type PolySelectManyQuery<T extends Record<string, unknown>> = Clean<{
 }>;
 
 type PolyDeleteQuery<T extends Record<string, unknown>> = Clean<{
-  where: Where<T>;
+  where?: Where<T>;
 }>;
 
 type PolyInsertOneQuery<T extends Record<string, unknown>> = Clean<{

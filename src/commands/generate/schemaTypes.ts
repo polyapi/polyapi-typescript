@@ -56,13 +56,12 @@ export type JsonSchema = {
   $id?: string;
   $ref?: string;
   $schema?: string;
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  'x-poly-ref'?: SchemaRef;
   deprecated?: boolean;
   nullable?: boolean;
   enum?: ConstValueT[];
   const?: ConstValueT;
   definitions?: Record<string, JsonSchema>;
+  'x-poly-ref'?: SchemaRef;
   [k: string]: unknown;
 };
 
