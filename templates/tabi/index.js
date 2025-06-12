@@ -24,6 +24,14 @@ const firstResult = (rsp) => {
   return rsp;
 }
 
+const deleteOneResponse = (rsp) => {
+  if (typeof rsp.deleted === 'number') {
+    return { deleted: rsp.deleted > 0 };
+  }
+  // Else rsp is some kind of error
+  return rsp;
+}
+
 class Table {
   constructor(id, clientID, polyCustom) {
     this.id = id;
@@ -49,7 +57,7 @@ class Table {
 
   insertOne(query){
     query.data = [query.data];
-    return executeQuery(this.id, 'insert', query, this.clientID, this.polyCustom).then(firstResult)
+    return executeQuery(this.id, 'insert', query, this.clientID, this.polyCustom).then(firstResult);
   }
 
   upsertMany(query) {
@@ -59,7 +67,7 @@ class Table {
 
   upsertOne(query) {
     query.data = [query.data];
-    return executeQuery(this.id, 'upsert', query, this.clientID, this.polyCustom).then(firstResult)
+    return executeQuery(this.id, 'upsert', query, this.clientID, this.polyCustom).then(firstResult);
   }
 
   updateMany(query) {
@@ -67,7 +75,7 @@ class Table {
   }
 
   updateOne(query) {
-    return executeQuery(this.id, 'update', query, this.clientID, this.polyCustom).then(firstResult)
+    return executeQuery(this.id, 'update', query, this.clientID, this.polyCustom).then(firstResult);
   }
 
   deleteMany(query) {
@@ -75,7 +83,7 @@ class Table {
   }
 
   deleteOne(query) {
-    return executeQuery(this.id, 'delete', query, this.clientID, this.polyCustom).then(firstResult)
+    return executeQuery(this.id, 'delete', query, this.clientID, this.polyCustom).then(deleteOneResponse);
   }
 }
 
