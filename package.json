@@ -1,6 +1,6 @@
 {
   "name": "polyapi",
-  "version": "0.23.22",
+  "version": "0.23.23",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
@@ -66,10 +66,10 @@
     "lodash": "4.17.21",
     "prettier": "3.0.0",
     "semver": "7.5.4",
-    "shelljs": "0.8.5",
+    "shelljs": "0.10.0",
     "slugify": "1.6.6",
     "socket.io-client": "4.7.5",
-    "ts-json-schema-generator": "2.4.0",
+    "ts-json-schema-generator": "2.3.0",
     "typescript": "5.1.6",
     "uuid": "9.0.0",
     "validator": "13.11.0",
