@@ -185,6 +185,8 @@ export const getAllDeployableFilesWindows = ({
       ? typeNames.map((name) => `\\<polyConfig: ${name}\\>`).join(' ')
       : 'polyConfig';
 
+  // Using two regular quotes or two smart quotes throws "The syntax of the command is incorrect".
+  // For some reason this configuration works.
   const excludeCommand = excludePattern
     ? ` | findstr /V /I "${excludePattern}”`
     : '';
