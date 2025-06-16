@@ -180,9 +180,9 @@ export const getAllDeployableFilesWindows = ({
       : 'polyConfig';
 
   // Using two regular quotes or two smart quotes throws "The syntax of the command is incorrect".
-  // For some reason this configuration works.
+  // For some reason, starting with a regular quote and leaving the end without a quote works.
   const excludeCommand = excludePattern
-    ? ` | findstr /V /I "${excludePattern}”`
+    ? ` | findstr /V /I "${excludePattern}`
     : '';
   const searchCommand = ` | findstr /M /I /F:/ ${pattern}`;
 
