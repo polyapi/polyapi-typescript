@@ -170,26 +170,33 @@ export const getAllDeployableFilesWindows = ({
   excludeDirs,
 }: PolyDeployConfig): string[] => {
   // To get the equivalent of grep in Windows we use a combination of `dir` and `findstr`
-  const includePattern =
-    includeFilesOrExtensions.length > 0
-      ? includeFilesOrExtensions
-        .map((f) => (f.includes('.') ? f : `*.${f}`))
-        .join(' ')
-      : '*';
-  const excludePattern = excludeDirs.length > 0 ? excludeDirs.join('|') : '';
+  const excludePattern = excludeDirs.length > 0 
+      ? excludeDirs
+        .map((f) => `\\${f}`)
+        .join(' ') : '';
   const pattern =
     typeNames.length > 0
-      ? typeNames.map((name) => `polyConfig: ${name}`).join('|')
+      ? typeNames.map((name) => `\\<polyConfig: ${name}\\>`).join(' ')
       : 'polyConfig';
 
+  // Using two regular quotes or two smart quotes throws "The syntax of the command is incorrect".
+  // For some reason, starting with a regular quote and leaving the end without a quote works.
   const excludeCommand = excludePattern
-    ? ` | findstr /V /I "${excludePattern}"`
+    ? ` | findstr /V /I "${excludePattern}`
     : '';
-  const searchCommand = ` | findstr /M /I /F:/ /C:"${pattern}"`;
+  const searchCommand = ` | findstr /M /I /F:/ ${pattern}`;
 
   let result: string[] = [];
   for (const dir of includeDirs) {
-    const dirCommand = `dir /S /P /B ${includePattern} ${dir}`;
+    const includePattern =
+      dir === '.'
+        ? includeFilesOrExtensions
+          .map((f) => (f.includes('.') ? f : `*.${f}`))
+          .join(' ')
+        : includeFilesOrExtensions
+          .map((f) => (f.includes('.') ? f : `${dir}*.${f}`))
+          .join(' ');
+    const dirCommand = `dir ${includePattern} /S /P /B`;
     const fullCommand = `${dirCommand}${excludeCommand}${searchCommand}`;
     try {
       const output = shell.exec(fullCommand).toString('utf8');
@@ -230,13 +237,13 @@ export const getAllDeployableFilesLinux = ({
 export const getAllDeployableFiles = (
   config: Partial<PolyDeployConfig> = {},
 ): string[] => {
-  config.typeNames = config.typeNames = DeployableTypeEntries.map((p) => p[0]);
-  config.includeDirs = config.includeDirs = ['.'];
-  config.includeFilesOrExtensions = config.includeFilesOrExtensions = [
+  config.typeNames = config.typeNames || DeployableTypeEntries.map((p) => p[0]);
+  config.includeDirs = config.includeDirs || ['.'];
+  config.includeFilesOrExtensions = config.includeFilesOrExtensions || [
     'ts',
     'js',
   ];
-  config.excludeDirs = config.excludeDirs = [
+  config.excludeDirs = config.excludeDirs || [
     'node_modules',
     'dist',
     'build',
