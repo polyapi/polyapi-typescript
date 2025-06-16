@@ -176,20 +176,23 @@ export const getAllDeployableFilesWindows = ({
         .map((f) => (f.includes('.') ? f : `*.${f}`))
         .join(' ')
       : '*';
-  const excludePattern = excludeDirs.length > 0 ? excludeDirs.join('|') : '';
+  const excludePattern = excludeDirs.length > 0 
+      ? excludeDirs
+        .map((f) => `\\${f}`)
+        .join(' ') : '';
   const pattern =
     typeNames.length > 0
-      ? typeNames.map((name) => `polyConfig: ${name}`).join('|')
+      ? typeNames.map((name) => `\\<polyConfig: ${name}\\>`).join(' ')
       : 'polyConfig';
 
   const excludeCommand = excludePattern
-    ? ` | findstr /V /I "${excludePattern}"`
+    ? ` | findstr /V /I "${excludePattern}”`
     : '';
-  const searchCommand = ` | findstr /M /I /F:/ /C:"${pattern}"`;
+  const searchCommand = ` | findstr /M /I /F:/ ${pattern}`;
 
   let result: string[] = [];
   for (const dir of includeDirs) {
-    const dirCommand = `dir /S /P /B ${includePattern} ${dir}`;
+    const dirCommand = `dir ${includePattern} /S /P /B`;
     const fullCommand = `${dirCommand}${excludeCommand}${searchCommand}`;
     try {
       const output = shell.exec(fullCommand).toString('utf8');
