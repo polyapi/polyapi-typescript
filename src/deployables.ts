@@ -170,12 +170,6 @@ export const getAllDeployableFilesWindows = ({
   excludeDirs,
 }: PolyDeployConfig): string[] => {
   // To get the equivalent of grep in Windows we use a combination of `dir` and `findstr`
-  const includePattern =
-    includeFilesOrExtensions.length > 0
-      ? includeFilesOrExtensions
-        .map((f) => (f.includes('.') ? f : `*.${f}`))
-        .join(' ')
-      : '*';
   const excludePattern = excludeDirs.length > 0 
       ? excludeDirs
         .map((f) => `\\${f}`)
@@ -194,6 +188,14 @@ export const getAllDeployableFilesWindows = ({
 
   let result: string[] = [];
   for (const dir of includeDirs) {
+    const includePattern =
+      dir === '.'
+        ? includeFilesOrExtensions
+          .map((f) => (f.includes('.') ? f : `*.${f}`))
+          .join(' ')
+        : includeFilesOrExtensions
+          .map((f) => (f.includes('.') ? f : `${dir}*.${f}`))
+          .join(' ');
     const dirCommand = `dir ${includePattern} /S /P /B`;
     const fullCommand = `${dirCommand}${excludeCommand}${searchCommand}`;
     try {
@@ -235,13 +237,13 @@ export const getAllDeployableFilesLinux = ({
 export const getAllDeployableFiles = (
   config: Partial<PolyDeployConfig> = {},
 ): string[] => {
-  config.typeNames = config.typeNames = DeployableTypeEntries.map((p) => p[0]);
-  config.includeDirs = config.includeDirs = ['.'];
-  config.includeFilesOrExtensions = config.includeFilesOrExtensions = [
+  config.typeNames = config.typeNames || DeployableTypeEntries.map((p) => p[0]);
+  config.includeDirs = config.includeDirs || ['.'];
+  config.includeFilesOrExtensions = config.includeFilesOrExtensions || [
     'ts',
     'js',
   ];
-  config.excludeDirs = config.excludeDirs = [
+  config.excludeDirs = config.excludeDirs || [
     'node_modules',
     'dist',
     'build',
