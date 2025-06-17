@@ -173,7 +173,7 @@ export const prepareDeployables = async (
         }
       }
       catch (error) {
-        console.log(error);
+        console.warn(error);
       }
     }
   }
