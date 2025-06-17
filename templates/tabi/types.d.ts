@@ -37,6 +37,10 @@ type Where<T extends Record<string, unknown>> = Clean<{
   NOT?: Where<T> | Where<T>[];
 }>;
 
+type PolyCountQuery<T extends Record<string, unknown>> = Clean<{
+  where?: Where<T>;
+}>;
+
 type PolySelectOneQuery<T extends Record<string, unknown>> = Clean<{
   where?: Where<T>;
   orderBy?: Record<keyof T, 'asc' | 'desc'>;
@@ -79,4 +83,8 @@ type PolyDeleteResults = {
 
 type PolyDeleteResult = {
   deleted: boolean;
+}
+
+type PolyCountResult = {
+  count: boolean;
 }

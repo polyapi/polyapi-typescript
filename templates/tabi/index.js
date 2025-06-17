@@ -39,6 +39,10 @@ class Table {
     this.polyCustom = polyCustom;
   }
 
+  count(query) {
+    return executeQuery(this.id, 'count', query, this.clientID, this.polyCustom);
+  }
+
   selectMany(query) {
     query.limit = query.limit || 1000;
     if (query.limit > 1000) throw Error(`Cannot select more than 1000 rows at a time.`);

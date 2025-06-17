@@ -65,6 +65,7 @@ const printTableInterface = (table: TableSpecification | string): string => {
   const formattedName = table.contextName.split('.').map(v => toPascalCase(v)).join('.');
   return [
     '{',
+    `${_ws}count(query: ${formattedName}.CountQuery): Promise<${formattedName}.CountResult>;`,
     `${_ws}selectMany(query: ${formattedName}.SelectManyQuery): Promise<${formattedName}.QueryResults>;`,
     `${_ws}selectOne(query: ${formattedName}.SelectOneQuery): Promise<${formattedName}.QueryResult>;`,
     `${_ws}insertMany(query: ${formattedName}.InsertManyQuery): Promise<${formattedName}.QueryResults>;`,
@@ -84,6 +85,7 @@ const printTableNamespace = (schema: JsonSchema, name: string, depth = 1): strin
     printSchemaAsType(schema, 'Row', depth + 1)
   }${EOL}${EOL}${ws(depth + 1)}${
     [
+      'type CountQuery = PolyCountQuery<Row>;',
       'type SelectManyQuery = PolySelectManyQuery<Row>;',
       'type SelectOneQuery = PolySelectOneQuery<Row>;',
       'type InsertManyQuery = PolyInsertManyQuery<Row>;',
@@ -94,6 +96,7 @@ const printTableNamespace = (schema: JsonSchema, name: string, depth = 1): strin
       'type QueryResult = PolyQueryResult<Row>;',
       'type DeleteResults = PolyDeleteResults;',
       'type DeleteResult = PolyDeleteResult;',
+      'type CountResult = PolyCountResult;',
     ].join(`${EOL}${ws(depth + 1)}`)
   }${EOL}${ws(depth)}}`;
 };
