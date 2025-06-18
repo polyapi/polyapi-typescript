@@ -166,7 +166,7 @@ export const prepareDeployables = async (
       .toString('utf8').replace('\n', '');
     for (const deployable of dirtyDeployables) {
       try{
-        const deployableName = deployable.file.replace(rootPath, '');
+        const deployableName = deployable.file.replace(`${rootPath}/`, '');
         if (staged.includes(deployableName)) {
           shell.echo(`Staging ${deployableName}`);
           shell.exec(`git add ${deployableName}`);
