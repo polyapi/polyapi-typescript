@@ -43,9 +43,12 @@ axios.interceptors.request.use(
 );
 
 const scrubKeys = (err) => {
-  if (err.request) {
-    // Scrub the api key in the authorization header
-    err.request.headers['Authorization'] = `Bearer ********`;
+  if (err.request && typeof err.request.headers === 'object' && err.request.headers.Authorization) {
+    // Scrub any credentials in the authorization header
+    const [type, ...rest] = err.request.headers.Authorization.split(' ');
+    err.request.headers.Authorization = rest.length && type
+      ? `${type} ********`
+      : `********`;
   }
   throw err;
 };

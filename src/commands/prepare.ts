@@ -160,6 +160,22 @@ export const prepareDeployables = async (
         writeUpdatedDeployable(deployable, disableDocs),
       ),
     );
+    const staged = shell.exec('git diff --name-only --cached')
+      .toString().split('\n').filter(Boolean);
+    const rootPath: string = shell.exec('git rev-parse --show-toplevel', {silent:true})
+      .toString('utf8').replace('\n', '');
+    for (const deployable of dirtyDeployables) {
+      try{
+        const deployableName = deployable.file.replace(`${rootPath}/`, '');
+        if (staged.includes(deployableName)) {
+          shell.echo(`Staging ${deployableName}`);
+          shell.exec(`git add ${deployableName}`);
+        }
+      }
+      catch (error) {
+        console.warn(error);
+      }
+    }
   }
   console.log('Poly deployments are prepared.');
   await saveDeployableRecords(parsedDeployables);
