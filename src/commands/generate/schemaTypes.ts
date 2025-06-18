@@ -56,13 +56,12 @@ export type JsonSchema = {
   $id?: string;
   $ref?: string;
   $schema?: string;
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  'x-poly-ref'?: SchemaRef;
   deprecated?: boolean;
   nullable?: boolean;
   enum?: ConstValueT[];
   const?: ConstValueT;
   definitions?: Record<string, JsonSchema>;
+  'x-poly-ref'?: SchemaRef;
   [k: string]: unknown;
 };
 
@@ -72,7 +71,7 @@ export type SchemaSpec = Omit<SchemaSpecification, 'definition'> & {
 
 type SchemaTree = Record<string, SchemaSpec | Record<string, SchemaSpec>>;
 
-const ws = memoize((depth = 1) =>
+export const ws = memoize((depth = 1) =>
   depth < 0 ? '' : new Array(depth).fill('  ').join(''),
 );
 const end = memoize((nested?: NestedT) =>
@@ -216,12 +215,13 @@ const printObjectSchema: PrintSchemaFn = (
     schema.description,
     depth,
     schema.deprecated,
-  )}${ws(depth)}${printTypeName(schema.title, key, nested, optional)}{`;
+  )}${ws(depth)}${printTypeName(schema.title, key, nested, optional)}`;
   if (
     schema.properties ||
     schema.patternProperties ||
     schema.additionalProperties
   ) {
+    result = `${result}{`;
     if (schema.properties) {
       Object.entries(schema.properties).forEach(([k, v]) => {
         result = `${result}${EOL}${printSchemaAsType(
@@ -265,8 +265,12 @@ const printObjectSchema: PrintSchemaFn = (
       }
     }
     result = `${result}${EOL}${ws(depth)}}${end(nested)}`;
+  } else if (nested) {
+    // Nested object type with no properties falls back to record type
+    result = `${result}Record<string, unknown>${end(nested)}`;
   } else {
-    result = `${result}}${end(nested)}`;
+    // Non-nested object type uses empty interface {}
+    result = `${result}{}${end(nested)}`;
   }
   return result;
 };
@@ -500,7 +504,7 @@ const printConstSchema: PrintSchemaFn = (
   }${end(nested)}`;
 };
 
-const printSchemaAsType: PrintSchemaFn = (
+export const printSchemaAsType: PrintSchemaFn = (
   schema: JsonSchema,
   key,
   depth = 0,

@@ -13,6 +13,7 @@ export type SpecificationType =
   | 'serverFunction'
   | 'serverVariable'
   | 'snippet'
+  | 'table'
   | 'schema';
 
 export interface ISpecification {
@@ -154,6 +155,12 @@ export interface SchemaSpecification extends ISpecification {
   unresolvedPolySchemaRefs?: SchemaRef[];
 }
 
+export interface TableSpecification extends ISpecification {
+  type: 'table';
+  schema: Record<string, unknown>;
+  unresolvedPolySchemaRefs?: SchemaRef[];
+}
+
 export type Specification =
   | ApiFunctionSpecification
   | CustomFunctionSpecification
@@ -162,7 +169,8 @@ export type Specification =
   | WebhookHandleSpecification
   | ServerVariableSpecification
   | SnippetSpecification
-  | SchemaSpecification;
+  | SchemaSpecification
+  | TableSpecification;
 
 interface CreateWebhookHandleDtoForSpecificationInput
   extends CreateWebhookHandleDto {
