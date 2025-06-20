@@ -236,6 +236,10 @@ void yargs
           .option('execution-api-key', {
             describe: 'Optional API key for server functions',
             type: 'string',
+          })
+          .option('cache-poly-library', {
+            describe: 'Server function only - cache the poly library to improve function performance',
+            type: 'boolean',
           }),
       async ({
         name,
@@ -247,6 +251,7 @@ void yargs
         logs,
         generateContexts,
         executionApiKey,
+        cachePolyLibrary,
       }) => {
         const logsEnabled =
           logs === 'enabled' ? true : logs === 'disabled' ? false : undefined;
@@ -266,6 +271,8 @@ void yargs
                           ? 'Invalid value for `logs` option.'
                           : executionApiKey && !uuidValidate(executionApiKey)
                             ? 'Invalid value for `execution-api-key`. Must be a valid PolyAPI Key.'
+                            : cachePolyLibrary && !server
+                              ? 'Option `cache-poly-library` is only for server functions (--server).'
                             : '';
         if (err) {
           shell.echo(chalk.redBright('ERROR:'), err);
@@ -286,6 +293,7 @@ void yargs
           logsEnabled,
           generateContexts,
           executionApiKey,
+          cachePolyLibrary,
         );
       },
     );
