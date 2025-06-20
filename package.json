@@ -11,8 +11,7 @@
   "files": [
     "build/**/*",
     "index.js",
-    "index.d.ts",
-    "lib/welcome.js"
+    "index.d.ts"
   ],
   "main": "index.js",
   "bin": {
@@ -29,7 +28,7 @@
     "prepublishOnly": "npm run lint && npm run build",
     "preversion": "npm run lint",
     "postversion": "git push && git push --tags",
-    "postinstall": "node lib/welcome.js",
+
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "devDependencies": {
