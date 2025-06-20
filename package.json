@@ -1,6 +1,6 @@
 {
   "name": "polyapi",
-  "version": "0.24.0",
+  "version": "0.24.2",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
@@ -11,7 +11,8 @@
   "files": [
     "build/**/*",
     "index.js",
-    "index.d.ts"
+    "index.d.ts",
+    "lib/welcome.js"
   ],
   "main": "index.js",
   "bin": {
@@ -28,6 +29,7 @@
     "prepublishOnly": "npm run lint && npm run build",
     "preversion": "npm run lint",
     "postversion": "git push && git push --tags",
+    "postinstall": "node lib/welcome.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "devDependencies": {
