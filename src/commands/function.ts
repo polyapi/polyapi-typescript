@@ -1,4 +1,3 @@
- 
 import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
@@ -31,6 +30,7 @@ export const addOrUpdateCustomFunction = async (
   logsEnabled: boolean | undefined,
   generateContexts: string | undefined,
   executionApiKey: string | null | undefined,
+  cachePolyLibrary: boolean | undefined,
 ) => {
   loadConfig(polyPath);
 
@@ -96,6 +96,7 @@ export const addOrUpdateCustomFunction = async (
       const other: Record<string, any> = {};
       if (generateContexts) { other.generateContexts = generateContexts.split(','); }
       if (logsEnabled !== undefined) other.logsEnabled = logsEnabled;
+      if (cachePolyLibrary !== undefined) other.cachePolyLibrary = cachePolyLibrary;
 
       customFunction = await createOrUpdateServerFunction(
         context,
