@@ -11,7 +11,10 @@ type PolyDeployable<CustomConfig extends Record<string, any> = {}> = {
 
 type PolyFunction = PolyDeployable<{ logsEnabled?: boolean; visibility?: Visibility }>;
 
-export type PolyServerFunction = PolyFunction & { alwaysOn?: boolean };
+export type PolyServerFunction = PolyFunction & { 
+  alwaysOn?: boolean; 
+  cachePolyLibrary?: boolean;
+};
 
 export type PolyClientFunction = PolyFunction;
 
