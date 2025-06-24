@@ -11,7 +11,7 @@ export const libraryMinVersionMap: Record<string, VersionT> = {
   'ts-node': '5.0.0',
   typescript: '4.0.2',
 };
-const MIN_NODE_VERSION: VersionT = '18.20.5';
+const MIN_NODE_VERSION: VersionT = '20.19.3';
 
 const DEFAULT_TS_CONFIG = {
   compilerOptions: {

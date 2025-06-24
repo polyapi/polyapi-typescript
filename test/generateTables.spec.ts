@@ -16,9 +16,9 @@ describe('printTableSpecs', () => {
       const specs: TableSpecification[] = [
         {
           'id': 'ad5edb98-9eeb-4bb5-8122-32f9a6f6b512',
-          'name': 'MyTable',
+          'name': 'myTable',
           'context': 'aaron.testing',
-          'contextName': 'aaron.testing.MyTable',
+          'contextName': 'aaron.testing.myTable',
           'type': 'table',
           'schema': {
             'type': 'object',
@@ -109,7 +109,7 @@ describe('printTableSpecs', () => {
           '  }',
           '',
           '  interface Testing {',
-          '    MyTable: {',
+          '    myTable: {',
           '      count(query: Aaron.Testing.MyTable.CountQuery): Promise<Aaron.Testing.MyTable.CountResult>;',
           '      selectMany(query: Aaron.Testing.MyTable.SelectManyQuery): Promise<Aaron.Testing.MyTable.QueryResults>;',
           '      selectOne(query: Aaron.Testing.MyTable.SelectOneQuery): Promise<Aaron.Testing.MyTable.QueryResult>;',

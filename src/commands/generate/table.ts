@@ -38,7 +38,7 @@ const buildTableTree = (specs: TableSpecification[]): TableRoot[] => {
     const last = contextParts.length - 1;
     for (let i = 0; i <= last; i++) {
       const name = contextParts[i];
-      const interfaceName = i === last ? toPascalCase(name) : toPascalCase(contextParts[i]);
+      const interfaceName = toPascalCase(i === last ? name : contextParts[i]);
       const path = contextParts.slice(0, i + 1).join('.');
       const parent = i ? contextParts.slice(0, i).join('.') : 'default';
       if (schemas[path]) continue;
@@ -81,7 +81,7 @@ const printTableInterface = (table: TableSpecification | string): string => {
 };
 
 const printTableNamespace = (schema: JsonSchema, name: string, depth = 1): string => {
-  return `${ws(depth)}namespace ${name} {${EOL}${
+  return `${ws(depth)}namespace ${toPascalCase(name)} {${EOL}${
     printSchemaAsType(schema, 'Row', depth + 1)
   }${EOL}${EOL}${ws(depth + 1)}${
     [

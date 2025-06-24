@@ -367,6 +367,7 @@ const getFunctionDetails = (
       const types = parseTSTypes(node, sourceFile);
       if (
         jsDoc &&
+        types.params.length === jsDoc.params.length &&
         types.params.every(
           (p, i) =>
             p.type === jsDoc.params[i].type && p.name === jsDoc.params[i].name,
@@ -419,6 +420,14 @@ const parseDeployableFunction = (
 ): DeployableRecord => {
   const [deployments, deploymentCommentRanges] = getDeployComments(sourceFile);
   const functionDetails = getFunctionDetails(sourceFile, polyConfig.name);
+  if (polyConfig.description) {
+    if (polyConfig.description !== functionDetails.types.description) {
+      functionDetails.types.description = polyConfig.description;
+      functionDetails.dirty = true;
+    }
+  } else {
+    polyConfig.description = functionDetails.types.description || '';
+  }
   const dependencies = getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl);
   const typeSchemas = generateTypeSchemas(sourceFile.fileName, DeployableTypeEntries.map(d => d[0]), polyConfig.name);
   return {

@@ -6,14 +6,18 @@ type Visibility = 'PUBLIC' | 'TENANT' | 'ENVIRONMENT';
 type PolyDeployable<CustomConfig extends Record<string, any> = {}> = {
   context: string;
   name: string;
+  description?: string;
   disableAi?: boolean; // Disable use of AI for filling in missing descriptions
 } & CustomConfig;
 
-type PolyFunction = PolyDeployable<{ logsEnabled?: boolean; visibility?: Visibility }>;
+type PolyFunction = PolyDeployable<{ visibility?: Visibility }>;
 
 export type PolyServerFunction = PolyFunction & { 
-  alwaysOn?: boolean; 
+  alwaysOn?: boolean;
+  logsEnabled?: boolean;
+  serverSideAsync?: boolean;
   cachePolyLibrary?: boolean;
+  generateContexts?: string[];
 };
 
 export type PolyClientFunction = PolyFunction;
