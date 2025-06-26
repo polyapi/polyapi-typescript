@@ -73,7 +73,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       }
     ).then(({ headers, data }) => {
       polyHeaders = headers;
-      if (data && (data.status < 200 || data.status >= 300)) {
+      if (data && (data.status < 200 || data.status >= 300) && process.env.LOGS_ENABLED) {
         let responseData = data.data;
         try {
           responseData = JSON.stringify(data.data);
@@ -95,7 +95,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
         httpsAgent,
       })
     }).then(({ headers, data, status }) => {
-      if (status && (status < 200 || status >= 300)) {
+      if (status && (status < 200 || status >= 300) && process.env.LOGS_ENABLED) {
         console.error('Error direct executing api function with id:', id, 'Status code:', status, 'Request data:', requestArgs, 'Response data:', data.data);
       }
       const apiExecutionTimeMs = Date.now() - requestApiStartTime;
@@ -122,7 +122,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       }
     }
   ).then(({ headers, data }) => {
-    if (data && (data.status < 200 || data.status >= 300)) {
+    if (data && (data.status < 200 || data.status >= 300) && process.env.LOGS_ENABLED) {
       let responseData = data.data;
       try {
         responseData = JSON.stringify(data.data);
