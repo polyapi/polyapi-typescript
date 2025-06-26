@@ -93,9 +93,6 @@ const getAllDeployables = async (
         baseUrl,
         gitRevision,
       );
-      if (deployable === null) {
-        continue;
-      }
       const fullName = `${deployable.context}.${deployable.name}`;
       if (found.has(fullName)) {
         console.error(
@@ -163,7 +160,7 @@ export const prepareDeployables = async (
         writeUpdatedDeployable(deployable, disableDocs),
       ),
     );
-    const staged = shell.exec('git diff --name-only --cached', {silent:true})
+    const staged = shell.exec('git diff --name-only --cached')
       .toString().split('\n').filter(Boolean);
     const rootPath: string = shell.exec('git rev-parse --show-toplevel', {silent:true})
       .toString('utf8').replace('\n', '');
@@ -171,7 +168,7 @@ export const prepareDeployables = async (
       try{
         const deployableName = deployable.file.replace(`${rootPath}/`, '');
         if (staged.includes(deployableName)) {
-          console.log(`Staging ${deployableName}`);
+          shell.echo(`Staging ${deployableName}`);
           shell.exec(`git add ${deployableName}`);
         }
       }
