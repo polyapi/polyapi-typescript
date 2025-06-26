@@ -177,15 +177,13 @@ export const getAllDeployableFilesWindows = ({
         .join(' ') : '';
   const pattern =
     typeNames.length > 0
-      ? typeNames.map((name) => `\\<polyConfig: ${name}\\>`).join(' ')
-      : 'polyConfig';
+      ? typeNames.map((name) => `/C:"polyConfig: ${name}"`).join(' ')
+      : 'C/:"polyConfig"';
 
-  // Using two regular quotes or two smart quotes throws "The syntax of the command is incorrect".
-  // For some reason, starting with a regular quote and leaving the end without a quote works.
   const excludeCommand = excludePattern
-    ? ` | findstr /V /I "${excludePattern}`
+    ? ` | findstr /V /I "${excludePattern}"`
     : '';
-  const searchCommand = ` | findstr /M /I /F:/ ${pattern}`;
+  const searchCommand = ` | findstr /M /I /S /F:/ ${pattern} *.*`;
 
   let result: string[] = [];
   for (const dir of includeDirs) {
@@ -197,10 +195,10 @@ export const getAllDeployableFilesWindows = ({
         : includeFilesOrExtensions
           .map((f) => (f.includes('.') ? f : `${dir}*.${f}`))
           .join(' ');
-    const dirCommand = `dir ${includePattern} /S /P /B`;
+    const dirCommand = `dir ${includePattern} /S /P /B > NUL`;
     const fullCommand = `${dirCommand}${excludeCommand}${searchCommand}`;
     try {
-      const output = shell.exec(fullCommand).toString('utf8');
+      const output = shell.exec(fullCommand, {silent:true}).toString('utf8');
       result = result.concat(output.split(/\r?\n/).filter(Boolean));
     } catch {}
   }
