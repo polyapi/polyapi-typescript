@@ -43,6 +43,7 @@ export type ParsedDeployableConfig = {
   context: string;
   name: string;
   type: DeployableTypes;
+  description?: string;
   disableAi?: boolean;
   config: Record<string, any>;
 };

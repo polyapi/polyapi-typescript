@@ -11,6 +11,7 @@ import {
   ServerFunctionSpecification,
   ServerVariableSpecification,
   Specification,
+  TableSpecification,
   WebhookHandleSpecification,
 } from '../../types';
 import { getSpecs } from '../../api';
@@ -37,6 +38,7 @@ import {
   setGenerationErrors,
 } from './types';
 import { generateSchemaTSDeclarationFiles } from './schemaTypes';
+import { generateTableTSDeclarationFiles } from './table';
 
 // Register the eq helper for equality comparison
 handlebars.registerHelper('eq', (a, b) => a === b);
@@ -62,6 +64,7 @@ const prepareDir = async (polyPath: string) => {
   fs.mkdirSync(`${libPath}/webhooks`);
   fs.mkdirSync(`${libPath}/server`);
   fs.mkdirSync(`${libPath}/vari`);
+  fs.mkdirSync(`${libPath}/tabi`);
   fs.mkdirSync(`${libPath}/schemas`);
 
   if (polyPath !== DEFAULT_POLY_PATH) {
@@ -138,6 +141,9 @@ const generateJSFiles = async (
   const serverVariables = specs.filter(
     (spec) => spec.type === 'serverVariable',
   ) as ServerVariableSpecification[];
+  const tables = specs.filter(
+    (spec) => spec.type === 'table',
+  ) as TableSpecification[];
 
   await generateIndexJSFile(libPath);
   await generatePolyCustomJSFile(libPath);
@@ -163,6 +169,10 @@ const generateJSFiles = async (
   await tryAsync(
     generateServerVariableJSFiles(libPath, serverVariables),
     'variables',
+  );
+  await tryAsync(
+    generateTableJSFiles(libPath, tables),
+    'tables',
   );
 
   return customFnCodeGenerationErrors;
@@ -321,6 +331,18 @@ const generateServerVariableJSFiles = async (
       arrPaths: JSON.stringify(arrPaths),
     }),
   );
+};
+
+const generateTableJSFiles = async (
+  libPath: string,
+  specifications: TableSpecification[],
+) => {
+  const tablesJSTemplate = handlebars.compile(loadTemplate('tabi/tables.js.hbs'));
+  fs.writeFileSync(
+    `${libPath}/tabi/tables.js`,
+    tablesJSTemplate({ specifications }),
+  );
+  fs.copyFileSync(templateUrl('tabi/index.js'), `${libPath}/tabi/index.js`);
 };
 
 const generateAuthFunctionJSFiles = async (
@@ -606,6 +628,13 @@ export const generateSpecs = async (
           filteredSpecs.filter((s) => s.type === 'schema') as any[],
         ),
         'schemas',
+      );
+      await tryAsync(
+        generateTableTSDeclarationFiles(
+          libPath,
+          filteredSpecs.filter((s) => s.type === 'table') as TableSpecification[],
+        ),
+        'table types',
       );
     }
 

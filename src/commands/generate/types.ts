@@ -81,7 +81,6 @@ const schemaToDeclarations = async (
     unknownAny: options.unknownAny,
     customName(innerSchema, keyNameFromDefinition) {
       const ref = innerSchema['x-poly-ref'] as
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         | (SchemaRef & { 'x-unresolved'?: true })
         | undefined;
 

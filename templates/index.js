@@ -6,6 +6,7 @@ const webhooks = require('./webhooks');
 const authFunctions = require('./auth');
 const serverFunctions = require('./server');
 const vari = require('./vari');
+const tabi = require('./tabi');
 const polyCustom = require('./poly-custom');
 const { createErrorHandler, sendLocalErrorEvent } = require('./error-handler');
 const { CLIENT_ID, API_KEY, API_BASE_URL } = require('./constants');
@@ -72,5 +73,6 @@ module.exports = {
   ...poly,
   errorHandler: createErrorHandler(getApiKey, getSocket),
   vari: vari(CLIENT_ID, getSocket, getApiKey),
+  tabi: tabi(CLIENT_ID, polyCustom),
   polyCustom,
 };

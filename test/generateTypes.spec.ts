@@ -1,9 +1,8 @@
 import { EOL } from 'node:os';
-import { JsonSchema, SchemaSpec, __test } from '../src/commands/generate/schemaTypes';
+import { JsonSchema, SchemaSpec, printSchemaAsType, __test } from '../src/commands/generate/schemaTypes';
 
 const {
   formatName,
-  printSchemaAsType,
   printComment,
   buildSchemaTree,
   printSchemaSpecs
