@@ -259,6 +259,10 @@ const getPolyConfig = (types: string[], sourceFile: ts.SourceFile): any => {
   };
 
   visit(sourceFile);
+
+  if (config === null) {
+    return null;
+  }
   const { name, context, type, description, ...other } = config;
   if (!name) throw new Error("polyConfig is missing 'name'.");
   if (!context) throw new Error("polyConfig is missing 'context'.");
@@ -471,6 +475,9 @@ export const parseDeployable = async (
     DeployableTypeEntries.map((e) => e[0]),
     sourceFile,
   );
+  if (polyConfig === null) {
+    return [null, null];
+  }
   polyConfig.type = DeployableTsTypeToName[polyConfig.type];
   const fileContents = sourceFile.getFullText();
   const fileRevision = getDeployableFileRevision(fileContents);
