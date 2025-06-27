@@ -1,4 +1,4 @@
-const axios = require('../axios');
+const { axios, scrubKeys } = require('../axios');
 const set = require('lodash/set');
 const get = require('lodash/get');
 const merge = require('lodash/merge');
@@ -49,7 +49,7 @@ const getVariableHandlers = (clientID, getSocket, getApiKey) => {
         } else {
           return axios.get(
             `/variables/${id}/value`
-          ).then(({data}) => data);
+          ).then(({data}) => data).catch(scrubKeys);
         }
       },
       update: (value) => {
@@ -62,7 +62,7 @@ const getVariableHandlers = (clientID, getSocket, getApiKey) => {
             status: response.status,
             headers: response.headers,
           };
-        });
+        }).catch(scrubKeys);
       },
       onUpdate: (callback) => {
         const socket = getSocket();
@@ -181,7 +181,7 @@ const getPathHandlers = () => {
     get: () => {
       return axios.get(
         `/variables/context/values`
-      ).then(({data}) => data);
+      ).then(({data}) => data).catch(scrubKeys);
     }
   };
   contextPaths.forEach(path => {
@@ -189,7 +189,7 @@ const getPathHandlers = () => {
       get: () => {
         return axios.get(
           `/variables/context/${path}/values`
-        ).then(({data}) => data);
+        ).then(({data}) => data).catch(scrubKeys);
       },
     });
   });

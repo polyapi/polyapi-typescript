@@ -11,7 +11,7 @@ export const libraryMinVersionMap: Record<string, VersionT> = {
   'ts-node': '5.0.0',
   typescript: '4.0.2',
 };
-const MIN_NODE_VERSION: VersionT = '18.20.5';
+const MIN_NODE_VERSION: VersionT = '20.19.3';
 
 const DEFAULT_TS_CONFIG = {
   compilerOptions: {
@@ -20,8 +20,10 @@ const DEFAULT_TS_CONFIG = {
 };
 
 export const MESSAGES = {
-  TS_CONFIG_DO_NOT_EXIST: 'tsconfig.json does not exist in this project. Do you want to create it?',
-  TS_CONFIG_UPDATE: 'tsconfig.json does not have esModuleInterop set to true in this project. Do you want to update it?',
+  TS_CONFIG_DO_NOT_EXIST:
+    'tsconfig.json does not exist in this project. Do you want to create it?',
+  TS_CONFIG_UPDATE:
+    'tsconfig.json does not have esModuleInterop set to true in this project. Do you want to update it?',
 };
 
 type TsConfigSetupSteps = {
@@ -29,20 +31,28 @@ type TsConfigSetupSteps = {
   requestUserPermissionToCreateTsConfig(): Promise<boolean>;
   requestUserPermissionToUpdateTsConfig(): Promise<boolean>;
   saveTsConfig(tsConfig: string): Promise<void>;
-}
+};
 
 type CheckLibraryVersionSteps = {
-  requestUserPermissionToUpdateLib(library: string, version: string, minVersion: string): Promise<boolean>;
+  requestUserPermissionToUpdateLib(
+    library: string,
+    version: string,
+    minVersion: string,
+  ): Promise<boolean>;
   createOrUpdateLib(library: string, create: boolean): Promise<void>;
-}
+};
 
 type CheckNodeVersionOpts = {
   onOldVersion(message: string): any;
   onMissingNode?(message: string): void;
   onSuccess?(): void;
-}
+};
 
-export const getUpdateLibraryVersionMessage = (version: string, minVersion: string, library: string) => {
+export const getUpdateLibraryVersionMessage = (
+  version: string,
+  minVersion: string,
+  library: string,
+) => {
   return version
     ? `${library} version is lower than ${minVersion} in this project. Do you want to update it to the latest version?`
     : `${library} is not installed in this project. Do you want to install it?`;
@@ -63,11 +73,14 @@ export const checkTsConfig = async (steps: TsConfigSetupSteps) => {
     try {
       tsConfig = parse(currentConfig, undefined, false) as any;
     } catch (error) {
-      throw new Error('tsconfig.json has invalid JSON syntax, please fix and try again');
+      throw new Error(
+        'tsconfig.json has invalid JSON syntax, please fix and try again',
+      );
     }
 
     if (!tsConfig.compilerOptions?.esModuleInterop) {
-      const updateTsConfig = await steps.requestUserPermissionToUpdateTsConfig();
+      const updateTsConfig =
+        await steps.requestUserPermissionToUpdateTsConfig();
       if (!updateTsConfig) {
         return;
       }
@@ -89,7 +102,10 @@ export const checkTsConfig = async (steps: TsConfigSetupSteps) => {
   }
 };
 
-const getSafeVersion = (version: string, defaultVersion: VersionT): VersionT => {
+const getSafeVersion = (
+  version: string,
+  defaultVersion: VersionT,
+): VersionT => {
   // npm and yarn are more lax on version specification than the semver library is
   // We need to be able to handle wildcard versions like 'latest', '*', 'x', '1.x', or '3.0.x'
   // We also need to handle only partially specified versions like '5' or '5.1'
@@ -97,22 +113,31 @@ const getSafeVersion = (version: string, defaultVersion: VersionT): VersionT => 
   if (version === 'latest' || version === '*') {
     return defaultVersion;
   }
-  const [expectedMajor, expectedMinor, expectedPatch] = defaultVersion.split('.');
+  const [expectedMajor, expectedMinor, expectedPatch] =
+    defaultVersion.split('.');
   const [major, minor, patch] = version.replace(/[^0-9.x]/g, '').split('.');
-  return `${
-    major === 'x' ? expectedMajor : major || '0'
-  }.${
+  return `${major === 'x' ? expectedMajor : major || '0'}.${
     minor === 'x' ? expectedMinor : minor || '0'
-  }.${
-    patch === 'x' ? expectedPatch : patch || '0'
-  }`;
+  }.${patch === 'x' ? expectedPatch : patch || '0'}`;
 };
 
-const checkLibraryVersion = async (packageJson: Record<string, any>, library: string, minVersion: VersionT, steps: CheckLibraryVersionSteps) => {
-  const version: string = packageJson.devDependencies?.[library] || packageJson.dependencies?.[library] || '';
+const checkLibraryVersion = async (
+  packageJson: Record<string, any>,
+  library: string,
+  minVersion: VersionT,
+  steps: CheckLibraryVersionSteps,
+) => {
+  const version: string =
+    packageJson.devDependencies?.[library] ||
+    packageJson.dependencies?.[library] ||
+    '';
 
   if (!version || semver.lt(getSafeVersion(version, minVersion), minVersion)) {
-    const updateVersion = await steps.requestUserPermissionToUpdateLib(library, version, minVersion);
+    const updateVersion = await steps.requestUserPermissionToUpdateLib(
+      library,
+      version,
+      minVersion,
+    );
 
     if (updateVersion) {
       await steps.createOrUpdateLib(library, !version);
@@ -120,9 +145,17 @@ const checkLibraryVersion = async (packageJson: Record<string, any>, library: st
   }
 };
 
-export const checkLibraryVersions = async (packageJson: Record<string, any>, steps: CheckLibraryVersionSteps) => {
+export const checkLibraryVersions = async (
+  packageJson: Record<string, any>,
+  steps: CheckLibraryVersionSteps,
+) => {
   for (const library of librariesToCheck) {
-    await checkLibraryVersion(packageJson, library, libraryMinVersionMap[library], steps);
+    await checkLibraryVersion(
+      packageJson,
+      library,
+      libraryMinVersionMap[library],
+      steps,
+    );
   }
 };
 
@@ -149,7 +182,9 @@ export const checkNodeVersion = (opts: CheckNodeVersionOpts) => {
   }
 
   if (semver.lt(currentVersion, MIN_NODE_VERSION)) {
-    opts.onOldVersion(`Node.js version is too old. The minimum required version is ${MIN_NODE_VERSION}. Please update Node.js to a newer version.`);
+    opts.onOldVersion(
+      `Node.js version is too old. The minimum required version is ${MIN_NODE_VERSION}. Please update Node.js to a newer version.`,
+    );
   } else {
     opts.onSuccess?.();
   }

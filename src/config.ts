@@ -8,7 +8,9 @@ const getPolyConfigDirPath = (polyPath: string) =>
 const getPolyConfigFilePath = (polyPath: string) =>
   `${getPolyConfigDirPath(polyPath)}/.config.env`;
 
-export const loadConfig = (polyPath: string): Record<string, string> | undefined => {
+export const loadConfig = (
+  polyPath: string,
+): Record<string, string> | undefined => {
   const configFilePath = getPolyConfigFilePath(polyPath);
   if (fs.existsSync(configFilePath)) {
     const result = dotenv.config({
@@ -21,7 +23,10 @@ export const loadConfig = (polyPath: string): Record<string, string> | undefined
   return undefined;
 };
 
-export const saveConfig = (polyPath: string, config: Record<string, string>) => {
+export const saveConfig = (
+  polyPath: string,
+  config: Record<string, string>,
+) => {
   fs.mkdirSync(getPolyConfigDirPath(polyPath), { recursive: true });
   fs.writeFileSync(
     getPolyConfigFilePath(polyPath),
@@ -31,7 +36,11 @@ export const saveConfig = (polyPath: string, config: Record<string, string>) => 
   );
 };
 
-export const addOrUpdateConfig = (polyPath: string, key: string, value: string) => {
+export const addOrUpdateConfig = (
+  polyPath: string,
+  key: string,
+  value: string,
+) => {
   const existingConfig = loadConfig(polyPath) ?? {};
 
   existingConfig[key] = value;

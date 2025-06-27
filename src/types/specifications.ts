@@ -6,13 +6,14 @@ import { CreateWebhookHandleDto } from './webhooks';
 export type ValueType = string | number | boolean | object | null | any[];
 
 export type SpecificationType =
-  'apiFunction'
+  | 'apiFunction'
   | 'customFunction'
   | 'authFunction'
   | 'webhookHandle'
   | 'serverFunction'
   | 'serverVariable'
   | 'snippet'
+  | 'table'
   | 'schema';
 
 export interface ISpecification {
@@ -52,7 +53,7 @@ interface IPropertyType {
 }
 
 export type PropertyType =
-  VoidPropertyType
+  | VoidPropertyType
   | PrimitivePropertyType
   | ArrayPropertyType
   | ObjectPropertyType
@@ -95,7 +96,7 @@ export interface PlainPropertyType extends IPropertyType {
 export interface ApiFunctionSpecification extends ISpecification {
   type: 'apiFunction';
   function: FunctionSpecification;
-  apiType: 'graphql' | 'rest'
+  apiType: 'graphql' | 'rest';
 }
 
 export interface CustomFunctionSpecification extends ISpecification {
@@ -132,14 +133,14 @@ export interface ServerVariableSpecification extends ISpecification {
 
 export interface VariableSpecification {
   environmentId: string;
-  secrecy: 'SECRET' | 'OBSCURED' | 'NONE'
+  secrecy: 'SECRET' | 'OBSCURED' | 'NONE';
   valueType: PropertyType;
   value?: ValueType;
 }
 
-export interface SnippetSpecification extends ISpecification{
-  type: 'snippet'
-  language: string
+export interface SnippetSpecification extends ISpecification {
+  type: 'snippet';
+  language: string;
   description: string;
 }
 
@@ -150,21 +151,29 @@ export interface SchemaRef {
 
 export interface SchemaSpecification extends ISpecification {
   type: 'schema';
-  definition: Record<string, unknown>
-  unresolvedPolySchemaRefs?: SchemaRef[]
+  definition: Record<string, unknown>;
+  unresolvedPolySchemaRefs?: SchemaRef[];
+}
+
+export interface TableSpecification extends ISpecification {
+  type: 'table';
+  schema: Record<string, unknown>;
+  unresolvedPolySchemaRefs?: SchemaRef[];
 }
 
 export type Specification =
-  ApiFunctionSpecification
+  | ApiFunctionSpecification
   | CustomFunctionSpecification
   | ServerFunctionSpecification
   | AuthFunctionSpecification
   | WebhookHandleSpecification
   | ServerVariableSpecification
   | SnippetSpecification
-  | SchemaSpecification;
+  | SchemaSpecification
+  | TableSpecification;
 
-interface CreateWebhookHandleDtoForSpecificationInput extends CreateWebhookHandleDto {
+interface CreateWebhookHandleDtoForSpecificationInput
+  extends CreateWebhookHandleDto {
   context: string;
 }
 
@@ -179,6 +188,10 @@ export interface SpecificationInputDto {
   schemas: CreateSchemaDtoForSpecificationInput[];
 }
 
-export type SpecificationWithFunction = Specification & { function: FunctionSpecification };
+export type SpecificationWithFunction = Specification & {
+  function: FunctionSpecification;
+};
 
-export type SpecificationWithVariable = Specification & { variable: VariableSpecification };
+export type SpecificationWithVariable = Specification & {
+  variable: VariableSpecification;
+};

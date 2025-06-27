@@ -5,8 +5,16 @@ import shell from 'shelljs';
 import { escapeRegExp } from 'lodash';
 import Axios from 'axios';
 
-import { ApiFunctionDescriptionGenerationDto, SpecificationInputDto, WebhookHandleDescriptionGenerationDto } from '../../types';
-import { translateSpecification, getApiFunctionDescription, getWebhookHandleDescription } from '../../api';
+import {
+  ApiFunctionDescriptionGenerationDto,
+  SpecificationInputDto,
+  WebhookHandleDescriptionGenerationDto,
+} from '../../types';
+import {
+  translateSpecification,
+  getApiFunctionDescription,
+  getWebhookHandleDescription,
+} from '../../api';
 import { firstLetterToUppercase } from '../../utils';
 import path from 'path';
 import { default as slugifyString } from 'slugify';
@@ -19,26 +27,34 @@ const readDir = promisify(fs.readdir);
 const access = promisify(fs.access);
 const write = promisify(fs.writeFile);
 
-const slugify = (content: string) => slugifyString(content, {
-  lower: true,
-  strict: true,
-});
+const slugify = (content: string) =>
+  slugifyString(content, {
+    lower: true,
+    strict: true,
+  });
 
 const axiosClient = Axios.create();
 
-const writeModelFile = async (title: string, specificationInput: SpecificationInputDto, destination?: string, rename: RenameT = []) => {
+const writeModelFile = async (
+  title: string,
+  specificationInput: SpecificationInputDto,
+  destination?: string,
+  rename: RenameT = [],
+) => {
   title = slugify(title);
 
   const adjustLines = (v: string) => {
     const lines = v.split('\n');
 
-    return lines.map((line, index) => {
-      if (index === 0) {
-        return line;
-      }
+    return lines
+      .map((line, index) => {
+        if (index === 0) {
+          return line;
+        }
 
-      return `    ${line}`;
-    }).join('\n');
+        return `    ${line}`;
+      })
+      .join('\n');
   };
 
   /*
@@ -48,13 +64,22 @@ const writeModelFile = async (title: string, specificationInput: SpecificationIn
   */
   let contents = `{
   "functions": [
-    ${specificationInput.functions.map(f => JSON.stringify(f, null, 2)).map(adjustLines).join(',\n    ')}
+    ${specificationInput.functions
+      .map((f) => JSON.stringify(f, null, 2))
+      .map(adjustLines)
+      .join(',\n    ')}
   ],
   "webhooks": [
-    ${specificationInput.webhooks.map(w => JSON.stringify(w, null, 2)).map(adjustLines).join(',\n    ')}
+    ${specificationInput.webhooks
+      .map((w) => JSON.stringify(w, null, 2))
+      .map(adjustLines)
+      .join(',\n    ')}
   ],
   "schemas": [
-    ${specificationInput.schemas.map(s => JSON.stringify(s, null, 2)).map(adjustLines).join(',\n    ')}
+    ${specificationInput.schemas
+      .map((s) => JSON.stringify(s, null, 2))
+      .map(adjustLines)
+      .join(',\n    ')}
   ]
 }`;
 
@@ -64,7 +89,10 @@ const writeModelFile = async (title: string, specificationInput: SpecificationIn
     // ` foo ` becomes ` bar `,
     // and `{{foo}}` becomes `{{bar}}`,
     // but ` foobaz ` stays ` foobaz `
-    contents = contents.replaceAll(new RegExp(`\\b${prevName}\\b`, 'g'), newName);
+    contents = contents.replaceAll(
+      new RegExp(`\\b${prevName}\\b`, 'g'),
+      newName,
+    );
   }
 
   const writeFile = (fileName: string) => {
@@ -76,7 +104,9 @@ const writeModelFile = async (title: string, specificationInput: SpecificationIn
     return path.join('./', destination);
   } else {
     const getFilename = (currentCount: number) => {
-      return currentCount === 0 ? `${title}.json` : `${title}-${currentCount}.json`;
+      return currentCount === 0
+        ? `${title}.json`
+        : `${title}-${currentCount}.json`;
     };
 
     let lastCount = 0;
@@ -90,7 +120,9 @@ const writeModelFile = async (title: string, specificationInput: SpecificationIn
     }
 
     for (const file of await readDir('.')) {
-      const matchResult = file.match(new RegExp(`${escapeRegExp(title)}-([0-9])+`));
+      const matchResult = file.match(
+        new RegExp(`${escapeRegExp(title)}-([0-9])+`),
+      );
 
       if (matchResult) {
         const [, count] = matchResult;
@@ -101,7 +133,9 @@ const writeModelFile = async (title: string, specificationInput: SpecificationIn
       }
     }
 
-    const fileName = getFilename(lastCount === 0 && !foundSingleName ? 0 : lastCount + 1);
+    const fileName = getFilename(
+      lastCount === 0 && !foundSingleName ? 0 : lastCount + 1,
+    );
 
     await writeFile(fileName);
 
@@ -112,14 +146,17 @@ const writeModelFile = async (title: string, specificationInput: SpecificationIn
 type BaseResource = {
   context: string;
   name: string;
-}
+};
 
 type BaseAIData = {
-  traceId?: string
-  name: string
-}
+  traceId?: string;
+  name: string;
+};
 
-const processResources = async <Resource extends BaseResource, AIData extends BaseAIData>({
+const processResources = async <
+  Resource extends BaseResource,
+  AIData extends BaseAIData,
+>({
   resources,
   disableAi,
   context,
@@ -128,13 +165,13 @@ const processResources = async <Resource extends BaseResource, AIData extends Ba
   getAIDataFn,
   resourceName,
 }: {
-  resources: Resource[],
-  disableAi: boolean,
-  defaultAIDataGenerator: (resource: Resource) => AIData,
-  aiDataProcessor: (resource: Resource, aiData: AIData) => void,
-  getAIDataFn(resource: Resource): Promise<AIData>,
-  context?: string,
-  resourceName: string,
+  resources: Resource[];
+  disableAi: boolean;
+  defaultAIDataGenerator: (resource: Resource) => AIData;
+  aiDataProcessor: (resource: Resource, aiData: AIData) => void;
+  getAIDataFn(resource: Resource): Promise<AIData>;
+  context?: string;
+  resourceName: string;
 }) => {
   const chunkSize = 5;
 
@@ -151,12 +188,24 @@ const processResources = async <Resource extends BaseResource, AIData extends Ba
     const lastFunctionNumberInChunk = chunkSize * (chunkIterations + 1);
 
     if (!disableAi) {
-      shell.echo(`Processing from ${resourceName} number ${(chunkSize * chunkIterations) + 1} to ${resourceName} number ${lastFunctionNumberInChunk <= resources.length ? lastFunctionNumberInChunk : resources.length} out of ${resources.length}`);
+      shell.echo(
+        `Processing from ${resourceName} number ${
+          chunkSize * chunkIterations + 1
+        } to ${resourceName} number ${
+          lastFunctionNumberInChunk <= resources.length
+            ? lastFunctionNumberInChunk
+            : resources.length
+        } out of ${resources.length}`,
+      );
     }
 
     for (const resource of resourceChunk) {
       if (disableAi) {
-        calls.push(new Promise<AIData>(resolve => resolve(defaultAIDataGenerator(resource))));
+        calls.push(
+          new Promise<AIData>((resolve) =>
+            resolve(defaultAIDataGenerator(resource)),
+          ),
+        );
       } else {
         calls.push(getAIDataFn(resource));
       }
@@ -166,8 +215,14 @@ const processResources = async <Resource extends BaseResource, AIData extends Ba
     descriptionSettledResults.push(...(await Promise.allSettled(calls)));
   }
 
-  const failedDescriptions: (typeof resources[number] & { index: number, reason?: string, traceId?: string })[] = [];
-  const resourcesWithNoName: (typeof resources[number] & { index: number })[] = [];
+  const failedDescriptions: ((typeof resources)[number] & {
+    index: number;
+    reason?: string;
+    traceId?: string;
+  })[] = [];
+  const resourcesWithNoName: ((typeof resources)[number] & {
+    index: number;
+  })[] = [];
 
   for (let i = 0; i < descriptionSettledResults.length; i++) {
     const descriptionSettledResult = descriptionSettledResults[i];
@@ -180,12 +235,15 @@ const processResources = async <Resource extends BaseResource, AIData extends Ba
 
       const httpStatusCode = descriptionSettledResult.reason?.response?.status;
 
-      const errMessage = descriptionSettledResult.reason?.response?.data?.message;
+      const errMessage =
+        descriptionSettledResult.reason?.response?.data?.message;
 
       let message = 'Request failure';
 
       if (httpStatusCode) {
-        message = `${message} with status code ${chalk.redBright(httpStatusCode)}`;
+        message = `${message} with status code ${chalk.redBright(
+          httpStatusCode,
+        )}`;
       }
 
       if (errMessage) {
@@ -227,19 +285,38 @@ const processResources = async <Resource extends BaseResource, AIData extends Ba
 
   if (failedDescriptions.length) {
     shell.echo('\n');
-    shell.echo(chalk.yellowBright('Warning:'), `Failed to generate some descriptions for ${resourceName}s:`);
+    shell.echo(
+      chalk.yellowBright('Warning:'),
+      `Failed to generate some descriptions for ${resourceName}s:`,
+    );
     shell.echo('\n');
     for (const failedResourceDescription of failedDescriptions) {
-      shell.echo(`${firstLetterToUppercase(resourceName)} with context`, `"${failedResourceDescription.context || ''}" and`, 'name', `"${failedResourceDescription.name || ''}"`, 'at index:', chalk.yellow(`${failedResourceDescription.index}`), failedResourceDescription.reason ? `- Reason: ${failedResourceDescription.reason}` : `- Trace id: ${failedResourceDescription.traceId}`);
+      shell.echo(
+        `${firstLetterToUppercase(resourceName)} with context`,
+        `"${failedResourceDescription.context || ''}" and`,
+        'name',
+        `"${failedResourceDescription.name || ''}"`,
+        'at index:',
+        chalk.yellow(`${failedResourceDescription.index}`),
+        failedResourceDescription.reason
+          ? `- Reason: ${failedResourceDescription.reason}`
+          : `- Trace id: ${failedResourceDescription.traceId}`,
+      );
     }
   }
 
   if (resourcesWithNoName.length) {
     shell.echo('\n');
-    shell.echo(chalk.redBright('Action required:'), `The following ${resourceName}s from your specification input do not have a name:`);
+    shell.echo(
+      chalk.redBright('Action required:'),
+      `The following ${resourceName}s from your specification input do not have a name:`,
+    );
     shell.echo('\n');
     for (const resourceWithNoName of resourcesWithNoName) {
-      shell.echo(`${firstLetterToUppercase(resourceName)} at index:`, chalk.redBright(resourceWithNoName.index));
+      shell.echo(
+        `${firstLetterToUppercase(resourceName)} at index:`,
+        chalk.redBright(resourceWithNoName.index),
+      );
     }
   }
 };
@@ -254,7 +331,9 @@ export const generateModel = async (
   rename: RenameT = [],
 ) => {
   try {
-    shell.echo('Translating specification into poly api specification input and generating context, names and descriptions for all resources...');
+    shell.echo(
+      'Translating specification into poly api specification input and generating context, names and descriptions for all resources...',
+    );
 
     let contents = '';
 
@@ -288,9 +367,14 @@ export const generateModel = async (
         hostUrlAsArgument = 'hostUrl';
       }
 
-      const specificationInputDto = await translateSpecification(contents, context, hostUrl, hostUrlAsArgument);
+      const specificationInputDto = await translateSpecification(
+        contents,
+        context,
+        hostUrl,
+        hostUrlAsArgument,
+      );
 
-      await processResources<typeof specificationInputDto.functions[number], ApiFunctionDescriptionGenerationDto>({
+      await processResources<(typeof specificationInputDto.functions)[number], ApiFunctionDescriptionGenerationDto>({
         resources: specificationInputDto.functions,
         aiDataProcessor(resource, aiData) {
           resource.name = aiData.name;
@@ -320,7 +404,7 @@ export const generateModel = async (
         resourceName: 'function',
       });
 
-      await processResources<typeof specificationInputDto.webhooks[number], WebhookHandleDescriptionGenerationDto>({
+      await processResources<(typeof specificationInputDto.webhooks)[number], WebhookHandleDescriptionGenerationDto>({
         resources: specificationInputDto.webhooks,
         aiDataProcessor(resource, aiData) {
           resource.name = aiData.name;
@@ -348,9 +432,19 @@ export const generateModel = async (
         resourceName: 'webhook',
       });
 
-      const createdFileName = await writeModelFile(specificationInputDto.title, specificationInputDto, destination, rename);
+      const createdFileName = await writeModelFile(
+        specificationInputDto.title,
+        specificationInputDto,
+        destination,
+        rename,
+      );
 
-      shell.echo(chalk.green('Poly api specification input created:'), 'Open file', chalk.blueBright(createdFileName), 'to check details.');
+      shell.echo(
+        chalk.green('Poly api specification input created:'),
+        'Open file',
+        chalk.blueBright(createdFileName),
+        'to check details.',
+      );
     } catch (error) {
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
