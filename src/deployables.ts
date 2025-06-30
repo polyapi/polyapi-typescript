@@ -183,7 +183,7 @@ export const getAllDeployableFilesWindows = ({
   const excludeCommand = excludePattern
     ? ` | findstr /V /I "${excludePattern}"`
     : '';
-  const searchCommand = ` | findstr /M /I /S /F:/ ${pattern} *.*`;
+  const searchCommand = ` | findstr /M /I /F:/ ${pattern}`;
 
   let result: string[] = [];
   for (const dir of includeDirs) {
@@ -195,7 +195,7 @@ export const getAllDeployableFilesWindows = ({
         : includeFilesOrExtensions
           .map((f) => (f.includes('.') ? f : `${dir}*.${f}`))
           .join(' ');
-    const dirCommand = `dir ${includePattern} /S /P /B > NUL`;
+    const dirCommand = `dir ${includePattern} /S /P /B `;
     const fullCommand = `${dirCommand}${excludeCommand}${searchCommand}`;
     try {
       const output = shell.exec(fullCommand, {silent:true}).toString('utf8');
