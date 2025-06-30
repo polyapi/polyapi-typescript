@@ -24,13 +24,13 @@ const firstResult = (rsp) => {
   return rsp;
 }
 
-const deleteOneResponse = (rsp) => {
-  if (typeof rsp.deleted === 'number') {
-    return { deleted: rsp.deleted > 0 };
-  }
-  // Else rsp is some kind of error
-  return rsp;
-}
+// const deleteOneResponse = (rsp) => {
+//   if (typeof rsp.deleted === 'number') {
+//     return { deleted: rsp.deleted > 0 };
+//   }
+//   // Else rsp is some kind of error
+//   return rsp;
+// }
 
 class Table {
   constructor(id, clientID, polyCustom) {
@@ -78,17 +78,17 @@ class Table {
     return executeQuery(this.id, 'update', query, this.clientID, this.polyCustom);
   }
 
-  updateOne(query) {
-    return executeQuery(this.id, 'update', query, this.clientID, this.polyCustom).then(firstResult);
-  }
+  // updateOne(query) {
+  //   return executeQuery(this.id, 'update', query, this.clientID, this.polyCustom).then(firstResult);
+  // }
 
   deleteMany(query) {
     return executeQuery(this.id, 'delete', query, this.clientID, this.polyCustom);
   }
 
-  deleteOne(query) {
-    return executeQuery(this.id, 'delete', query, this.clientID, this.polyCustom).then(deleteOneResponse);
-  }
+  // deleteOne(query) {
+  //   return executeQuery(this.id, 'delete', query, this.clientID, this.polyCustom).then(deleteOneResponse);
+  // }
 }
 
 module.exports = (clientID, polyCustom) => tables.reduce(
