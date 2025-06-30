@@ -8,46 +8,11 @@ import { loadConfig } from './config';
 import { type RenameT } from './commands/model';
 import { DEFAULT_POLY_PATH } from './constants';
 import { isValidHttpUrl } from './utils';
-import fs from 'fs';
-import path from 'path';
 
 if (process.env.NO_COLOR) {
   // Support NO_COLOR env variable https://no-color.org/
   chalk.level = 0;
 }
-
-const showWelcomeIfFirstTime = () => {
-  try {
-    const polyDir = DEFAULT_POLY_PATH;
-    const welcomeFile = path.join(polyDir, '.welcome-shown');
-    
-    // If welcome has already been shown, return early
-    if (fs.existsSync(welcomeFile)) {
-      return;
-    }
-    
-    // Get version from package.json
-    const packagePath = path.join(__dirname, '..', 'package.json');
-    const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-    const version = packageJson.version;
-    
-    // Show welcome message
-    console.log('');
-    console.log(chalk.green('✓ PolyAPI SDK installed successfully!'));
-    console.log(chalk.blue(`📦 Version: ${version}`));
-    console.log('');
-    console.log(chalk.yellow('Getting started:'));
-    console.log('  • Run ' + chalk.cyan('poly --help') + ' to see all available commands');
-    console.log('  • Run ' + chalk.cyan('poly setup') + ' to configure your Poly connection');
-    console.log('');
-    
-    // Ensure .poly directory exists and mark welcome as shown
-    fs.mkdirSync(polyDir, { recursive: true });
-    fs.writeFileSync(welcomeFile, new Date().toISOString());
-  } catch (error) {
-    // Silently fail if there's an issue - don't break the CLI
-  }
-};
 
 const checkPolyConfig = (polyPath: string) => {
   loadConfig(polyPath);
@@ -58,9 +23,6 @@ const checkPolyConfig = (polyPath: string) => {
 
   return true;
 };
-
-// Show welcome message on first usage
-showWelcomeIfFirstTime();
 
 void yargs
   .usage('$0 <cmd> [args]')
