@@ -14,7 +14,13 @@ const languageFormatMap = {
   python: ['py'],
 };
 
-export const addSnippet = async (polyPath: string, name: string, path: string, context: string, description: string) => {
+export const addSnippet = async (
+  polyPath: string,
+  name: string,
+  path: string,
+  context: string,
+  description: string,
+) => {
   let code = '';
 
   let language = '';
@@ -44,7 +50,10 @@ export const addSnippet = async (polyPath: string, name: string, path: string, c
       code,
       language,
     } as any);
-    shell.echo(`${chalk.greenBright('Success:')}`, 'Snippet successfully added.');
+    shell.echo(
+      `${chalk.greenBright('Success:')}`,
+      'Snippet successfully added.',
+    );
 
     shell.echo(`Snippet ID: ${response.data.id}`);
     upsertResourceInSpec(polyPath, {
@@ -60,7 +69,9 @@ export const addSnippet = async (polyPath: string, name: string, path: string, c
     let finalMessage = '';
 
     if (httpStatusCode === 400) {
-      const messages = Array.isArray(error.response.data.message) ? error.response.data.message : [`Failed with status code ${chalk.redBright(400)}`];
+      const messages = Array.isArray(error.response.data.message)
+        ? error.response.data.message
+        : [`Failed with status code ${chalk.redBright(400)}`];
       finalMessage = messages[0];
     } else if (httpStatusCode) {
       finalMessage = errMessage;

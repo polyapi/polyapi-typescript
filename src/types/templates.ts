@@ -10,5 +10,5 @@ export interface ProjectTemplatesConfig {
 }
 
 export interface ProjectTemplatesConfigVariable {
-  value: ProjectTemplatesConfig
+  value: ProjectTemplatesConfig;
 }

@@ -30,22 +30,33 @@ const DEPLOY_ORDER: DeployableTypes[] = [
   'webhook',
 ];
 
-const removeDeployable = async (deployable: SyncDeployment | Deployment): Promise<boolean> => {
+const removeDeployable = async (
+  deployable: SyncDeployment | Deployment,
+): Promise<boolean> => {
   switch (deployable.type) {
     case 'server-function': {
-      const instance = await getServerFunctionByName(deployable.context, deployable.name);
+      const instance = await getServerFunctionByName(
+        deployable.context,
+        deployable.name,
+      );
       if (!instance) return false;
       await deleteServerFunction(instance.id);
       return true;
     }
     case 'client-function': {
-      const instance = await getClientFunctionByName(deployable.context, deployable.name);
+      const instance = await getClientFunctionByName(
+        deployable.context,
+        deployable.name,
+      );
       if (!instance) return false;
       await deleteClientFunction(instance.id);
       return true;
     }
     case 'webhook': {
-      const webhook = await getWebhookByName(deployable.context, deployable.name);
+      const webhook = await getWebhookByName(
+        deployable.context,
+        deployable.name,
+      );
       if (!webhook) return false;
       await deleteWebhook(webhook.id);
       return true;
@@ -60,21 +71,43 @@ const syncDeployableAndGetId = async (deployable, code) => {
   switch (deployable.type) {
     case 'server-function':
       return (
-        await createOrUpdateServerFunction(deployable.context, deployable.name, deployable.description, code, deployable.typeSchemas, deployable.dependencies, deployable.config)
+        await createOrUpdateServerFunction(
+          deployable.context,
+          deployable.name,
+          deployable.description,
+          code,
+          deployable.typeSchemas,
+          deployable.dependencies,
+          deployable.config,
+        )
       ).id;
     case 'client-function':
       return (
-        await createOrUpdateClientFunction(deployable.context, deployable.name, deployable.description, code, deployable.typeSchemas, deployable.config)
+        await createOrUpdateClientFunction(
+          deployable.context,
+          deployable.name,
+          deployable.description,
+          code,
+          deployable.typeSchemas,
+          deployable.config,
+        )
       ).id;
     case 'webhook':
       return (
-        await createOrUpdateWebhook(deployable.context, deployable.name, deployable.description, deployable.config)
+        await createOrUpdateWebhook(
+          deployable.context,
+          deployable.name,
+          deployable.description,
+          deployable.config,
+        )
       ).id;
   }
   throw new Error(`Unsupported deployable type: '${deployable.type}'`);
 };
 
-const syncDeployable = async (deployable: SyncDeployment): Promise<Deployment> => {
+const syncDeployable = async (
+  deployable: SyncDeployment,
+): Promise<Deployment> => {
   const code = fs.readFileSync(deployable.file, 'utf8');
   const id = await syncDeployableAndGetId(deployable, code);
   return {
@@ -90,7 +123,10 @@ const syncDeployable = async (deployable: SyncDeployment): Promise<Deployment> =
 
 type GroupedDeployables = Record<DeployableTypes, DeployableRecord[]>;
 
-export const syncDeployables = async (dryRun: boolean, instance = process.env.POLY_API_BASE_URL) => {
+export const syncDeployables = async (
+  dryRun: boolean,
+  instance = process.env.POLY_API_BASE_URL,
+) => {
   await prepareDeployableDirectory();
   const gitRevision = await getCacheDeploymentsRevision();
   const allDeployables = await loadDeployableRecords();
@@ -103,13 +139,19 @@ export const syncDeployables = async (dryRun: boolean, instance = process.env.PO
   // Right now we're doing rudimentary ordering by type
   // But this does not safely handle cases where one server function may reference another
   // We should parse the functions bodies for references to other Poly deployables and work them into a DAG
-  const groupedDeployables = groupBy(allDeployables, 'type') as unknown as GroupedDeployables;
+  const groupedDeployables = groupBy(
+    allDeployables,
+    'type',
+  ) as unknown as GroupedDeployables;
   for (const type of DEPLOY_ORDER) {
     const deployables = groupedDeployables[type] || [];
     for (const deployable of deployables) {
-      const previousDeployment = deployable.deployments.find(i => i.instance === instance);
+      const previousDeployment = deployable.deployments.find(
+        (i) => i.instance === instance,
+      );
       const gitRevisionChanged = gitRevision !== deployable.gitRevision;
-      const fileRevisionChanged = previousDeployment?.fileRevision !== deployable.fileRevision;
+      const fileRevisionChanged =
+        previousDeployment?.fileRevision !== deployable.fileRevision;
       let action = gitRevisionChanged
         ? 'REMOVED'
         : !previousDeployment?.id
@@ -149,16 +191,32 @@ export const syncDeployables = async (dryRun: boolean, instance = process.env.PO
           // This deployable no longer exists so let's remove it
           const found = await removeDeployable(syncDeployment);
           if (!found) action = 'NOT FOUND';
-          const removeIndex = allDeployables.findIndex(d => d.name === deployable.name && d.context === deployable.context && d.file === deployable.file);
+          const removeIndex = allDeployables.findIndex(
+            (d) =>
+              d.name === deployable.name &&
+              d.context === deployable.context &&
+              d.file === deployable.file,
+          );
           toRemove.push(...allDeployables.splice(removeIndex, 1));
         }
       }
 
-      console.log(`${dryRun ? 'Would sync' : 'Synced'} ${deployable.type.replaceAll('-', ' ')} ${deployable.context}.${deployable.name}: ${dryRun ? 'TO BE ' : ''}${action}`);
+      console.log(
+        `${dryRun ? 'Would sync' : 'Synced'} ${deployable.type.replaceAll(
+          '-',
+          ' ',
+        )} ${deployable.context}.${deployable.name}: ${
+          dryRun ? 'TO BE ' : ''
+        }${action}`,
+      );
     }
   }
   if (dryRun) return;
-  await Promise.all(allDeployables.map(deployable => writeUpdatedDeployable(deployable, true)));
+  await Promise.all(
+    allDeployables.map((deployable) =>
+      writeUpdatedDeployable(deployable, true),
+    ),
+  );
   await saveDeployableRecords(allDeployables);
   if (toRemove.length) await removeDeployableRecords(toRemove);
 };

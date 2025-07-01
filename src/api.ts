@@ -35,8 +35,14 @@ import { POLY_API_VERSION_HEADER } from './constants';
 
 dotenv.config();
 
-const httpProxy = process.env.HTTP_PROXY || process.env.http_proxy || process.env.npm_config_proxy;
-const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.npm_config_https_proxy;
+const httpProxy =
+  process.env.HTTP_PROXY ||
+  process.env.http_proxy ||
+  process.env.npm_config_proxy;
+const httpsProxy =
+  process.env.HTTPS_PROXY ||
+  process.env.https_proxy ||
+  process.env.npm_config_https_proxy;
 const nodeEnv = process.env.NODE_ENV;
 const isDevEnv = nodeEnv === 'development';
 
@@ -54,9 +60,7 @@ const getApiHeaders = () => ({
 });
 
 const axios = Axios.create({
-  httpAgent: httpProxy
-    ? new HttpProxyAgent(httpProxy)
-    : undefined,
+  httpAgent: httpProxy ? new HttpProxyAgent(httpProxy) : undefined,
   httpsAgent: httpsProxy
     ? new HttpsProxyAgent(httpsProxy, {
       rejectUnauthorized: !isDevEnv,
@@ -67,7 +71,12 @@ const axios = Axios.create({
   proxy: false,
 });
 
-export const getSpecs = async (contexts?: string[], names?: string[], ids?: string[], noTypes?: boolean) => {
+export const getSpecs = async (
+  contexts?: string[],
+  names?: string[],
+  ids?: string[],
+  noTypes?: boolean,
+) => {
   return (
     await axios.get<Specification[]>(`${getApiBaseURL()}/specs`, {
       headers: getApiHeaders(),
@@ -128,23 +137,16 @@ export const getServerFunctionByName = async (
         },
       },
     )
-  ).data.find(fn => fn.name === name && fn.context === context);
+  ).data.find((fn) => fn.name === name && fn.context === context);
 };
 
-export const deleteServerFunction = async (
-  id: string,
-) => {
-  return (
-    await axios.delete(
-      `${getApiBaseURL()}/functions/server/${id}`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getApiHeaders(),
-        },
-      },
-    )
-  );
+export const deleteServerFunction = async (id: string) => {
+  return await axios.delete(`${getApiBaseURL()}/functions/server/${id}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...getApiHeaders(),
+    },
+  });
 };
 
 export const createOrUpdateClientFunction = async (
@@ -190,90 +192,131 @@ export const getClientFunctionByName = async (
         },
       },
     )
-  ).data.find(fn => fn.name === name && fn.context === context);
+  ).data.find((fn) => fn.name === name && fn.context === context);
 };
 
-export const deleteClientFunction = async (
-  id: string,
-) => {
-  return (
-    await axios.delete(
-      `${getApiBaseURL()}/functions/client/${id}`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getApiHeaders(),
-        },
-      },
-    )
-  );
-};
-
-export const createTenantSignUp = async (instance: string, email: string, tenantName: string | null = null) => {
-  return (
-    await axios.post<any, AxiosResponse<SignUpDto>>(`${getInstanceUrl(instance)}/tenants/sign-up`, {
-      email,
-      tenantName,
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
-      },
-    })
-  ).data;
-};
-
-export const verifyTenantSignUp = async (instance: string, email: string, code: string) => {
-  return (
-    await axios.post<any, AxiosResponse<SignUpVerificationResultDto>>(`${getInstanceUrl(instance)}/tenants/sign-up/verify`, {
-      code,
-      email,
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
-      },
-    })
-  ).data;
-};
-
-export const resendVerificationCode = (instance: string, email: string) => {
-  return axios.post<any, AxiosResponse<SignUpDto>>(`${getInstanceUrl(instance)}/tenants/sign-up/resend-verification-code`, {
-    email,
-  }, {
+export const deleteClientFunction = async (id: string) => {
+  return await axios.delete(`${getApiBaseURL()}/functions/client/${id}`, {
     headers: {
-      [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+      'Content-Type': 'application/json',
+      ...getApiHeaders(),
     },
   });
 };
 
-export const getLastTos = async (instance: string) => {
-  return (await axios.get<any, AxiosResponse<TosDto>>(`${getInstanceUrl(instance)}/tos`, {
-    headers: {
-      [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+export const createTenantSignUp = async (
+  instance: string,
+  email: string,
+  tenantName: string | null = null,
+) => {
+  return (
+    await axios.post<any, AxiosResponse<SignUpDto>>(
+      `${getInstanceUrl(instance)}/tenants/sign-up`,
+      {
+        email,
+        tenantName,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+        },
+      },
+    )
+  ).data;
+};
+
+export const verifyTenantSignUp = async (
+  instance: string,
+  email: string,
+  code: string,
+) => {
+  return (
+    await axios.post<any, AxiosResponse<SignUpVerificationResultDto>>(
+      `${getInstanceUrl(instance)}/tenants/sign-up/verify`,
+      {
+        code,
+        email,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+        },
+      },
+    )
+  ).data;
+};
+
+export const resendVerificationCode = (instance: string, email: string) => {
+  return axios.post<any, AxiosResponse<SignUpDto>>(
+    `${getInstanceUrl(instance)}/tenants/sign-up/resend-verification-code`,
+    {
+      email,
     },
-  })).data;
+    {
+      headers: {
+        [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+      },
+    },
+  );
+};
+
+export const getLastTos = async (instance: string) => {
+  return (
+    await axios.get<any, AxiosResponse<TosDto>>(
+      `${getInstanceUrl(instance)}/tos`,
+      {
+        headers: {
+          [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+        },
+      },
+    )
+  ).data;
 };
 
 export const upsertApiFunction = async (data: CreateApiFunctionDto) => {
-  return (await axios.put<any, AxiosResponse<ApiFunctionDetailsDto>>(`${getApiBaseURL()}/functions/api`, data, {
-    headers: getApiHeaders(),
-  })).data;
+  return (
+    await axios.put<any, AxiosResponse<ApiFunctionDetailsDto>>(
+      `${getApiBaseURL()}/functions/api`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
+  ).data;
 };
 
 export const upsertWebhookHandle = async (data: CreateWebhookHandleDto) => {
-  return (await axios.put<any, AxiosResponse<WebhookHandleDto>>(`${getApiBaseURL()}/webhooks`, data, {
-    headers: getApiHeaders(),
-  })).data;
+  return (
+    await axios.put<any, AxiosResponse<WebhookHandleDto>>(
+      `${getApiBaseURL()}/webhooks`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
+  ).data;
 };
 
 export const upsertSchema = async (data: CreateSchemaDto) => {
-  return (await axios.put<any, AxiosResponse<SchemaDto>>(`${getApiBaseURL()}/schemas`, data, {
-    headers: getApiHeaders(),
-  })).data;
+  return (
+    await axios.put<any, AxiosResponse<SchemaDto>>(
+      `${getApiBaseURL()}/schemas`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
+  ).data;
 };
 
-export const translateSpecification = async (contents: string, context?: string, hostUrl?: string, hostUrlAsArgument?: string) => {
+export const translateSpecification = async (
+  contents: string,
+  context?: string,
+  hostUrl?: string,
+  hostUrlAsArgument?: string,
+) => {
   const params = new URLSearchParams();
   if (context) params.append('context', context);
   if (hostUrl) params.append('hostUrl', hostUrl);
@@ -281,74 +324,137 @@ export const translateSpecification = async (contents: string, context?: string,
 
   const url = `${getApiBaseURL()}/specification-input/oas?${params.toString()}`;
 
-  return (await axios.post<any, AxiosResponse<SpecificationInputDto>>(url, contents, {
-    headers: {
-      'Content-Type': 'text/plain',
-      ...getApiHeaders(),
-    },
-  })).data;
+  return (
+    await axios.post<any, AxiosResponse<SpecificationInputDto>>(url, contents, {
+      headers: {
+        'Content-Type': 'text/plain',
+        ...getApiHeaders(),
+      },
+    })
+  ).data;
 };
 
 export const validateApiFunctionDto = async (data: CreateApiFunctionDto) => {
-  return (await axios.post<any, AxiosResponse<void>>(`${getApiBaseURL()}/specification-input/validation/api-function`, data, {
-    headers: getApiHeaders(),
-  })).data;
+  return (
+    await axios.post<any, AxiosResponse<void>>(
+      `${getApiBaseURL()}/specification-input/validation/api-function`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
+  ).data;
 };
 
-export const validateWebhookHandleDto = async (data: CreateWebhookHandleDto) => {
-  return (await axios.post<any, AxiosResponse<void>>(`${getApiBaseURL()}/specification-input/validation/webhook-handle`, data, {
-    headers: getApiHeaders(),
-  })).data;
+export const validateWebhookHandleDto = async (
+  data: CreateWebhookHandleDto,
+) => {
+  return (
+    await axios.post<any, AxiosResponse<void>>(
+      `${getApiBaseURL()}/specification-input/validation/webhook-handle`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
+  ).data;
 };
 
-export const getServerFunctionDescription = async (data: ExecuteCustomFunctionDescriptionGenerationDto) => {
-  return (await axios.post<any, AxiosResponse<CustomFunctionDescriptionGenerationDto>>(`${getApiBaseURL()}/functions/server/description-generation`, data, {
-    headers: getApiHeaders(),
-  })).data;
+export const getServerFunctionDescription = async (
+  data: ExecuteCustomFunctionDescriptionGenerationDto,
+) => {
+  return (
+    await axios.post<
+      any,
+      AxiosResponse<CustomFunctionDescriptionGenerationDto>
+    >(`${getApiBaseURL()}/functions/server/description-generation`, data, {
+      headers: getApiHeaders(),
+    })
+  ).data;
 };
 
-export const getClientFunctionDescription = async (data: ExecuteCustomFunctionDescriptionGenerationDto) => {
-  return (await axios.post<any, AxiosResponse<CustomFunctionDescriptionGenerationDto>>(`${getApiBaseURL()}/functions/client/description-generation`, data, {
-    headers: getApiHeaders(),
-  })).data;
+export const getClientFunctionDescription = async (
+  data: ExecuteCustomFunctionDescriptionGenerationDto,
+) => {
+  return (
+    await axios.post<
+      any,
+      AxiosResponse<CustomFunctionDescriptionGenerationDto>
+    >(`${getApiBaseURL()}/functions/client/description-generation`, data, {
+      headers: getApiHeaders(),
+    })
+  ).data;
 };
 
-export const getApiFunctionDescription = async (data: ExecuteApiFunctionDescriptionGenerationDto) => {
-  return (await axios.post<any, AxiosResponse<ApiFunctionDescriptionGenerationDto>>(`${getApiBaseURL()}/functions/api/description-generation`, data, {
-    headers: getApiHeaders(),
-  })).data;
+export const getApiFunctionDescription = async (
+  data: ExecuteApiFunctionDescriptionGenerationDto,
+) => {
+  return (
+    await axios.post<any, AxiosResponse<ApiFunctionDescriptionGenerationDto>>(
+      `${getApiBaseURL()}/functions/api/description-generation`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
+  ).data;
 };
 
 export const upsertSnippet = async (data: CreateSnippetDto) => {
-  return (
-    await axios.put<any, AxiosResponse<SnippetDetailsDto>>(`${getApiBaseURL()}/snippets`, data, {
+  return await axios.put<any, AxiosResponse<SnippetDetailsDto>>(
+    `${getApiBaseURL()}/snippets`,
+    data,
+    {
       headers: getApiHeaders(),
-    })
+    },
   );
 };
 
-export const getWebhookHandleDescription = async (data: ExecuteWebhookHandleDescriptionGenerationDto) => {
-  return (await axios.post<any, AxiosResponse<WebhookHandleDescriptionGenerationDto>>(`${getApiBaseURL()}/webhooks/description-generation`, data, {
-    headers: getApiHeaders(),
-  })).data;
+export const getWebhookHandleDescription = async (
+  data: ExecuteWebhookHandleDescriptionGenerationDto,
+) => {
+  return (
+    await axios.post<any, AxiosResponse<WebhookHandleDescriptionGenerationDto>>(
+      `${getApiBaseURL()}/webhooks/description-generation`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
+  ).data;
 };
 
-export const getAuthData = async (baseUrl: string, apiKey: string): Promise<AuthData> => {
-  return (await axios.get<any, AxiosResponse<AuthData>>(`${baseUrl}/auth`, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
-    },
-  })).data;
+export const getAuthData = async (
+  baseUrl: string,
+  apiKey: string,
+): Promise<AuthData> => {
+  return (
+    await axios.get<any, AxiosResponse<AuthData>>(`${baseUrl}/auth`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+      },
+    })
+  ).data;
 };
 
-export const getProjectTemplatesConfig = async (baseUrl: string, apiKey: string, tenantId: string, environmentId: string): Promise<ProjectTemplatesConfig> => {
-  return (await axios.get<any, AxiosResponse<ProjectTemplatesConfigVariable>>(`${baseUrl}/tenants/${tenantId}/environments/${environmentId}/config-variables/ProjectTemplates`, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
-    },
-  })).data.value;
+export const getProjectTemplatesConfig = async (
+  baseUrl: string,
+  apiKey: string,
+  tenantId: string,
+  environmentId: string,
+): Promise<ProjectTemplatesConfig> => {
+  return (
+    await axios.get<any, AxiosResponse<ProjectTemplatesConfigVariable>>(
+      `${baseUrl}/tenants/${tenantId}/environments/${environmentId}/config-variables/ProjectTemplates`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+        },
+      },
+    )
+  ).data.value;
 };
 
 export const createOrUpdateWebhook = async (
@@ -387,16 +493,19 @@ export const getWebhookByName = async (context: string, name: string) => {
         },
       },
     )
-  ).data.find(webhook => webhook.name === name && webhook.context === context);
+  ).data.find(
+    (webhook) => webhook.name === name && webhook.context === context,
+  );
 };
 
 export const deleteWebhook = async (webhookId: string) => {
-  return (
-    await axios.delete<any, AxiosResponse>(`${getApiBaseURL()}/webhooks/${webhookId}`, {
+  return await axios.delete<any, AxiosResponse>(
+    `${getApiBaseURL()}/webhooks/${webhookId}`,
+    {
       headers: {
         'Content-Type': 'application/json',
         ...getApiHeaders(),
       },
-    })
+    },
   );
 };

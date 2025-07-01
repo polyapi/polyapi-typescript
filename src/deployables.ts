@@ -8,10 +8,7 @@ export const CACHE_VERSION_FILE = './node_modules/.poly/deployments_revision';
 export const CACHE_DIR = './node_modules/.poly/deployables';
 
 // NOTE: DeployableTypes should be the string used for these types within the Canopy url.
-export type DeployableTypes =
-  | 'server-function'
-  | 'client-function'
-  | 'webhook'
+export type DeployableTypes = 'server-function' | 'client-function' | 'webhook';
 // | "api-function"
 // | "variable"
 // | "webhook"
@@ -30,7 +27,8 @@ export type DeployableTypeNames =
 export type SyncFn = (deployable: SyncDeployment) => Promise<Deployment>;
 export type RemoveFn = (deployable: SyncDeployment) => Promise<boolean>; // returns true if found and removed
 
-export const DeployableTypeEntries: [DeployableTypeNames, DeployableTypes][] = [];
+export const DeployableTypeEntries: [DeployableTypeNames, DeployableTypes][] =
+  [];
 
 DeployableTypeEntries.push(['PolyServerFunction', 'server-function']);
 DeployableTypeEntries.push(['PolyClientFunction', 'client-function']);
@@ -45,9 +43,10 @@ export type ParsedDeployableConfig = {
   context: string;
   name: string;
   type: DeployableTypes;
+  description?: string;
   disableAi?: boolean;
   config: Record<string, any>;
-}
+};
 
 export type Deployment = {
   // Deployments can be across several instances (or environments)
@@ -60,7 +59,7 @@ export type Deployment = {
   id: string; // uuid of deployed thing
   deployed: string; // ISO timestamp
   fileRevision: string; // ex. "a3f9b02"
-}
+};
 
 export type DeployableRecord = ParsedDeployableConfig & {
   gitRevision: string; // ex. "343c0e67", output from `git rev-parse --short HEAD`
@@ -72,11 +71,11 @@ export type DeployableRecord = ParsedDeployableConfig & {
       name: string;
       type: string;
       description: string;
-    }>
+    }>;
     returns: {
       type: string;
       description: string;
-    }
+    };
   };
   typeSchemas?: Record<string, any>;
   dependencies?: string[];
@@ -86,7 +85,7 @@ export type DeployableRecord = ParsedDeployableConfig & {
   docStartIndex?: number;
   docEndIndex?: number;
   dirty?: boolean;
-}
+};
 
 export type SyncDeployment = {
   context: string;
@@ -101,33 +100,45 @@ export type SyncDeployment = {
   instance: string; // ex. "https://na1.polyapi.io"
   id?: string; // uuid of deployed thing
   deployed?: string; // ISO timestamp
-}
+};
 
 export const prepareDeployableDirectory = async () => {
   try {
     await mkdir(CACHE_DIR, { recursive: true });
-  } catch { }
+  } catch {}
 };
 
 export const loadDeployableRecords = async (): Promise<DeployableRecord[]> => {
   // Load in all JSON records found in node_modules/.poly/deployables/
   const cachedRecords = (await readdir(CACHE_DIR, { withFileTypes: true }))
-    .filter(d => d.isFile() && d.name.endsWith('.json'))
-    .map(d => d.name);
+    .filter((d) => d.isFile() && d.name.endsWith('.json'))
+    .map((d) => d.name);
 
-  return Promise.all(cachedRecords.map(name =>
-    readJsonFile<DeployableRecord>(`${CACHE_DIR}/${name}`)),
+  return Promise.all(
+    cachedRecords.map((name) =>
+      readJsonFile<DeployableRecord>(`${CACHE_DIR}/${name}`),
+    ),
   );
 };
 
 export const saveDeployableRecords = async (records: DeployableRecord[]) => {
-  await Promise.all(records.map(record =>
-    writeJsonFile(`${CACHE_DIR}/${record.context}.${record.name}.json`, record),
-  ));
+  await Promise.all(
+    records.map((record) =>
+      writeJsonFile(
+        `${CACHE_DIR}/${record.context}.${record.name}.json`,
+        record,
+      ),
+    ),
+  );
 };
 
 export const removeDeployableRecords = async (records: DeployableRecord[]) => {
-  shell.rm('-f', ...records.map(record => `${CACHE_DIR}/${record.context}.${record.name}.json`));
+  shell.rm(
+    '-f',
+    ...records.map(
+      (record) => `${CACHE_DIR}/${record.context}.${record.name}.json`,
+    ),
+  );
 };
 
 const readJsonFile = async <T = any>(path): Promise<T> => {
@@ -135,9 +146,15 @@ const readJsonFile = async <T = any>(path): Promise<T> => {
   return JSON.parse(file);
 };
 
-const writeJsonFile = async <T = any>(path: string, contents: T): Promise<unknown> => {
+const writeJsonFile = async <T = any>(
+  path: string,
+  contents: T,
+): Promise<unknown> => {
   await open(path, 'w');
-  return writeFile(path, JSON.stringify(contents, undefined, 2), { encoding: 'utf8', flag: 'w' });
+  return writeFile(path, JSON.stringify(contents, undefined, 2), {
+    encoding: 'utf8',
+    flag: 'w',
+  });
 };
 
 type PolyDeployConfig = {
@@ -145,7 +162,7 @@ type PolyDeployConfig = {
   includeDirs: string[];
   includeFilesOrExtensions: string[];
   excludeDirs: string[];
-}
+};
 
 export const getAllDeployableFilesWindows = ({
   typeNames,
@@ -154,23 +171,36 @@ export const getAllDeployableFilesWindows = ({
   excludeDirs,
 }: PolyDeployConfig): string[] => {
   // To get the equivalent of grep in Windows we use a combination of `dir` and `findstr`
-  const includePattern = includeFilesOrExtensions.length > 0 ? includeFilesOrExtensions.map(f => f.includes('.') ? f : `*.${f}`).join(' ') : '*';
-  const excludePattern = excludeDirs.length > 0 ? excludeDirs.join('|') : '';
-  const pattern = typeNames.length > 0
-    ? typeNames.map((name) => `polyConfig: ${name}`).join('|')
-    : 'polyConfig';
+  const excludePattern = excludeDirs.length > 0 
+      ? excludeDirs
+        .map((f) => `\\${f}`)
+        .join(' ') : '';
+  const pattern =
+    typeNames.length > 0
+      ? typeNames.map((name) => `/C:"polyConfig: ${name}"`).join(' ')
+      : 'C/:"polyConfig"';
 
-  const excludeCommand = excludePattern ? ` | findstr /V /I "${excludePattern}"` : '';
-  const searchCommand = ` | findstr /M /I /F:/ /C:"${pattern}"`;
+  const excludeCommand = excludePattern
+    ? ` | findstr /V /I "${excludePattern}"`
+    : '';
+  const searchCommand = ` | findstr /M /I /F:/ ${pattern}`;
 
   let result: string[] = [];
   for (const dir of includeDirs) {
-    const dirCommand = `dir /S /P /B ${includePattern} ${dir}`;
+    const includePattern =
+      dir === '.'
+        ? includeFilesOrExtensions
+          .map((f) => (f.includes('.') ? f : `*.${f}`))
+          .join(' ')
+        : includeFilesOrExtensions
+          .map((f) => (f.includes('.') ? f : `${dir}*.${f}`))
+          .join(' ');
+    const dirCommand = `dir ${includePattern} /S /P /B `;
     const fullCommand = `${dirCommand}${excludeCommand}${searchCommand}`;
     try {
-      const output = shell.exec(fullCommand).toString('utf8');
+      const output = shell.exec(fullCommand, {silent:true}).toString('utf8');
       result = result.concat(output.split(/\r?\n/).filter(Boolean));
-    } catch { }
+    } catch {}
   }
   return result;
 };
@@ -183,28 +213,36 @@ export const getAllDeployableFilesLinux = ({
 }: PolyDeployConfig): string[] => {
   // In Linux we can just use `grep` to find possible poly deployables
   const include = includeFilesOrExtensions.length
-    ? includeFilesOrExtensions.map((f) => {
-      return `--include=${f.includes('.') ? f : `*.${f}`}`;
-    }).join(' ')
+    ? includeFilesOrExtensions
+      .map((f) => {
+        return `--include=${f.includes('.') ? f : `*.${f}`}`;
+      })
+      .join(' ')
     : '';
-  const excludeDir = excludeDirs.length ? excludeDirs.map(dir => `--exclude-dir=${dir}`).join(' ') : '';
+  const excludeDir = excludeDirs.length
+    ? excludeDirs.map((dir) => `--exclude-dir=${dir}`).join(' ')
+    : '';
 
-  const searchPath = includeDirs.length
-    ? includeDirs.join(' ')
-    : '.';
-  const patterns = typeNames.length > 0
-    ? typeNames.map((name) => `-e 'polyConfig: ${name}'`).join(' ')
-    : '-e \'polyConfig\'';
+  const searchPath = includeDirs.length ? includeDirs.join(' ') : '.';
+  const patterns =
+    typeNames.length > 0
+      ? typeNames.map((name) => `-e 'polyConfig: ${name}'`).join(' ')
+      : "-e 'polyConfig'";
   const grepCommand = `grep ${include} ${excludeDir} -Rl ${patterns} ${searchPath}`;
   const output: string = shell.exec(grepCommand).toString('utf8');
   return output.split('\n').filter(Boolean) as string[];
 };
 
-export const getAllDeployableFiles = (config: Partial<PolyDeployConfig> = {}): string[] => {
-  config.typeNames = config.typeNames = DeployableTypeEntries.map(p => p[0]);
-  config.includeDirs = config.includeDirs = ['.'];
-  config.includeFilesOrExtensions = config.includeFilesOrExtensions = ['ts', 'js'];
-  config.excludeDirs = config.excludeDirs = [
+export const getAllDeployableFiles = (
+  config: Partial<PolyDeployConfig> = {},
+): string[] => {
+  config.typeNames = config.typeNames || DeployableTypeEntries.map((p) => p[0]);
+  config.includeDirs = config.includeDirs || ['.'];
+  config.includeFilesOrExtensions = config.includeFilesOrExtensions || [
+    'ts',
+    'js',
+  ];
+  config.excludeDirs = config.excludeDirs || [
     'node_modules',
     'dist',
     'build',
@@ -235,12 +273,17 @@ export const getDeployableFileRevision = (fileContents: string): string =>
 
 export const getGitRevision = (branchOrTag = 'HEAD'): string => {
   try {
-    const result = shell.exec(`git rev-parse --short ${branchOrTag}`).toString('utf8').trim();
+    const result = shell
+      .exec(`git rev-parse --short ${branchOrTag}`)
+      .toString('utf8')
+      .trim();
     if (!result) throw new Error('Failed to get git revision.');
     return result;
   } catch (err) {
     console.warn('Failed to get git revision. Falling back to random hash.');
-    return Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    return Array.from({ length: 8 }, () =>
+      Math.floor(Math.random() * 16).toString(16),
+    ).join('');
   }
 };
 
@@ -252,7 +295,9 @@ export const getCacheDeploymentsRevision = (): Promise<string> => {
   });
 };
 
-export const writeCacheRevision = async (gitRevision: string = getGitRevision()) => {
+export const writeCacheRevision = async (
+  gitRevision: string = getGitRevision(),
+) => {
   await writeFile(CACHE_VERSION_FILE, gitRevision, {
     flag: 'w',
     encoding: 'utf8',
@@ -271,48 +316,73 @@ export const writeDeployComments = (deployments: Deployment[]): string => {
     : 'canopy/polyui/collections';
 
   return deployments
-    .map(d =>
-      `// Poly deployed @ ${d.deployed} - ${d.context}.${d.name} - ${d.instance.endsWith(':8000') ? d.instance.replace(':8000', ':3000') : d.instance}/${canopyPath}/${d.type}s/${d.id} - ${d.fileRevision}`,
-    ).join('\n');
+    .map(
+      (d) =>
+        `// Poly deployed @ ${d.deployed} - ${d.context}.${d.name} - ${
+          d.instance.endsWith(':8000')
+            ? d.instance.replace(':8000', ':3000')
+            : d.instance
+        }/${canopyPath}/${d.type}s/${d.id} - ${d.fileRevision}`,
+    )
+    .join('\n');
 };
 
 const printJSDocFunctionComment = ({ description, params, returns }) => {
   return `/**\n${[
     ...description.split('\n').filter(Boolean),
-    ...params.map(p => `@param {${p.type}} ${p.name}${p.description ? ' - ' : ''}${p.description}`),
+    ...params.map(
+      (p) =>
+        `@param {${p.type}} ${p.name}${p.description ? ' - ' : ''}${
+          p.description
+        }`,
+    ),
     `@returns {${returns.type}} ${returns.description}`,
-  ].map(l => ` * ${l}`).join('\n')}\n */\n`;
+  ]
+    .map((l) => ` * ${l}`)
+    .join('\n')}\n */\n`;
 };
 
-const updateDeploymentComments = (fileContent: string, deployable: DeployableRecord): string => {
+const updateDeploymentComments = (
+  fileContent: string,
+  deployable: DeployableRecord,
+): string => {
   while (deployable.deploymentCommentRanges.length > 0) {
     const range = deployable.deploymentCommentRanges.pop();
-    fileContent = `${fileContent.substring(0, range[0])}${fileContent.substring(range[1])}`;
+    fileContent = `${fileContent.substring(0, range[0])}${fileContent.substring(
+      range[1],
+    )}`;
   }
   if (deployable.deployments.length) {
     const deploymentComments = writeDeployComments(deployable.deployments);
     // +1 because of the newline character we insert afterwards
     deployable.deploymentCommentRanges.push([0, deploymentComments.length + 1]);
     // Then add deploy comments to the top
-    fileContent = `${deploymentComments
-      }\n${fileContent
-      }`;
+    fileContent = `${deploymentComments}\n${fileContent}`;
   }
   return fileContent;
 };
 
-const updateDeployableFunctionComments = (fileContent: string, deployable: DeployableRecord, disableDocs = false): string => {
+const updateDeployableFunctionComments = (
+  fileContent: string,
+  deployable: DeployableRecord,
+  disableDocs = false,
+): string => {
   if (!disableDocs) {
     // First write/overwrite the JSDoc comment
-    fileContent = `${fileContent.substring(0, deployable.docStartIndex)
-      }${printJSDocFunctionComment(deployable.types)
-      }${fileContent.substring(deployable.docEndIndex)
-      }`;
+    fileContent = `${fileContent.substring(
+      0,
+      deployable.docStartIndex,
+    )}${printJSDocFunctionComment(deployable.types)}${fileContent.substring(
+      deployable.docEndIndex,
+    )}`;
   }
   return fileContent;
 };
 
-export const writeUpdatedDeployable = async (deployable: DeployableRecord, disableDocs = false): Promise<DeployableRecord> => {
+export const writeUpdatedDeployable = async (
+  deployable: DeployableRecord,
+  disableDocs = false,
+): Promise<DeployableRecord> => {
   let fileContents = await readFile(deployable.file, {
     flag: 'r',
     encoding: 'utf8',
@@ -320,7 +390,11 @@ export const writeUpdatedDeployable = async (deployable: DeployableRecord, disab
   switch (deployable.type) {
     case 'client-function':
     case 'server-function': {
-      fileContents = updateDeployableFunctionComments(fileContents, deployable, disableDocs);
+      fileContents = updateDeployableFunctionComments(
+        fileContents,
+        deployable,
+        disableDocs,
+      );
       break;
     }
     case 'webhook':
@@ -329,7 +403,7 @@ export const writeUpdatedDeployable = async (deployable: DeployableRecord, disab
       throw new Error(`Unsupported deployable type: '${deployable.type}'`);
   }
   // Then write/overwrite any deployment comments (must happen last to prevent the JSDoc comment ranges from breaking)
-  if (deployable.type !== 'webhook') fileContents = updateDeploymentComments(fileContents, deployable);
+  if (deployable.type !== 'webhook') { fileContents = updateDeploymentComments(fileContents, deployable); }
   await writeFile(deployable.file, fileContents, {
     flag: 'w',
     encoding: 'utf8',

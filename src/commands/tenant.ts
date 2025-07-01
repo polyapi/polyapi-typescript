@@ -1,7 +1,11 @@
 import shell from 'shelljs';
 import { input, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { createTenantSignUp, resendVerificationCode, verifyTenantSignUp } from '../api';
+import {
+  createTenantSignUp,
+  resendVerificationCode,
+  verifyTenantSignUp,
+} from '../api';
 import { SignUpDto } from '../types';
 import { saveConfig } from '../config';
 import { exec as execCommand } from 'child_process';
@@ -10,12 +14,15 @@ import isEmail from 'validator/lib/isEmail';
 
 const exec = promisify(execCommand);
 
-export const create = async (instance: string, loadedTenantSignUp: SignUpDto | null = null) => {
+export const create = async (
+  instance: string,
+  loadedTenantSignUp: SignUpDto | null = null,
+) => {
   let tenantSignUp: SignUpDto | null = loadedTenantSignUp;
 
   let credentials: {
-    apiKey: string,
-    apiBaseUrl: string
+    apiKey: string;
+    apiBaseUrl: string;
   } | null = null;
 
   let email = '';
@@ -43,7 +50,7 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
     tenantName = result || null;
   };
 
-  const signUp = async (data : 'tenant' | '' = '') => {
+  const signUp = async (data: 'tenant' | '' = '') => {
     try {
       if (data === 'tenant') {
         await requestTenant();
@@ -51,7 +58,8 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
         await requestEmail();
         await requestTenant();
         const acceptedTos = await confirm({
-          message: 'Do you agree with our terms of service expressed here: https://polyapi.io/terms-of-service ?',
+          message:
+            'Do you agree with our terms of service expressed here: https://polyapi.io/terms-of-service ?',
         });
 
         if (!acceptedTos) {
@@ -83,7 +91,7 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
   };
 
   try {
-    if (!await signUp()) {
+    if (!(await signUp())) {
       return;
     }
   } catch (err) {
@@ -92,13 +100,19 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
 
   const verifyTenant = async (showDescription = true) => {
     if (showDescription) {
-      shell.echo('A verification code has been sent to your email address', chalk.bold(`(${tenantSignUp.email}),`), 'check your email and enter your verification code. \nIf you didn\'t receive your verification code you can enter', chalk.bold('resend'), 'to send it again\n');
+      shell.echo(
+        'A verification code has been sent to your email address',
+        chalk.bold(`(${tenantSignUp.email}),`),
+        "check your email and enter your verification code. \nIf you didn't receive your verification code you can enter",
+        chalk.bold('resend'),
+        'to send it again\n',
+      );
     }
 
     const code = await input({
       message: 'Enter your verification code:',
-      transformer: value => value.trim(),
-      validate: verificationCode => !!verificationCode.length,
+      transformer: (value) => value.trim(),
+      validate: (verificationCode) => !!verificationCode.length,
     });
 
     if (code === 'resend') {
@@ -108,7 +122,11 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
         await resendVerificationCode(instance, tenantSignUp.email);
       } catch (error) {
         shell.echo(chalk.red('ERROR\n'));
-        shell.echo('Error sending verification code to', `${chalk.bold(tenantSignUp.email)}.`, '\n');
+        shell.echo(
+          'Error sending verification code to',
+          `${chalk.bold(tenantSignUp.email)}.`,
+          '\n',
+        );
         throw error;
       }
 
@@ -118,7 +136,11 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
     shell.echo('-n', 'Verifying your code...\n\n');
 
     try {
-      const response = await verifyTenantSignUp(instance, tenantSignUp.email, code);
+      const response = await verifyTenantSignUp(
+        instance,
+        tenantSignUp.email,
+        code,
+      );
 
       shell.echo(chalk.green('Tenant created successfully, details:\n'));
       shell.echo(chalk.bold('Instance url:'), response.apiBaseUrl, '\n');
@@ -132,7 +154,11 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
       shell.echo(chalk.red('ERROR\n'));
       if (error.response?.status === 409) {
         if (error.response?.data?.code === 'INVALID_VERIFICATION_CODE') {
-          shell.echo('Wrong verification code. If you didn\'t receive your verification code, you can type', chalk.bold('resend'), 'to send a new one.');
+          shell.echo(
+            "Wrong verification code. If you didn't receive your verification code, you can type",
+            chalk.bold('resend'),
+            'to send a new one.',
+          );
         }
 
         if (error.response?.data?.code === 'EXPIRED_VERIFICATION_CODE') {
@@ -157,7 +183,7 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
   };
 
   try {
-    if (!await verifyTenant()) {
+    if (!(await verifyTenant())) {
       return;
     }
   } catch (error) {
@@ -165,7 +191,8 @@ export const create = async (instance: string, loadedTenantSignUp: SignUpDto | n
   }
 
   const generate = await confirm({
-    message: 'Would you like to generate the poly client library using the new tenant key?',
+    message:
+      'Would you like to generate the poly client library using the new tenant key?',
   });
 
   if (generate) {

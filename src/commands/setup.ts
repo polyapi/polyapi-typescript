@@ -16,7 +16,12 @@ import {
 import { getAuthData, getProjectTemplatesConfig } from '../api';
 import { handleAxiosError, validateBaseUrl, URL_REGEX } from '../utils';
 
-const setup = async (polyPath: string, baseUrl?: string, apiKey?: string, apiVersion = '1') => {
+const setup = async (
+  polyPath: string,
+  baseUrl?: string,
+  apiKey?: string,
+  apiVersion = '1',
+) => {
   try {
     loadConfig(polyPath);
     process.env.POLY_API_KEY = process.env.POLY_API_KEY || apiVersion;
@@ -53,13 +58,24 @@ const setup = async (polyPath: string, baseUrl?: string, apiKey?: string, apiVer
       });
 
       if (process.env.ENVIRONMENT_SETUP_COMPLETE !== 'true') {
-        const { tenant: { id: tenantId }, environment: { id: environmentId } } = await getAuthData(polyApiBaseUrl, polyApiKey);
-        const projectTemplatesConfig = await getProjectTemplatesConfig(polyApiBaseUrl, polyApiKey, tenantId, environmentId);
+        const {
+          tenant: { id: tenantId },
+          environment: { id: environmentId },
+        } = await getAuthData(polyApiBaseUrl, polyApiKey);
+        const projectTemplatesConfig = await getProjectTemplatesConfig(
+          polyApiBaseUrl,
+          polyApiKey,
+          tenantId,
+          environmentId,
+        );
         const templateChoices = [
           { name: 'No (empty project)', value: null },
           ...projectTemplatesConfig.templates
-            .filter(template => template.typescript)
-            .map(template => ({ name: template.name, value: template.typescript })),
+            .filter((template) => template.typescript)
+            .map((template) => ({
+              name: template.name,
+              value: template.typescript,
+            })),
         ];
 
         const projectTemplateFileUrl = await rawlist({
@@ -67,7 +83,10 @@ const setup = async (polyPath: string, baseUrl?: string, apiKey?: string, apiVer
           choices: templateChoices,
         });
 
-        if (projectTemplateFileUrl && typeof projectTemplateFileUrl === 'string') {
+        if (
+          projectTemplateFileUrl &&
+          typeof projectTemplateFileUrl === 'string'
+        ) {
           await initProjectStructure(projectTemplateFileUrl);
         }
       }
@@ -111,7 +130,10 @@ const initProjectStructure = async (fileUrl: string) => {
     const extractedDirPath = path.join(process.cwd(), zipBaseName);
 
     // Check if single directory with same name as zip file exists
-    if (fs.existsSync(extractedDirPath) && fs.statSync(extractedDirPath).isDirectory()) {
+    if (
+      fs.existsSync(extractedDirPath) &&
+      fs.statSync(extractedDirPath).isDirectory()
+    ) {
       // Move all contents to current directory and remove extracted directory
       shell.mv(`${extractedDirPath}/*`, process.cwd());
       fs.rmdirSync(extractedDirPath);
@@ -120,7 +142,11 @@ const initProjectStructure = async (fileUrl: string) => {
     fs.unlinkSync(filePath);
   } catch (error) {
     shell.echo(chalk.red('ERROR'));
-    shell.echo(chalk.red('Project template cannot be downloaded or extracted. Continuing...'));
+    shell.echo(
+      chalk.red(
+        'Project template cannot be downloaded or extracted. Continuing...',
+      ),
+    );
   }
 };
 
@@ -170,7 +196,8 @@ const setupEnvironment = async (polyPath: string) => {
     },
     async requestUserPermissionToUpdateTsConfig() {
       const updateTsConfig = await confirm({
-        message: 'tsconfig.json does not have esModuleInterop set to true. Do you want to update it?',
+        message:
+          'tsconfig.json does not have esModuleInterop set to true. Do you want to update it?',
         default: true,
       });
 
@@ -190,7 +217,9 @@ const getPackageJson = () => {
   try {
     packageJson = fs.readFileSync(`${process.cwd()}/package.json`);
   } catch (error) {
-    throw new Error(`Failed to open package.json file, details: ${error.message}`);
+    throw new Error(
+      `Failed to open package.json file, details: ${error.message}`,
+    );
   }
 
   try {
@@ -198,7 +227,9 @@ const getPackageJson = () => {
 
     return contents;
   } catch (error) {
-    throw new Error('package.json file contains JSON syntax errors, please fix and try again.');
+    throw new Error(
+      'package.json file contains JSON syntax errors, please fix and try again.',
+    );
   }
 };
 

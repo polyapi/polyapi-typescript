@@ -1,0 +1,18 @@
+// Environment variables injected during generation
+const env = {
+  directExecute: {{executionConfig.directExecute}},
+  mtls: {
+    certPath: '{{executionConfig.mtls.certPath}}',
+    keyPath: '{{executionConfig.mtls.keyPath}}',
+    caPath: '{{executionConfig.mtls.caPath}}',
+    rejectUnauthorized: {{executionConfig.mtls.rejectUnauthorized}},
+  }
+};
+
+const functions = [
+{{#each specifications}}
+  ['{{#if context}}{{context}}.{{/if}}{{name}}', '{{id}}',{{#each function.arguments}}'{{name}}',{{/each}}],
+{{/each}}
+];
+
+module.exports = { env, functions };

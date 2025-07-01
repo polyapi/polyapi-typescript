@@ -44,7 +44,10 @@ export interface FunctionArgument {
   unresolvedPolySchemaRefs?: SchemaRef[];
 }
 
-export type FunctionArgumentDto = Omit<FunctionArgument, 'location' | 'typeObject'>;
+export type FunctionArgumentDto = Omit<
+  FunctionArgument,
+  'location' | 'typeObject'
+>;
 
 export interface FunctionDetailsDto extends FunctionBasicDto {
   ownerUserId?: string | null;
@@ -72,27 +75,27 @@ export interface BodySource {
 }
 
 export interface EmptyBodySource extends BodySource {
-mode: 'empty';
+  mode: 'empty';
 }
 
 export interface FileBodySource extends BodySource {
-mode: 'file';
+  mode: 'file';
 }
 
 export interface RawBodySource extends BodySource {
-mode: 'raw';
-raw: string;
-language: 'html' | 'xml' | 'text' | 'json' | 'javascript';
+  mode: 'raw';
+  raw: string;
+  language: 'html' | 'xml' | 'text' | 'json' | 'javascript';
 }
 
 export interface FormDataBodySource extends BodySource {
-mode: 'formdata';
-formdata: FormDataEntrySource[];
+  mode: 'formdata';
+  formdata: FormDataEntrySource[];
 }
 
 export interface UrlEncodedBodySource extends BodySource {
-mode: 'urlencoded';
-urlencoded: EntrySource[];
+  mode: 'urlencoded';
+  urlencoded: EntrySource[];
 }
 
 export interface UpdateAuthSource {
@@ -111,7 +114,7 @@ export interface BasicAuthSource extends UpdateAuthSource {
 
 export interface ApiKeyAuthSource extends UpdateAuthSource {
   type: 'apikey';
-  apikey: { key: string, value: string }[];
+  apikey: { key: string; value: string }[];
 }
 
 export interface BearerAuthSourceEntry {
@@ -125,14 +128,19 @@ export interface BearerAuthSource extends UpdateAuthSource {
 }
 
 export interface NoAuthSource extends UpdateAuthSource {
-type: 'noauth';
+  type: 'noauth';
 }
 
 export interface SourceDto {
   url: string;
   headers: EntrySource[];
   method: string;
-  body: EmptyBodySource | RawBodySource | UrlEncodedBodySource | FormDataBodySource | FileBodySource;
+  body:
+    | EmptyBodySource
+    | RawBodySource
+    | UrlEncodedBodySource
+    | FormDataBodySource
+    | FileBodySource;
   auth: NoAuthSource | BasicAuthSource | BearerAuthSource | ApiKeyAuthSource;
 }
 
@@ -141,7 +149,12 @@ export interface CreateSourceDto {
   method: string;
   headers?: EntrySource[];
   auth: BasicAuthSource | BearerAuthSource | ApiKeyAuthSource | NoAuthSource;
-  body: UrlEncodedBodySource | FormDataBodySource | RawBodySource | EmptyBodySource | FileBodySource;
+  body:
+    | UrlEncodedBodySource
+    | FormDataBodySource
+    | RawBodySource
+    | EmptyBodySource
+    | FileBodySource;
 }
 
 export interface ApiFunctionDetailsDto extends FunctionDetailsDto {
@@ -150,17 +163,17 @@ export interface ApiFunctionDetailsDto extends FunctionDetailsDto {
 }
 
 export interface ArgumentsMetadataDto {
-    name: string;
-    description?: string;
-    required?: boolean;
-    secure?: boolean;
-    type?: string;
-    typeSchema?: Record<string, unknown>;
-    typeObject?: object;
-    payload?: boolean;
-    variable?: string | null;
-    removeIfNotPresentOnExecute?: boolean;
-    serialization?: ArgumentSerializationDto;
+  name: string;
+  description?: string;
+  required?: boolean;
+  secure?: boolean;
+  type?: string;
+  typeSchema?: Record<string, unknown>;
+  typeObject?: object;
+  payload?: boolean;
+  variable?: string | null;
+  removeIfNotPresentOnExecute?: boolean;
+  serialization?: ArgumentSerializationDto;
 }
 
 export interface CreateApiFunctionDto {
@@ -201,7 +214,8 @@ export interface ExecuteApiFunctionDescriptionGenerationDto {
   source: CreateSourceDto;
 }
 
-export interface CreateServerCustomFunctionResponseDto extends FunctionDetailsDto {
+export interface CreateServerCustomFunctionResponseDto
+  extends FunctionDetailsDto {
   traceId?: string;
 }
 

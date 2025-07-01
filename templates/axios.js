@@ -4,6 +4,7 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const https = require('https');
 const dotenv = require('dotenv');
 const polyCustom = require('./poly-custom');
+const { API_KEY, API_BASE_URL } = require('./constants');
 
 dotenv.config();
 
@@ -12,7 +13,7 @@ const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy || process
 const nodeEnv = process.env.NODE_ENV;
 const isDevEnv = nodeEnv === 'development';
 
-let baseURL = '{{apiBaseUrl}}';
+let baseURL = API_BASE_URL;
 if (!isDevEnv) {
   baseURL = baseURL.replace(/^http:/, 'https:');
 }
@@ -33,7 +34,7 @@ const axios = Axios.create({
 });
 axios.interceptors.request.use(
   config => {
-    config.headers['Authorization'] = `Bearer ${polyCustom.executionApiKey || '{{apiKey}}'}`;
+    config.headers['Authorization'] = `Bearer ${polyCustom.executionApiKey || API_KEY}`;
     return config;
   },
   error => {
@@ -41,4 +42,18 @@ axios.interceptors.request.use(
   }
 );
 
-module.exports = axios;
+const scrubKeys = (err) => {
+  if (err.request && typeof err.request.headers === 'object' && err.request.headers.Authorization) {
+    // Scrub any credentials in the authorization header
+    const [type, ...rest] = err.request.headers.Authorization.split(' ');
+    err.request.headers.Authorization = rest.length && type
+      ? `${type} ********`
+      : `********`;
+  }
+  throw err;
+};
+
+module.exports = {
+  axios,
+  scrubKeys
+};
