@@ -49,6 +49,17 @@ const handleError = (err) => {
   };
 }
 
+const scrub = (data) => {
+  const secrets = ["x_api_key", "x-api-key", "access_token", "access-token", "authorization", "api_key", "apiKey", "accessToken", "token", "password", "key"];
+  for (const secret of secrets) {
+    if (typeof secret === 'object') {
+      scrub(object)
+    }else if (data[secret]) {
+      data[secret] = "*******"
+    }
+  }
+}
+
 const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
   const requestServerStartTime = Date.now();
 
@@ -78,7 +89,8 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
         try {
           responseData = JSON.stringify(data.data);
         } catch (err) {}
-        console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', responseData);
+        scrub(requestArgs)
+        console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', scrubbedArgs, 'Response data:', responseData);
       }
 
       serverPreperationTimeMs = Number(polyHeaders['x-poly-execution-duration']);
@@ -96,6 +108,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       })
     }).then(({ headers, data, status }) => {
       if (status && (status < 200 || status >= 300) && process.env.LOGS_ENABLED) {
+        scrub(requestArgs)
         console.error('Error direct executing api function with id:', id, 'Status code:', status, 'Request data:', requestArgs, 'Response data:', data.data);
       }
       const apiExecutionTimeMs = Date.now() - requestApiStartTime;
@@ -127,6 +140,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       try {
         responseData = JSON.stringify(data.data);
       } catch (err) {}
+      scrub(requestArgs)
       console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', responseData);
     }
     const serverExecutionTimeMs = Number(headers['x-poly-execution-duration']);
