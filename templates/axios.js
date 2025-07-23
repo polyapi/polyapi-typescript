@@ -5,6 +5,7 @@ const https = require('https');
 const dotenv = require('dotenv');
 const polyCustom = require('./poly-custom');
 const { API_KEY, API_BASE_URL } = require('./constants');
+import { scrub } from './api-index.js'
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ const scrubKeys = (err) => {
     err.request.headers.Authorization = rest.length && type
       ? `${type} ********`
       : `********`;
+    err.request.headers = scrub(err.request.headers)
   }
   throw err;
 };

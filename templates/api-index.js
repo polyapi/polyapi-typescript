@@ -50,15 +50,20 @@ const handleError = (err) => {
 }
 
 const scrub = (data) => {
+  let temp = {};
   const secrets = ["x_api_key", "x-api-key", "access_token", "access-token", "authorization", "api_key", "apiKey", "accessToken", "token", "password", "key"];
-  for (const secret of secrets) {
-    if (typeof secret === 'object') {
-      scrub(object)
-    }else if (data[secret]) {
-      data[secret] = "*******"
+  for (const key of Object.keys(data)) {
+    if (typeof data[key] === 'object') {
+      temp[key] = scrub(data[key]);
+    } else if (secrets.includes(key)) {
+      temp[key] = "********";
+    } else {
+      temp[key] = data[key];
     }
   }
+  return temp
 }
+
 
 const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
   const requestServerStartTime = Date.now();
