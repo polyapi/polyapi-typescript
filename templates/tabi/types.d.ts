@@ -43,14 +43,14 @@ type PolyCountQuery<T extends Record<string, unknown>> = Clean<{
 
 type PolySelectOneQuery<T extends Record<string, unknown>> = Clean<{
   where?: Where<T>;
-  orderBy?: Record<keyof T, 'asc' | 'desc'>;
+  orderBy?: Partial<Record<keyof T, 'asc' | 'desc'>>;
 }>;
 
 type PolySelectManyQuery<T extends Record<string, unknown>> = Clean<{
   where?: Where<T>;
   limit?: number; // 1000 is max limit for now
   offset?: number;
-  orderBy?: Record<keyof T, 'asc' | 'desc'>;
+  orderBy?: Partial<Record<keyof T, 'asc' | 'desc'>>;
 }>;
 
 type PolyDeleteQuery<T extends Record<string, unknown>> = Clean<{
