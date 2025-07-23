@@ -710,7 +710,7 @@ const fillInUnresolvedSchemas = (specs: SchemaSpec[]): SchemaSpec[] => {
         },
       };
       shell.echo(
-        chalk.yellow(`WARNING: Referenced Schema '${contextName}' is unresolved, as context \`${context}\` was not generated.`)
+        chalk.yellow(`WARNING: Referenced Schema '${contextName}' is unresolved, as context \`${context}\` was not generated. Falling back to 'unknown' type.`)
       );
       schemas.set(contextName, fillerSpec);
     }
