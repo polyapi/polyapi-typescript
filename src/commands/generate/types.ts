@@ -3,8 +3,6 @@ import handlebars from 'handlebars';
 import { toCamelCase, toPascalCase } from '@guanghechen/helper-string';
 import { compile } from 'json-schema-to-typescript';
 import * as ts from 'typescript';
-import shell from 'shelljs'
-import chalk from 'chalk';
 
 import {
   FunctionPropertyType,
@@ -315,9 +313,6 @@ const schemaToDeclarations = async (
         `schemas.${realPathParts.join('.')}`,
       );
     } else {
-      shell.echo(
-        chalk.yellow(`WARNING: Referenced Schema '${polySchemaTypeReference.path}' is unresolved. Falling back to 'unknown' type.`)
-      );
       result = result.replace(polySchemaTypeReference.name, 'unknown');
     }
   }
