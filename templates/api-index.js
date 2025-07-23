@@ -50,18 +50,32 @@ const handleError = (err) => {
 }
 
 const scrub = (data) => {
-  let temp = {};
+  if (!data || (typeof data !== 'object' && !Array.isArray(data))) return data;
   const secrets = ["x_api_key", "x-api-key", "access_token", "access-token", "authorization", "api_key", "apiKey", "accessToken", "token", "password", "key"];
-  for (const key of Object.keys(data)) {
-    if (typeof data[key] === 'object') {
-      temp[key] = scrub(data[key]);
-    } else if (secrets.includes(key)) {
-      temp[key] = "********";
-    } else {
-      temp[key] = data[key];
+  if (Array.isArray(data)) {
+    const temp = []
+    for (const item of data) {
+      if (Array.isArray(item) || typeof item === 'object') {
+        temp.push(scrub(item));
+      } else {
+        temp.push(item);
+      }
     }
+    return temp;
   }
-  return temp
+  else {
+    const temp = {};
+    for (const key of Object.keys(data)) {
+      if (Array.isArray(data[key]) || typeof data[key] === 'object') {
+        temp[key] = scrub(data[key]);
+      } else if (secrets.map(e => e.toLowerCase()).includes(key.toLowerCase())) {
+        temp[key] = "********";
+      } else {
+        temp[key] = data[key];
+      }
+    }
+    return temp
+  }
 }
 
 
