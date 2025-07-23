@@ -5,6 +5,7 @@ const https = require('https');
 const dotenv = require('dotenv');
 const polyCustom = require('./poly-custom');
 const { API_KEY, API_BASE_URL } = require('./constants');
+import { scrub } from './api-index.js'
 
 dotenv.config();
 
@@ -43,13 +44,16 @@ axios.interceptors.request.use(
 );
 
 const scrubKeys = (err) => {
-  if (err.request && typeof err.request.headers === 'object' && err.request.headers.Authorization) {
+  if (!err.request || typeof err.request.headers !== 'object') throw err
+  const temp = scrub(err.request.headers)
+  if (err.request.headers.Authorization) {
     // Scrub any credentials in the authorization header
     const [type, ...rest] = err.request.headers.Authorization.split(' ');
-    err.request.headers.Authorization = rest.length && type
+    temp.Authorization = rest.length && type
       ? `${type} ********`
       : `********`;
   }
+  err.request.headers = temp
   throw err;
 };
 
