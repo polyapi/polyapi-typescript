@@ -98,7 +98,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       })
     }).then(({ headers, data, status }) => {
       if (status && (status < 200 || status >= 300) && process.env.LOGS_ENABLED) {
-        scrub(requestArgs)
+        requestArgs = scrub(requestArgs)
         console.error('Error direct executing api function with id:', id, 'Status code:', status, 'Request data:', requestArgs, 'Response data:', data.data);
       }
       const apiExecutionTimeMs = Date.now() - requestApiStartTime;
@@ -130,7 +130,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       try {
         responseData = JSON.stringify(data.data);
       } catch (err) {}
-      scrub(requestArgs)
+      requestArgs = scrub(requestArgs)
       console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', responseData);
     }
     const serverExecutionTimeMs = Number(headers['x-poly-execution-duration']);
