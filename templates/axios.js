@@ -5,7 +5,7 @@ const https = require('https');
 const dotenv = require('dotenv');
 const polyCustom = require('./poly-custom');
 const { API_KEY, API_BASE_URL } = require('./constants');
-import { scrub } from './api-index.js'
+const { scrub } = require('../api/index.js')
 
 dotenv.config();
 
