@@ -1,4 +1,4 @@
-const { axios } = require('../axios');
+const { axios, scrub } = require('../axios');
 const set = require('lodash/set');
 const https = require('https');
 const fs = require('fs');
@@ -47,27 +47,6 @@ const handleError = (err) => {
     headers: {},
     metrics: {},
   };
-}
-
-const scrub = (data) => {
-  if (!data || typeof data !== 'object' ) return data;
-  const secrets = ["x_api_key", "x-api-key", "access_token", "access-token", "authorization", "api_key", "api-key", "apikey", "accesstoken", "token", "password", "key"];
-  if (Array.isArray(data)) {
-    return data.map(item => scrub(item))
-  }
-  else {
-    const temp = {};
-    for (const key of Object.keys(data)) {
-      if (typeof data[key] === 'object') {
-        temp[key] = scrub(data[key]);
-      } else if (secrets.includes(key.toLowerCase())) {
-        temp[key] = "********";
-      } else {
-        temp[key] = data[key];
-      }
-    }
-    return temp
-  }
 }
 
 
