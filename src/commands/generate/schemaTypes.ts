@@ -681,7 +681,7 @@ const fillInUnresolvedSchemas = (specs: SchemaSpec[]): SchemaSpec[] => {
           },
         };
         shell.echo(
-          chalk.yellow(`WARNING: Schema '${unresolved.path}' referenced from '${spec.contextName}' is unresolved. Falling back to 'unknown' type fro '${unresolved.path}'.`)
+          chalk.yellow(`WARNING: Schema '${unresolved.path}' referenced from '${spec.contextName}' is unresolved. Falling back to 'unknown' type for '${unresolved.path}'.`)
         );
         schemas.set(unresolved.path, fillerSpec);
       }
