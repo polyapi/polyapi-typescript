@@ -81,5 +81,6 @@ const scrubKeys = (err) => {
 
 module.exports = {
   axios,
-  scrubKeys
+  scrubKeys,
+  scrub
 };
