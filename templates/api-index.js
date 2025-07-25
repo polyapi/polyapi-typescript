@@ -78,8 +78,8 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
         let responseData = data.data;
         try {
           responseData = JSON.stringify(data.data);
-        } catch (err) {}
-        scrub(requestArgs)
+        } catch (err) {
+        requestArgs = scrub(requestArgs)
         console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', scrubbedArgs, 'Response data:', responseData);
       }
 
