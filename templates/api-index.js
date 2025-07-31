@@ -1,4 +1,4 @@
-const { axios } = require('../axios');
+const { axios, scrub } = require('../axios');
 const set = require('lodash/set');
 const https = require('https');
 const fs = require('fs');
@@ -78,7 +78,8 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
         try {
           responseData = JSON.stringify(data.data);
         } catch (err) {}
-        console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', responseData);
+        requestArgs = scrub(requestArgs)
+        console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', scrubbedArgs, 'Response data:', responseData);
       }
 
       serverPreperationTimeMs = Number(polyHeaders['x-poly-execution-duration']);
@@ -96,6 +97,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       })
     }).then(({ headers, data, status }) => {
       if (status && (status < 200 || status >= 300) && process.env.LOGS_ENABLED) {
+        requestArgs = scrub(requestArgs)
         console.error('Error direct executing api function with id:', id, 'Status code:', status, 'Request data:', requestArgs, 'Response data:', data.data);
       }
       const apiExecutionTimeMs = Date.now() - requestApiStartTime;
@@ -127,6 +129,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       try {
         responseData = JSON.stringify(data.data);
       } catch (err) {}
+      requestArgs = scrub(requestArgs)
       console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', responseData);
     }
     const serverExecutionTimeMs = Number(headers['x-poly-execution-duration']);

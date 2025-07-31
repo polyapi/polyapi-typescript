@@ -5,6 +5,8 @@ import { EOL } from 'node:os';
 import { SchemaRef, SchemaSpecification } from '../../types';
 import { echoGenerationError } from '../../utils';
 import { setGenerationErrors } from './types';
+import shell from 'shelljs'
+import chalk from 'chalk';
 
 const unsafeCharacters = /(?:^\d)|[^0-9a-zA-Z_]/gi;
 const unescapedSingleQuote = /\b'\b/gi;
@@ -678,6 +680,9 @@ const fillInUnresolvedSchemas = (specs: SchemaSpec[]): SchemaSpec[] => {
             visibility: 'ENVIRONMENT',
           },
         };
+        // shell.echo(
+        //   chalk.yellow(`WARNING: Schema '${unresolved.path}' referenced from '${spec.contextName}' is unresolved. Falling back to 'unknown' type for '${unresolved.path}'.`)
+        // );
         schemas.set(unresolved.path, fillerSpec);
       }
     }
@@ -704,6 +709,9 @@ const fillInUnresolvedSchemas = (specs: SchemaSpec[]): SchemaSpec[] => {
           visibility: 'ENVIRONMENT',
         },
       };
+      // shell.echo(
+      //   chalk.yellow(`WARNING: Schema '${contextName}' referenced from '${spec.contextName}' is unresolved. Falling back to 'unknown' type for '${contextName}'.`)
+      // );
       schemas.set(contextName, fillerSpec);
     }
   }

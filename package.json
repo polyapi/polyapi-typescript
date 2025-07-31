@@ -1,11 +1,11 @@
 {
   "name": "polyapi",
-  "version": "0.24.8",
+  "version": "0.24.17",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/polyapi/poly-alpha",
+    "url": "https://github.com/polyapi/polyapi-typescript",
     "directory": "packages/client"
   },
   "files": [
