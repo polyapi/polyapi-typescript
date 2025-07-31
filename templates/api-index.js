@@ -49,7 +49,6 @@ const handleError = (err) => {
   };
 }
 
-
 const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
   const requestServerStartTime = Date.now();
 
