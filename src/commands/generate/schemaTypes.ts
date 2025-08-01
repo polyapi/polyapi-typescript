@@ -680,9 +680,9 @@ const fillInUnresolvedSchemas = (specs: SchemaSpec[]): SchemaSpec[] => {
             visibility: 'ENVIRONMENT',
           },
         };
-        shell.echo(
-          chalk.yellow(`WARNING: Schema '${unresolved.path}' referenced from '${spec.contextName}' is unresolved. Falling back to 'unknown' type for '${unresolved.path}'.`)
-        );
+        // shell.echo(
+        //   chalk.yellow(`WARNING: Schema '${unresolved.path}' referenced from '${spec.contextName}' is unresolved. Falling back to 'unknown' type for '${unresolved.path}'.`)
+        // );
         schemas.set(unresolved.path, fillerSpec);
       }
     }
@@ -709,9 +709,9 @@ const fillInUnresolvedSchemas = (specs: SchemaSpec[]): SchemaSpec[] => {
           visibility: 'ENVIRONMENT',
         },
       };
-      shell.echo(
-        chalk.yellow(`WARNING: Schema '${contextName}' referenced from '${spec.contextName}' is unresolved. Falling back to 'unknown' type for '${contextName}'.`)
-      );
+      // shell.echo(
+      //   chalk.yellow(`WARNING: Schema '${contextName}' referenced from '${spec.contextName}' is unresolved. Falling back to 'unknown' type for '${contextName}'.`)
+      // );
       schemas.set(contextName, fillerSpec);
     }
   }
