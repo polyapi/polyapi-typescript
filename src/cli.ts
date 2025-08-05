@@ -240,6 +240,10 @@ void yargs
           .option('cache-poly-library', {
             describe: 'Server function only - cache the poly library to improve function performance',
             type: 'boolean',
+          })
+          .option('visibility', {
+            describe: 'Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive',
+            type: 'string',
           }),
       async ({
         name,
@@ -252,9 +256,11 @@ void yargs
         generateContexts,
         executionApiKey,
         cachePolyLibrary,
+        visibility,
       }) => {
         const logsEnabled =
           logs === 'enabled' ? true : logs === 'disabled' ? false : undefined;
+        visibility = visibility.toUpperCase();
         const err = !name
           ? 'Missing function name.'
           : !file
@@ -273,7 +279,9 @@ void yargs
                             ? 'Invalid value for `execution-api-key`. Must be a valid PolyAPI Key.'
                             : cachePolyLibrary && !server
                               ? 'Option `cache-poly-library` is only for server functions (--server).'
-                            : '';
+                              : !["PUBLIC", "TENANT", "ENVIRONMENT"].includes(visibility)
+                                ? 'Option `visibility` must be either PUBLIC, TENANT, or ENVIRONMENT. Case insensitive.' 
+                                : '';
         if (err) {
           shell.echo(chalk.redBright('ERROR:'), err);
           yargs.showHelp();
@@ -294,6 +302,7 @@ void yargs
           generateContexts,
           executionApiKey,
           cachePolyLibrary,
+          visibility,
         );
       },
     );

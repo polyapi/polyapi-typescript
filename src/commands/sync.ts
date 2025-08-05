@@ -76,6 +76,7 @@ const syncDeployableAndGetId = async (deployable, code) => {
           deployable.name,
           deployable.description,
           code,
+          deployable.visibility,
           deployable.typeSchemas,
           deployable.dependencies,
           deployable.config,
@@ -88,6 +89,7 @@ const syncDeployableAndGetId = async (deployable, code) => {
           deployable.name,
           deployable.description,
           code,
+          deployable.visibility,
           deployable.typeSchemas,
           deployable.config,
         )
