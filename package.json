@@ -1,6 +1,6 @@
 {
   "name": "polyapi",
-  "version": "0.24.17",
+  "version": "0.24.18",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
@@ -75,6 +75,11 @@
     "uuid": "9.0.0",
     "validator": "13.11.0",
     "yargs": "17.7.1"
+  },
+  "overrides": {
+    "axios": {
+      "form-data": "^4.0.4"
+    }
   },
   "engines": {
     "node": ">=18.20.5"
