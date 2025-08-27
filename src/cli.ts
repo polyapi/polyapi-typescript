@@ -260,7 +260,7 @@ void yargs
       }) => {
         const logsEnabled =
           logs === 'enabled' ? true : logs === 'disabled' ? false : undefined;
-        visibility = visibility.toUpperCase();
+        visibility = visibility ? visibility.toUpperCase() : "ENVIRONMENT";
         const err = !name
           ? 'Missing function name.'
           : !file

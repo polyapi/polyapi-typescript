@@ -99,13 +99,12 @@ export const addOrUpdateCustomFunction = async (
       if (generateContexts) { other.generateContexts = generateContexts.split(','); }
       if (logsEnabled !== undefined) other.logsEnabled = logsEnabled;
       if (cachePolyLibrary !== undefined) other.cachePolyLibrary = cachePolyLibrary;
-
       customFunction = await createOrUpdateServerFunction(
         context,
         name,
         description,
         code,
-        Visibility[visibility as keyof typeof Visibility],
+        visibility,
         typeSchemas,
         dependencies,
         other,
@@ -141,7 +140,7 @@ export const addOrUpdateCustomFunction = async (
         name,
         description,
         code,
-        Visibility[visibility as keyof typeof Visibility],
+        visibility,
         typeSchemas,
       );
       shell.echo(chalk.green('DONE'));

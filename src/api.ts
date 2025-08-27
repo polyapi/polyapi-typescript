@@ -96,7 +96,7 @@ export const createOrUpdateServerFunction = async (
   name: string,
   description: string | null,
   code: string,
-  visibility: Visibility,
+  visibility: string,
   typeSchemas: Record<string, any>,
   requirements: string[],
   other?: Record<string, any>,
@@ -157,7 +157,7 @@ export const createOrUpdateClientFunction = async (
   name: string,
   description: string | null,
   code: string,
-  visibility: Visibility,
+  visibility: string,
   typeSchemas: Record<string, any>,
   other?: Record<string, any>,
 ) => {
