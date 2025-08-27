@@ -76,6 +76,11 @@
     "validator": "13.11.0",
     "yargs": "17.7.1"
   },
+  "overrides": {
+    "axios": {
+      "form-data": "^4.0.4"
+    }
+  },
   "engines": {
     "node": ">=18.20.5"
   },
