@@ -126,13 +126,10 @@ export const createOrUpdateServerFunction = async (
   ).data;
 };
 
-export const getServerFunctionByName = async (
-  context: string,
-  name: string,
-) => {
+export const getServerFunctionById = async (id: string) => {
   return (
-    await axios.get<any, AxiosResponse<FunctionBasicDto[]>>(
-      `${getApiBaseURL()}/functions/server`,
+    await axios.get<any, AxiosResponse<FunctionDetailsDto>>(
+      `${getApiBaseURL()}/functions/server/${id}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -140,7 +137,28 @@ export const getServerFunctionByName = async (
         },
       },
     )
-  ).data.find((fn) => fn.name === name && fn.context === context);
+  ).data;
+};
+
+export const getServerFunctionByName = async (
+  context: string,
+  name: string,
+  detail = false
+) => {
+  const basic = (
+    await axios.get<any, AxiosResponse<{ results: FunctionBasicDto[] }>>(
+      `${getApiBaseURL()}/functions/server?search=${encodeURIComponent(`${context}${context && name ? '.' : ''}${name}`)}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getApiHeaders(),
+          'x-poly-api-version': '2',
+        },
+      },
+    )
+  ).data.results.find((fn) => fn.name === name && fn.context === context);
+  if (!detail || !basic) return basic;
+  return getServerFunctionById(basic.id);
 };
 
 export const deleteServerFunction = async (id: string) => {
@@ -183,13 +201,10 @@ export const createOrUpdateClientFunction = async (
   ).data;
 };
 
-export const getClientFunctionByName = async (
-  context: string,
-  name: string,
-) => {
+export const getClientFunctionById = async (id: string) => {
   return (
-    await axios.get<any, AxiosResponse<FunctionBasicDto[]>>(
-      `${getApiBaseURL()}/functions/client`,
+    await axios.get<any, AxiosResponse<FunctionDetailsDto>>(
+      `${getApiBaseURL()}/functions/client/${id}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +212,28 @@ export const getClientFunctionByName = async (
         },
       },
     )
-  ).data.find((fn) => fn.name === name && fn.context === context);
+  ).data;
+};
+
+export const getClientFunctionByName = async (
+  context: string,
+  name: string,
+  detail = false,
+) => {
+  const basic = (
+    await axios.get<any, AxiosResponse<{ results: FunctionBasicDto[] }>>(
+      `${getApiBaseURL()}/functions/client?search=${encodeURIComponent(`${context}${context && name ? '.' : ''}${name}`)}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getApiHeaders(),
+          'x-poly-api-version': '2',
+        },
+      },
+    )
+  ).data.results.find((fn) => fn.name === name && fn.context === context);
+  if (!detail || !basic) return basic;
+  return getClientFunctionById(basic.id);
 };
 
 export const deleteClientFunction = async (id: string) => {
@@ -487,8 +523,22 @@ export const createOrUpdateWebhook = async (
   ).data;
 };
 
-export const getWebhookByName = async (context: string, name: string) => {
+export const getWebhookById = async (id: string) => {
   return (
+    await axios.get<any, AxiosResponse<WebhookHandleDto>>(
+      `${getApiBaseURL()}/webhooks/${id}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getApiHeaders(),
+        },
+      },
+    )
+  ).data;
+};
+
+export const getWebhookByName = async (context: string, name: string, detail = false) => {
+  const basic = (
     await axios.get<any, AxiosResponse<WebhookHandleBasicDto[]>>(
       `${getApiBaseURL()}/webhooks`,
       {
@@ -501,6 +551,8 @@ export const getWebhookByName = async (context: string, name: string) => {
   ).data.find(
     (webhook) => webhook.name === name && webhook.context === context,
   );
+  if (!detail || !basic) return basic;
+  return getWebhookById(basic.id);
 };
 
 export const deleteWebhook = async (webhookId: string) => {

@@ -41,7 +41,7 @@ Add the line "HELLO WORLD" to the end of `README.md`
 Then run this command to publish to your local Verdaccio instance:
 
 ```bash
-./publish_local.sh
+./scripts/publish_local.sh
 ```
 
 ## Install Your Updated NPM Package Locally

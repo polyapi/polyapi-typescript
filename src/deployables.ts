@@ -150,7 +150,6 @@ const writeJsonFile = async <T = any>(
   path: string,
   contents: T,
 ): Promise<unknown> => {
-  await open(path, 'w');
   return writeFile(path, JSON.stringify(contents, undefined, 2), {
     encoding: 'utf8',
     flag: 'w',
@@ -268,8 +267,14 @@ export const getDeployableFileRevision = (fileContents: string): string =>
       fileContents.replace(/^(\/\/.*\n)+/, ''),
     )
     .digest('hex')
-    // Trimming to 7 characters to align with git revision format and to keep this nice and short!
-    .substring(0, 7);
+    // Trimming to 8 characters to align with git revision format and to keep this nice and short!
+    .substring(0, 8);
+
+export const getRandomString = (length = 8) => {
+  return Array.from({ length }, () =>
+    Math.floor(Math.random() * 16).toString(16),
+  ).join('');
+}
 
 export const getGitRevision = (branchOrTag = 'HEAD'): string => {
   try {
@@ -281,9 +286,7 @@ export const getGitRevision = (branchOrTag = 'HEAD'): string => {
     return result;
   } catch (err) {
     console.warn('Failed to get git revision. Falling back to random hash.');
-    return Array.from({ length: 8 }, () =>
-      Math.floor(Math.random() * 16).toString(16),
-    ).join('');
+    return getRandomString(8);
   }
 };
 

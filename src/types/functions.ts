@@ -59,6 +59,15 @@ export interface FunctionDetailsDto extends FunctionBasicDto {
    * If there are some missing poly schemas in `returnTypeSchema`, they will be listed here.
    */
   unresolvedReturnTypePolySchemaRefs?: SchemaRef[];
+  code: string;
+  language: string;
+  logsEnabled?: boolean;
+  serverSideAsync?: boolean;
+  minScale?: number | null;
+  maxScale?: number | null;
+  requirements?: string | null;
+  generateContexts?: string[] | null;
+  hash: string;
 }
 
 export interface EntrySource {
