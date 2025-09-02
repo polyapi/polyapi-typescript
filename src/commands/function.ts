@@ -4,6 +4,7 @@ import shell from 'shelljs';
 import {
   CreateServerCustomFunctionResponseDto,
   FunctionDetailsDto,
+  Visibility,
 } from '../types';
 import {
   createOrUpdateClientFunction,
@@ -31,6 +32,7 @@ export const addOrUpdateCustomFunction = async (
   generateContexts: string | undefined,
   executionApiKey: string | null | undefined,
   cachePolyLibrary: boolean | undefined,
+  visibility: string | undefined,
 ) => {
   loadConfig(polyPath);
 
@@ -97,12 +99,12 @@ export const addOrUpdateCustomFunction = async (
       if (generateContexts) { other.generateContexts = generateContexts.split(','); }
       if (logsEnabled !== undefined) other.logsEnabled = logsEnabled;
       if (cachePolyLibrary !== undefined) other.cachePolyLibrary = cachePolyLibrary;
-
       customFunction = await createOrUpdateServerFunction(
         context,
         name,
         description,
         code,
+        visibility,
         typeSchemas,
         dependencies,
         other,
@@ -138,6 +140,7 @@ export const addOrUpdateCustomFunction = async (
         name,
         description,
         code,
+        visibility,
         typeSchemas,
       );
       shell.echo(chalk.green('DONE'));
