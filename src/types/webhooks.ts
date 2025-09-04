@@ -71,30 +71,6 @@ export interface ExecuteWebhookHandleDescriptionGenerationDto {
   eventPayload: any;
 }
 
-export interface WebhookHandleDto {
-  id: string;
-  context: string;
-  name: string;
-  contextName: string;
-  description: string;
-  url: string;
-  uri: string;
-  visibility: Visibility;
-  ownerUserId?: string | null;
-  eventPayloadType: string;
-  eventPayloadTypeSchema?: Record<string, any>;
-  responsePayload?: any;
-  responseHeaders?: any;
-  responseStatus: number | null;
-  slug: string | null;
-  subpath: string | null;
-  method: string | null;
-  requirePolyApiKey: boolean;
-  securityFunctions: WebhookSecurityFunction[];
-  enabled: boolean;
-  xmlParserOptions: WebhookHandleXmlParserOptions;
-}
-
 export interface WebhookHandleBasicDto {
   id: string;
   name: string;
@@ -106,6 +82,21 @@ export interface WebhookHandleBasicDto {
   state: LifecycleState;
   enabled: boolean;
   ownerUserId?: string | null;
+}
+
+export interface WebhookHandleDto extends WebhookHandleBasicDto {
+  url: string;
+  uri: string;
+  eventPayloadType: string;
+  eventPayloadTypeSchema?: Record<string, any>;
+  responsePayload?: any;
+  responseHeaders?: any;
+  responseStatus: number | null;
+  slug: string | null;
+  method: string;
+  requirePolyApiKey: boolean;
+  securityFunctions: WebhookSecurityFunction[];
+  xmlParserOptions: WebhookHandleXmlParserOptions;
 }
 
 export interface WebhookHandleDescriptionGenerationDto {

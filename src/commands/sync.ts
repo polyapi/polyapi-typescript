@@ -11,6 +11,8 @@ import {
   getCacheDeploymentsRevision,
   removeDeployableRecords,
   prepareDeployableDirectory,
+  getDeployableFileRevision,
+  getRandomString,
 } from '../deployables';
 import {
   createOrUpdateClientFunction,
@@ -19,14 +21,18 @@ import {
   deleteClientFunction,
   deleteServerFunction,
   deleteWebhook,
+  getClientFunctionById,
   getClientFunctionByName,
+  getServerFunctionById,
   getServerFunctionByName,
+  getWebhookById,
   getWebhookByName,
 } from '../api';
+import { FunctionDetailsDto, WebhookHandleDto } from '../types';
 
 const DEPLOY_ORDER: DeployableTypes[] = [
-  'server-function',
   'client-function',
+  'server-function',
   'webhook',
 ];
 
@@ -76,6 +82,7 @@ const syncDeployableAndGetId = async (deployable, code) => {
           deployable.name,
           deployable.description,
           code,
+          deployable.config.visibility,
           deployable.typeSchemas,
           deployable.dependencies,
           deployable.config,
@@ -88,6 +95,7 @@ const syncDeployableAndGetId = async (deployable, code) => {
           deployable.name,
           deployable.description,
           code,
+          deployable.config.visibility,
           deployable.typeSchemas,
           deployable.config,
         )
@@ -104,6 +112,32 @@ const syncDeployableAndGetId = async (deployable, code) => {
   }
   throw new Error(`Unsupported deployable type: '${deployable.type}'`);
 };
+
+const getDeployableFromServer = async <T = FunctionDetailsDto | WebhookHandleDto>(
+  deployable: SyncDeployment,
+): Promise<T | null | undefined> => {
+  try {
+    switch(deployable.type) {
+      case 'server-function': {
+        return deployable.id
+          ? getServerFunctionById(deployable.id) as T
+          : getServerFunctionByName(deployable.context, deployable.name, true) as T;
+      }
+      case 'client-function': {
+        return deployable.id
+          ? getClientFunctionById(deployable.id) as T
+          : getClientFunctionByName(deployable.context, deployable.name, true) as T;
+      }
+      case 'webhook': {
+        return deployable.id
+          ? getWebhookById(deployable.id) as T
+          : getWebhookByName(deployable.context, deployable.name, true) as T;
+      }
+    }
+  } catch (err) {
+    return null;
+  }
+}
 
 const syncDeployable = async (
   deployable: SyncDeployment,
@@ -149,33 +183,51 @@ export const syncDeployables = async (
       const previousDeployment = deployable.deployments.find(
         (i) => i.instance === instance,
       );
+      // Any deployable may be deployed to multiple instances/environments at the same time
+      // So we reduce the deployable record down to a single instance we want to deploy to
+      const syncDeployment: SyncDeployment = {
+        ...deployable,
+        ...previousDeployment, // flatten to grab name & context
+        type: deployable.type, // but make sure we use the latest type
+        description: deployable.description ?? deployable.types?.description,
+        instance,
+      };
+      const deployed = await getDeployableFromServer(syncDeployment);
       const gitRevisionChanged = gitRevision !== deployable.gitRevision;
-      const fileRevisionChanged =
-        previousDeployment?.fileRevision !== deployable.fileRevision;
+      const serverFileRevision = !deployed
+      ? ''
+      : type === 'webhook'
+      // TODO: Actually calculate real revision on webhook
+      ? getRandomString(8)
+      : ((deployed as FunctionDetailsDto).hash || getDeployableFileRevision((deployed as FunctionDetailsDto).code));
+      const fileRevisionChanged = serverFileRevision !== deployable.fileRevision;
+      // TODO: If deployed variabnt exists AND was deployed after timestamp on previousDeployment then sync it back to the repo
       let action = gitRevisionChanged
         ? 'REMOVED'
-        : !previousDeployment?.id
+        : !previousDeployment?.id && !deployed
             ? 'ADDED'
             : fileRevisionChanged
               ? 'UPDATED'
-              : 'OK';
+              : 'SKIPPED';
 
-      if (!dryRun && (gitRevisionChanged || fileRevisionChanged)) {
+      if (!dryRun && action !== 'SKIPPED') {
         // if user is changing type, ex. server -> client function or vice versa
         // then try to cleanup the old type first
         if (previousDeployment && deployable.type !== previousDeployment.type) {
           await removeDeployable(previousDeployment);
         }
-        // Any deployable may be deployed to multiple instances/environments at the same time
-        // So we reduce the deployable record down to a single instance we want to deploy to
-        const syncDeployment: SyncDeployment = {
-          ...deployable,
-          ...previousDeployment, // flatten to grab name & context
-          type: deployable.type, // but make sure we use the latest type
-          description: deployable.description ?? deployable.types?.description,
-          instance,
-        };
-        if (gitRevision === deployable.gitRevision) {
+        if (gitRevisionChanged) {
+          // This deployable no longer exists so let's remove it
+          const found = await removeDeployable(syncDeployment);
+          if (!found) action = 'NOT FOUND';
+          const removeIndex = allDeployables.findIndex(
+            (d) =>
+              d.name === deployable.name &&
+              d.context === deployable.context &&
+              d.file === deployable.file,
+          );
+          toRemove.push(...allDeployables.splice(removeIndex, 1));
+        } else {
           const deployment = await syncDeployable(syncDeployment);
           if (previousDeployment) {
             previousDeployment.id = deployment.id;
@@ -187,17 +239,6 @@ export const syncDeployables = async (
           } else {
             deployable.deployments.unshift(deployment);
           }
-        } else {
-          // This deployable no longer exists so let's remove it
-          const found = await removeDeployable(syncDeployment);
-          if (!found) action = 'NOT FOUND';
-          const removeIndex = allDeployables.findIndex(
-            (d) =>
-              d.name === deployable.name &&
-              d.context === deployable.context &&
-              d.file === deployable.file,
-          );
-          toRemove.push(...allDeployables.splice(removeIndex, 1));
         }
       }
 
