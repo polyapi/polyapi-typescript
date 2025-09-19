@@ -420,6 +420,8 @@ const getIDComment = (specification: Specification) => {
       return `* Auth provider ID: ${specification.id}`;
     case 'webhookHandle':
       return `* Webhook ID: ${specification.id}`;
+    case 'graphqlSubscription':
+      return `* GraphQL Subscription ID: ${specification.id}`;
     default:
       return null;
   }
