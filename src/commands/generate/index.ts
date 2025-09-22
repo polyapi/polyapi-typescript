@@ -8,6 +8,7 @@ import {
   ApiFunctionSpecification,
   AuthFunctionSpecification,
   CustomFunctionSpecification,
+  GraphQLSubscriptionSpecification,
   ServerFunctionSpecification,
   ServerVariableSpecification,
   Specification,
@@ -62,6 +63,7 @@ const prepareDir = async (polyPath: string) => {
   fs.mkdirSync(`${libPath}/client`);
   fs.mkdirSync(`${libPath}/auth`);
   fs.mkdirSync(`${libPath}/webhooks`);
+  fs.mkdirSync(`${libPath}/subscriptions`);
   fs.mkdirSync(`${libPath}/server`);
   fs.mkdirSync(`${libPath}/vari`);
   fs.mkdirSync(`${libPath}/tabi`);
@@ -144,6 +146,9 @@ const generateJSFiles = async (
   const tables = specs.filter(
     (spec) => spec.type === 'table',
   ) as TableSpecification[];
+  const gqlSubscriptions = specs.filter(
+    (spec) => spec.type === 'graphqlSubscription',
+  ) as GraphQLSubscriptionSpecification[];
 
   await generateIndexJSFile(libPath);
   await generatePolyCustomJSFile(libPath);
@@ -158,6 +163,7 @@ const generateJSFiles = async (
     'custom functions',
   );
   await tryAsync(generateWebhooksJSFiles(libPath, webhookHandles), 'webhooks');
+  await tryAsync(generateGraphQLSubscriptionJSFiles(libPath, gqlSubscriptions), 'GraphQL subscriptions');
   await tryAsync(
     generateAuthFunctionJSFiles(libPath, authFunctions),
     'auth functions',
@@ -283,6 +289,21 @@ const generateWebhooksJSFiles = async (
   );
   fs.copyFileSync(templateUrl('webhooks-index.js'), `${libPath}/webhooks/index.js`);
 };
+
+const generateGraphQLSubscriptionJSFiles = async (
+  libPath: string,
+  specifications: GraphQLSubscriptionSpecification[],
+) => {
+  const template = handlebars.compile(loadTemplate('graphql-subscriptions.js.hbs'));
+  fs.writeFileSync(
+    `${libPath}/subscriptions/subscriptions.js`,
+    template({
+      specifications,
+      apiKey: getApiKey(),
+    }),
+  );
+  fs.copyFileSync(templateUrl('graphql-subscriptions-index.js'), `${libPath}/subscriptions/index.js`);
+}
 
 const generateServerFunctionJSFiles = async (
   libPath: string,

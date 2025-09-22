@@ -54,15 +54,17 @@ export type GenerationError = {
 };
 
 export const echoGenerationError = (specification: Specification) => {
-  const typeMap = {
+  const typeMap: Record<SpecificationType, string> = {
     apiFunction: 'API Function',
     customFunction: 'Custom Function',
     authFunction: 'Auth Function',
     webhookHandle: 'Webhook Handle',
+    graphqlSubscription: 'Webhook Handle',
     serverFunction: 'Server Function',
     serverVariable: 'Variable',
     schema: 'Schema',
     snippet: 'Snippet',
+    table: 'Table'
   };
 
   const type = typeMap[specification.type];

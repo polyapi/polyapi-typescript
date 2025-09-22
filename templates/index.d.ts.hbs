@@ -15,6 +15,7 @@ declare const poly: Poly;
 export default poly;
 
 export type UnregisterWebhookEventListener = () => void;
+export type UnregisterGraphQLSubscriptionEventListener = () => void;
 export type AuthFunctionCallback = (token?: string, url?: string, error?: any) => any;
 
 export interface AuthFunctionResponse<T> {
