@@ -4,7 +4,6 @@ import shell from 'shelljs';
 import {
   CreateServerCustomFunctionResponseDto,
   FunctionDetailsDto,
-  Visibility,
 } from '../types';
 import {
   createOrUpdateClientFunction,
@@ -86,8 +85,8 @@ export const addOrUpdateCustomFunction = async (
         `${updating ? 'Updating' : 'Adding'} custom server side function...`,
       );
 
-      const dependencies = getDependencies(code, file, tsConfigBaseUrl);
-      if (dependencies.length) {
+      const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl);
+      if (externalDependencies) {
         shell.echo(
           chalk.yellow(
             'Please note that deploying your functions will take a few minutes because it makes use of libraries other than polyapi.',
@@ -106,7 +105,8 @@ export const addOrUpdateCustomFunction = async (
         code,
         visibility,
         typeSchemas,
-        dependencies,
+        externalDependencies,
+        internalDependencies,
         other,
         executionApiKey,
       );
@@ -149,7 +149,7 @@ export const addOrUpdateCustomFunction = async (
 
     await generateSingleCustomFunction(polyPath, customFunction.id, updating);
   } catch (e) {
-    shell.echo(chalk.red('ERROR\n'));
-    shell.echo(`${e.response?.data?.message || e.message}`);
+    shell.echo(chalk.redBright('ERROR\n'));
+    shell.echo(chalk.red((e instanceof Error ? e.message : e.response?.data?.message) || 'Unexpected error.'));
   }
 };

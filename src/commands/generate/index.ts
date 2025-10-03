@@ -18,10 +18,9 @@ import {
 import { getSpecs } from '../../api';
 import { loadConfig, addOrUpdateConfig } from '../../config';
 import {
-  generateContextDataFile,
-  getContextDataFileContent,
+  writeCachedSpecs,
+  getCachedSpecs,
   getPolyLibPath,
-  getSpecsFromContextData,
   showErrGettingSpecs,
   getStringPaths,
   loadTemplate,
@@ -463,10 +462,10 @@ const generateSingleCustomFunction = async (
   );
 
   const libPath = getPolyLibPath(polyPath);
-  let contextData: Record<string, any> = {};
+  let prevSpecs: Specification[] = [];
 
   try {
-    contextData = getContextDataFileContent(libPath);
+    prevSpecs = getCachedSpecs(libPath);
   } catch (error) {
     shell.echo(chalk.red('ERROR'));
     shell.echo('Error while fetching local context data.');
@@ -474,8 +473,6 @@ const generateSingleCustomFunction = async (
     shell.echo(chalk.red(error.stack));
     return;
   }
-
-  const prevSpecs = getSpecsFromContextData(contextData);
 
   let specs: Specification[] = [];
 
@@ -501,6 +498,8 @@ const generateSingleCustomFunction = async (
   }
 
   await prepareDir(polyPath);
+
+  writeCachedSpecs(libPath, specs);
 
   setGenerationErrors(false);
 
@@ -553,13 +552,13 @@ const generate = async ({
   polyPath,
   contexts,
   names,
-  functionIds,
+  ids,
   noTypes,
 }: {
   polyPath: string;
   contexts?: string[];
   names?: string[];
-  functionIds?: string[];
+  ids?: string[];
   noTypes: boolean;
 }) => {
   let specs: Specification[] = [];
@@ -572,17 +571,20 @@ const generate = async ({
   await prepareDir(polyPath);
   loadConfig(polyPath);
 
-  try {
-    specs = await getSpecs(contexts, names, functionIds, noTypes);
+  const libPath = getPolyLibPath(polyPath);
 
-    updateLocalConfig(polyPath, contexts, names, functionIds, noTypes);
+  try {
+    specs = await getSpecs(contexts, names, ids, noTypes);
+    writeCachedSpecs(libPath, specs);
+    updateLocalConfig(polyPath, contexts, names, ids, noTypes);
   } catch (error) {
     showErrGettingSpecs(error);
     return;
   }
 
   setGenerationErrors(false);
-  await generateSpecs(getPolyLibPath(polyPath), specs, noTypes);
+  await generateSpecs(libPath, specs, noTypes);
+
 
   if (getGenerationErrors()) {
     shell.echo(
@@ -658,8 +660,6 @@ export const generateSpecs = async (
         'table types',
       );
     }
-
-    generateContextDataFile(libPath, filteredSpecs);
 
     if (missingNames.length) {
       setGenerationErrors(true);
