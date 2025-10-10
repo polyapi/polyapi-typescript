@@ -334,8 +334,18 @@ export const getDependencies = async (
         const spec = specs.find(s => s.contextName.toLowerCase() === path.toLowerCase());
         if (spec) {
           found.push(spec);
-          internalDependencies[spec.type] = internalDependencies[spec.type] || [];
-          internalDependencies[spec.type].push({ path: spec.contextName, id: spec.id });
+          let type: string = spec.type;
+          const dep = { path: spec.contextName, id: spec.id };
+          if (
+            spec.visibilityMetadata.visibility === 'PUBLIC' &&
+            ['apiFunction', 'customFunction', 'serverFunction'].includes(type)
+          ) {
+            type = `public${type.substring(0, 1).toUpperCase()}${type.substring(1)}`;
+            dep['tenantName'] = spec.visibilityMetadata.foreignTenantName;
+            dep['environmentName'] = spec.visibilityMetadata.foreignEnvironmentName;
+          }
+          internalDependencies[type] = internalDependencies[type] || [];
+          internalDependencies[type].push(dep);
         } else {
           missing.push(path);
         }
