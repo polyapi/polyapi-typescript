@@ -86,5 +86,5 @@ type PolyDeleteResult = {
 }
 
 type PolyCountResult = {
-  count: boolean;
+  count: number;
 }
