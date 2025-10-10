@@ -78,6 +78,7 @@ export const addOrUpdateCustomFunction = async (
     }
 
     const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]), name);
+    const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl);
 
     if (server) {
       shell.echo(
@@ -85,7 +86,6 @@ export const addOrUpdateCustomFunction = async (
         `${updating ? 'Updating' : 'Adding'} custom server side function...`,
       );
 
-      const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl);
       if (externalDependencies) {
         shell.echo(
           chalk.yellow(
@@ -142,6 +142,8 @@ export const addOrUpdateCustomFunction = async (
         code,
         visibility,
         typeSchemas,
+        externalDependencies,
+        internalDependencies,
       );
       shell.echo(chalk.green('DONE'));
       shell.echo(`Client Function ID: ${customFunction.id}`);

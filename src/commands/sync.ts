@@ -74,41 +74,48 @@ const removeDeployable = async (
 };
 
 const syncDeployableAndGetId = async (deployable, code) => {
-  switch (deployable.type) {
-    case 'server-function':
-      return (
-        await createOrUpdateServerFunction(
-          deployable.context,
-          deployable.name,
-          deployable.description,
-          code,
-          deployable.config.visibility,
-          deployable.typeSchemas,
-          deployable.dependencies,
-          deployable.config,
-        )
-      ).id;
-    case 'client-function':
-      return (
-        await createOrUpdateClientFunction(
-          deployable.context,
-          deployable.name,
-          deployable.description,
-          code,
-          deployable.config.visibility,
-          deployable.typeSchemas,
-          deployable.config,
-        )
-      ).id;
-    case 'webhook':
-      return (
-        await createOrUpdateWebhook(
-          deployable.context,
-          deployable.name,
-          deployable.description,
-          deployable.config,
-        )
-      ).id;
+  if (deployable.type === 'webhook') {
+    return (
+      await createOrUpdateWebhook(
+        deployable.context,
+        deployable.name,
+        deployable.description,
+        deployable.config,
+      )
+    ).id;
+  }
+  let { externalDependencies, dependencies } = deployable;
+  if (Array.isArray(dependencies) && !externalDependencies) {
+    externalDependencies = Object.fromEntries(dependencies.map(d => [d, "latest"]));
+  }
+  if (deployable.type === 'server-function') {
+    return (
+      await createOrUpdateServerFunction(
+        deployable.context,
+        deployable.name,
+        deployable.description,
+        code,
+        deployable.config.visibility,
+        deployable.typeSchemas,
+        externalDependencies,
+        deployable.internalDependencies,
+        deployable.config,
+      )
+    ).id;
+  } else if (deployable.type === 'client-function') {
+    return (
+      await createOrUpdateClientFunction(
+        deployable.context,
+        deployable.name,
+        deployable.description,
+        code,
+        deployable.config.visibility,
+        deployable.typeSchemas,
+        externalDependencies,
+        deployable.internalDependencies,
+        deployable.config,
+      )
+    ).id;
   }
   throw new Error(`Unsupported deployable type: '${deployable.type}'`);
 };

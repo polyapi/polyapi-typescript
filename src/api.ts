@@ -25,7 +25,6 @@ import {
   Specification,
   SpecificationInputDto,
   TosDto,
-  Visibility,
   WebhookHandleBasicDto,
   WebhookHandleDescriptionGenerationDto,
   WebhookHandleDto,
@@ -179,6 +178,8 @@ export const createOrUpdateClientFunction = async (
   code: string,
   visibility: string,
   typeSchemas: Record<string, any>,
+  externalDependencies: Record<string, string> | undefined,
+  internalDependencies: Record<string, Array<{ path: string; id: string }>> | undefined,
   other?: Record<string, any>,
 ) => {
   return (
@@ -191,6 +192,8 @@ export const createOrUpdateClientFunction = async (
         code,
         visibility,
         typeSchemas,
+        externalDependencies,
+        internalDependencies,
         ...other,
       },
       {
