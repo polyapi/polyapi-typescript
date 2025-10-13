@@ -33,6 +33,7 @@ export const writeCachedSpecs = (
   libPath: string,
   specs: Specification[],
 ) => {
+  fs.mkdirSync(libPath, { recursive: true });
   fs.writeFileSync(
     `${libPath}/specs.json`,
     JSON.stringify(
