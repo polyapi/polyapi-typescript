@@ -1,4 +1,6 @@
 import fs from 'fs';
+import chalk from 'chalk';
+import shell from 'shelljs';
 import { EOL } from 'node:os';
 import { echoGenerationError, templateUrl } from '../../utils';
 import { TableSpecification } from '../../types';
@@ -73,9 +75,9 @@ const printTableInterface = (table: TableSpecification | string): string => {
     `${_ws}upsertMany(query: ${formattedName}.InsertManyQuery): Promise<${formattedName}.QueryResults>;`,
     `${_ws}upsertOne(query: ${formattedName}.InsertOneQuery): Promise<${formattedName}.QueryResult>;`,
     `${_ws}updateMany(query: ${formattedName}.UpdateQuery): Promise<${formattedName}.QueryResults>;`,
-    // `${_ws}updateOne(query: ${formattedName}.UpdateQuery): Promise<${formattedName}.QueryResult>;`,
+    `${_ws}updateOne(id: string, query: ${formattedName}.UpdateQuery): Promise<${formattedName}.QueryResult>;`,
     `${_ws}deleteMany(query: ${formattedName}.DeleteQuery): Promise<${formattedName}.DeleteResults>;`,
-    // `${_ws}deleteOne(query: ${formattedName}.DeleteQuery): Promise<${formattedName}.DeleteResult>;`,
+    `${_ws}deleteOne(id: string, query?: ${formattedName}.DeleteQuery): Promise<${formattedName}.DeleteResult>;`,
     '}',
   ].join(`${EOL}${ws(2)}`);
 };
@@ -95,7 +97,7 @@ const printTableNamespace = (schema: JsonSchema, name: string, depth = 1): strin
       'type QueryResults = PolyQueryResults<Row>;',
       'type QueryResult = PolyQueryResult<Row>;',
       'type DeleteResults = PolyDeleteResults;',
-      // 'type DeleteResult = PolyDeleteResult;',
+      'type DeleteResult = PolyDeleteResult;',
       'type CountResult = PolyCountResult;',
     ].join(`${EOL}${ws(depth + 1)}`)
   }${EOL}${ws(depth)}}`;
@@ -119,7 +121,7 @@ const printTableTreeAsTypes = (
           depth + 1,
         );
       } catch (err) {
-        console.error(err);
+        shell.echo(chalk.red(err));
         echoGenerationError(child as TableSpecification);
         setGenerationErrors(true);
       }

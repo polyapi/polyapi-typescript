@@ -1,6 +1,6 @@
 {
   "name": "polyapi",
-  "version": "0.24.20",
+  "version": "0.25.3",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
@@ -51,7 +51,7 @@
     "@typescript-eslint/eslint-plugin": "8.32.1",
     "@typescript-eslint/parser": "8.32.1",
     "adm-zip": "0.5.16",
-    "axios": "1.8.3",
+    "axios": "1.12.0",
     "chalk": "4.1.2",
     "comment-json": "4.2.3",
     "dotenv": "16.0.3",

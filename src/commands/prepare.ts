@@ -1,4 +1,5 @@
 import shell from 'shelljs';
+import chalk from 'chalk';
 import { FunctionArgumentDto } from '../types';
 import { getTSBaseUrl, parseDeployable } from '../transpiler';
 import {
@@ -95,12 +96,12 @@ const getAllDeployables = async (
       );
       const fullName = `${deployable.context}.${deployable.name}`;
       if (found.has(fullName)) {
-        console.error(
+        shell.echo(chalk.redBright(
           `Prepared ${deployable.type.replaceAll(
             '-',
             ' ',
           )} ${fullName}: DUPLICATE`,
-        );
+        ));
       } else {
         found.set(
           fullName,
@@ -115,8 +116,8 @@ const getAllDeployables = async (
         );
       }
     } catch (err) {
-      console.error(`ERROR parsing ${possible}`);
-      console.error(err);
+      shell.echo(chalk.redBright(`ERROR parsing ${possible}`));
+      shell.echo(chalk.red(err));
     }
   }
   return Array.from(found.values());

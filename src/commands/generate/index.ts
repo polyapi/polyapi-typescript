@@ -8,6 +8,7 @@ import {
   ApiFunctionSpecification,
   AuthFunctionSpecification,
   CustomFunctionSpecification,
+  GraphQLSubscriptionSpecification,
   ServerFunctionSpecification,
   ServerVariableSpecification,
   Specification,
@@ -17,10 +18,9 @@ import {
 import { getSpecs } from '../../api';
 import { loadConfig, addOrUpdateConfig } from '../../config';
 import {
-  generateContextDataFile,
-  getContextDataFileContent,
+  writeCachedSpecs,
+  getCachedSpecs,
   getPolyLibPath,
-  getSpecsFromContextData,
   showErrGettingSpecs,
   getStringPaths,
   loadTemplate,
@@ -62,6 +62,7 @@ const prepareDir = async (polyPath: string) => {
   fs.mkdirSync(`${libPath}/client`);
   fs.mkdirSync(`${libPath}/auth`);
   fs.mkdirSync(`${libPath}/webhooks`);
+  fs.mkdirSync(`${libPath}/subscriptions`);
   fs.mkdirSync(`${libPath}/server`);
   fs.mkdirSync(`${libPath}/vari`);
   fs.mkdirSync(`${libPath}/tabi`);
@@ -144,6 +145,9 @@ const generateJSFiles = async (
   const tables = specs.filter(
     (spec) => spec.type === 'table',
   ) as TableSpecification[];
+  const gqlSubscriptions = specs.filter(
+    (spec) => spec.type === 'graphqlSubscription',
+  ) as GraphQLSubscriptionSpecification[];
 
   await generateIndexJSFile(libPath);
   await generatePolyCustomJSFile(libPath);
@@ -158,6 +162,7 @@ const generateJSFiles = async (
     'custom functions',
   );
   await tryAsync(generateWebhooksJSFiles(libPath, webhookHandles), 'webhooks');
+  await tryAsync(generateGraphQLSubscriptionJSFiles(libPath, gqlSubscriptions), 'GraphQL subscriptions');
   await tryAsync(
     generateAuthFunctionJSFiles(libPath, authFunctions),
     'auth functions',
@@ -283,6 +288,21 @@ const generateWebhooksJSFiles = async (
   );
   fs.copyFileSync(templateUrl('webhooks-index.js'), `${libPath}/webhooks/index.js`);
 };
+
+const generateGraphQLSubscriptionJSFiles = async (
+  libPath: string,
+  specifications: GraphQLSubscriptionSpecification[],
+) => {
+  const template = handlebars.compile(loadTemplate('graphql-subscriptions.js.hbs'));
+  fs.writeFileSync(
+    `${libPath}/subscriptions/subscriptions.js`,
+    template({
+      specifications,
+      apiKey: getApiKey(),
+    }),
+  );
+  fs.copyFileSync(templateUrl('graphql-subscriptions-index.js'), `${libPath}/subscriptions/index.js`);
+}
 
 const generateServerFunctionJSFiles = async (
   libPath: string,
@@ -442,10 +462,10 @@ const generateSingleCustomFunction = async (
   );
 
   const libPath = getPolyLibPath(polyPath);
-  let contextData: Record<string, any> = {};
+  let prevSpecs: Specification[] = [];
 
   try {
-    contextData = getContextDataFileContent(libPath);
+    prevSpecs = getCachedSpecs(libPath);
   } catch (error) {
     shell.echo(chalk.red('ERROR'));
     shell.echo('Error while fetching local context data.');
@@ -453,8 +473,6 @@ const generateSingleCustomFunction = async (
     shell.echo(chalk.red(error.stack));
     return;
   }
-
-  const prevSpecs = getSpecsFromContextData(contextData);
 
   let specs: Specification[] = [];
 
@@ -480,6 +498,8 @@ const generateSingleCustomFunction = async (
   }
 
   await prepareDir(polyPath);
+
+  writeCachedSpecs(libPath, specs);
 
   setGenerationErrors(false);
 
@@ -532,13 +552,13 @@ const generate = async ({
   polyPath,
   contexts,
   names,
-  functionIds,
+  ids,
   noTypes,
 }: {
   polyPath: string;
   contexts?: string[];
   names?: string[];
-  functionIds?: string[];
+  ids?: string[];
   noTypes: boolean;
 }) => {
   let specs: Specification[] = [];
@@ -551,17 +571,20 @@ const generate = async ({
   await prepareDir(polyPath);
   loadConfig(polyPath);
 
-  try {
-    specs = await getSpecs(contexts, names, functionIds, noTypes);
+  const libPath = getPolyLibPath(polyPath);
 
-    updateLocalConfig(polyPath, contexts, names, functionIds, noTypes);
+  try {
+    specs = await getSpecs(contexts, names, ids, noTypes);
+    writeCachedSpecs(libPath, specs);
+    updateLocalConfig(polyPath, contexts, names, ids, noTypes);
   } catch (error) {
     showErrGettingSpecs(error);
     return;
   }
 
   setGenerationErrors(false);
-  await generateSpecs(getPolyLibPath(polyPath), specs, noTypes);
+  await generateSpecs(libPath, specs, noTypes);
+
 
   if (getGenerationErrors()) {
     shell.echo(
@@ -637,8 +660,6 @@ export const generateSpecs = async (
         'table types',
       );
     }
-
-    generateContextDataFile(libPath, filteredSpecs);
 
     if (missingNames.length) {
       setGenerationErrors(true);

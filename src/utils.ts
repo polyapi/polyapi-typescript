@@ -13,7 +13,6 @@ import {
   SpecificationType,
 } from './types';
 
-import { getSpecs } from './api';
 import { INSTANCE_URL_MAP } from './constants';
 
 export const getPolyLibPath = (polyPath: string) =>
@@ -21,32 +20,39 @@ export const getPolyLibPath = (polyPath: string) =>
     ? `${polyPath}/lib`
     : `${__dirname}/../../../${polyPath}/lib`;
 
-export const getContextDataFileContent = (libPath: string) => {
+export const getCachedSpecs = (libPath: string) => {
   try {
     const contents = fs.readFileSync(`${libPath}/specs.json`, 'utf-8');
-    return JSON.parse(contents) as Record<string, any>;
+    return JSON.parse(contents) as Specification[];
   } catch (err) {
-    return {};
+    return [];
   }
 };
 
-export const getSpecsFromContextData = (contextData) => {
-  const specs: Specification[] = [];
+export const writeCachedSpecs = (
+  libPath: string,
+  specs: Specification[],
+) => {
+  fs.mkdirSync(libPath, { recursive: true });
+  fs.writeFileSync(
+    `${libPath}/specs.json`,
+    JSON.stringify(
+      specs.filter((spec) => {
+        if (spec.type === 'snippet') {
+          return spec.language === 'javascript';
+        }
+        if (spec.type === 'customFunction') {
+          return spec.language === 'javascript';
+        }
 
-  const traverseAndGetSpec = (data) => {
-    for (const key of Object.keys(data)) {
-      if (typeof data[key].context === 'string') {
-        specs.push(data[key]);
-      } else {
-        traverseAndGetSpec(data[key]);
-      }
-    }
-  };
-
-  traverseAndGetSpec(contextData);
-
-  return specs;
+        return true;
+      }),
+      null,
+      2,
+    ),
+  );
 };
+
 
 export type GenerationError = {
   specification: Specification;
@@ -54,15 +60,17 @@ export type GenerationError = {
 };
 
 export const echoGenerationError = (specification: Specification) => {
-  const typeMap = {
+  const typeMap: Record<SpecificationType, string> = {
     apiFunction: 'API Function',
     customFunction: 'Custom Function',
     authFunction: 'Auth Function',
     webhookHandle: 'Webhook Handle',
+    graphqlSubscription: 'Webhook Handle',
     serverFunction: 'Server Function',
     serverVariable: 'Variable',
     schema: 'Schema',
     snippet: 'Snippet',
+    table: 'Table'
   };
 
   const type = typeMap[specification.type];
@@ -96,90 +104,6 @@ export const showErrGettingSpecs = (error: any) => {
     chalk.red(JSON.stringify(error.response?.data)),
   );
   shell.exit(1);
-};
-
-export const generateContextDataFile = (
-  libPath: string,
-  specs: Specification[],
-) => {
-  fs.writeFileSync(
-    `${libPath}/specs.json`,
-    JSON.stringify(
-      specs.filter((spec) => {
-        if (spec.type === 'snippet') {
-          return spec.language === 'javascript';
-        }
-        if (spec.type === 'customFunction') {
-          return spec.language === 'javascript';
-        }
-
-        return true;
-      }),
-      null,
-      2,
-    ),
-  );
-};
-
-export const upsertResourceInSpec = async (
-  polyPath: string,
-  {
-    resourceId,
-    resourceName,
-    updated,
-  }: {
-    resourceId: string;
-    resourceName: string;
-    updated: boolean;
-  },
-) => {
-  shell.echo(
-    '-n',
-    updated
-      ? `Updating ${resourceName} in specs...`
-      : `Adding ${resourceName} to SDK...`,
-  );
-
-  let contextData: Record<string, any> = {};
-
-  try {
-    contextData = getContextDataFileContent(getPolyLibPath(polyPath));
-  } catch (error) {
-    shell.echo(chalk.red('ERROR'));
-    shell.echo('Error while fetching local context data.');
-    shell.echo(chalk.red(error.message));
-    shell.echo(chalk.red(error.stack));
-    return;
-  }
-
-  const prevSpecs = getSpecsFromContextData(contextData);
-
-  let specs: Specification[] = [];
-
-  try {
-    specs = await getSpecs([], [], [resourceId], false);
-  } catch (error) {
-    showErrGettingSpecs(error);
-    return;
-  }
-
-  const [resource] = specs;
-
-  if (prevSpecs.some((prevSpec) => prevSpec.id === resource.id)) {
-    specs = prevSpecs.map((prevSpec) => {
-      if (prevSpec.id === resource.id) {
-        return resource;
-      }
-      return prevSpec;
-    });
-  } else {
-    prevSpecs.push(resource);
-    specs = prevSpecs;
-  }
-
-  generateContextDataFile(getPolyLibPath(polyPath), specs);
-
-  shell.echo(chalk.green('DONE'));
 };
 
 export const getStringPaths = (data: Record<string, any> | any[]) => {
