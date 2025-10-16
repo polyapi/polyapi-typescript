@@ -112,6 +112,8 @@ export const createOrUpdateServerFunction = async (
         code,
         visibility,
         typeSchemas,
+        // Keeping backwards compatability on requirements
+        requirements: Object.keys(externalDependencies),
         externalDependencies,
         internalDependencies,
         executionApiKey,
