@@ -25,6 +25,7 @@ import {
   Specification,
   SpecificationInputDto,
   TosDto,
+  Visibility,
   WebhookHandleBasicDto,
   WebhookHandleDescriptionGenerationDto,
   WebhookHandleDto,

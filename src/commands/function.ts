@@ -4,6 +4,7 @@ import shell from 'shelljs';
 import {
   CreateServerCustomFunctionResponseDto,
   FunctionDetailsDto,
+  Visibility,
 } from '../types';
 import {
   createOrUpdateClientFunction,
