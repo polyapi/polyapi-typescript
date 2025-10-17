@@ -87,7 +87,7 @@ let fetchedSpecs = false;
 export const getDependencies = async (
   code: string,
   fileName: string,
-  baseUrl: string | undefined
+  baseUrl: string | undefined,
 ) => {
   const importedLibraries = new Set<string>();
   const internalReferences = new Set<string>();
@@ -225,7 +225,7 @@ export const getDependencies = async (
                   }
                 } else if (ts.isPropertyAccessExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
                   let path = getPropertyPath(node);
-                  const root = path.split('.')[0]!;
+                  const root = path.split('.')[0];
                   // If root is an alias, substitute
                   if (aliasMap.has(root)) {
                     const aliasBase = aliasMap.get(root)!;
@@ -370,7 +370,7 @@ export const getDependencies = async (
   return [dependencies.length ? externalDependencies : undefined, internalReferences.size ? internalDependencies : undefined];
 };
 
-export const parseDeployComment = (comment: string): Deployment | null => {
+export const parseDeployComment = (comment: string): Deployment => {
   // Poly deployed @ 2024-08-29T22:46:46.791Z - test.weeklyReport - https://develop-k8s.polyapi.io/canopy/polyui/collections/server-functions/f0630f95-eac8-4c7d-9d23-639d39034bb6 - e3b0c44
   const match = comment.match(
     /^\s*(?:\/\/\s*)*Poly deployed @ (\S+) - (\S+)\.([^.]+) - (https?:\/\/[^/]+)\/\S+\/(\S+)s\/(\S+) - (\S+)$/,
@@ -385,10 +385,10 @@ export const parseDeployComment = (comment: string): Deployment | null => {
     deployed,
     fileRevision,
     // Local development puts canopy on a different port than the poly-server
-    instance: instance?.endsWith('localhost:3000')
+    instance: instance.endsWith('localhost:3000')
       ? instance.replace(':3000', ':8000')
       : instance,
-  } as Deployment;
+  };
 };
 
 type Ranges = Array<[start: number, end: number]>;
@@ -424,10 +424,10 @@ const getPolyConfig = (types: string[], sourceFile: ts.SourceFile): any => {
   const visit = (node: ts.Node) => {
     if (ts.isVariableStatement(node)) {
       const declaration = node.declarationList.declarations[0];
-      const name = declaration?.name.getText(sourceFile);
-      const type = declaration?.type?.getText(sourceFile);
-      if (declaration && name === 'polyConfig' && type && types.includes(type)) {
-        const initializer = declaration.initializer;
+      const name = declaration.name.getText(sourceFile);
+      const type = declaration.type?.getText(sourceFile);
+      if (name === 'polyConfig' && type && types.includes(type)) {
+        const initializer = node.declarationList.declarations[0].initializer;
         if (initializer && ts.isObjectLiteralExpression(initializer)) {
           // eval() is generally considered harmful
           // but since we're running entirely client side on user-provided code
@@ -462,7 +462,7 @@ const parseJSDoc = (node: ts.FunctionDeclaration): any => {
         description: '',
       },
     };
-    const firstJsDoc = jsDoc[0]!;
+    const firstJsDoc = jsDoc[0];
     jsDocTags.description = firstJsDoc.comment
       ? ts.getTextOfJSDocComment(firstJsDoc.comment)
       : '';
@@ -535,10 +535,7 @@ const parseTSTypes = (
 const getFunctionDetails = (
   sourceFile: ts.SourceFile,
   functionName: string,
-): Pick<
-  DeployableRecord,
-  'types' | 'docStartIndex' | 'docEndIndex' | 'dirty'
-> => {
+) => {
   let functionDetails: null | Pick<
     DeployableRecord,
     'types' | 'docStartIndex' | 'docEndIndex' | 'dirty'
@@ -607,12 +604,12 @@ const parseDeployableFunction = async (
   const [deployments, deploymentCommentRanges] = getDeployComments(sourceFile);
   const functionDetails = getFunctionDetails(sourceFile, polyConfig.name);
   if (polyConfig.description) {
-    if (polyConfig.description !== functionDetails.types?.description) {
-      functionDetails.types!.description = polyConfig.description;
+    if (polyConfig.description !== functionDetails.types.description) {
+      functionDetails.types.description = polyConfig.description;
       functionDetails.dirty = true;
     }
   } else {
-    polyConfig.description = functionDetails.types?.description || '';
+    polyConfig.description = functionDetails.types.description || '';
   }
   const [externalDependencies, internalDependencies] = await getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl);
   const typeSchemas = generateTypeSchemas(sourceFile.fileName, DeployableTypeEntries.map(d => d[0]), polyConfig.name);
@@ -651,7 +648,7 @@ export const parseDeployable = async (
   filePath: string,
   baseUrl: string,
   gitRevision: string,
-): Promise<[DeployableRecord, string] | undefined> => {
+): Promise<[DeployableRecord, string]> => {
   const sourceFile = await loadTsSourceFile(filePath);
 
   const polyConfig = getPolyConfig(
@@ -710,7 +707,7 @@ const dereferenceSchema = (obj: any, definitions: any, visited: Set<string> = ne
     if (key === '$ref' && typeof value === 'string') {
       const match = value.match(/^#\/definitions\/(.+)$/);
       if (match) {
-        const defName = match[1]!;
+        const defName = match[1];
 
         // Prevent infinite recursion
         if (visited.has(defName)) {
@@ -823,7 +820,7 @@ const dereferenceRoot = (schema: any): any => {
       if (key === '$ref' && typeof value === 'string') {
         const match = value.match(/^#\/definitions\/(.+)$/);
         if (match) {
-          const encodedDefName = match[1]!;
+          const encodedDefName = match[1];
           const decodedDefName = decodeURIComponent(encodedDefName);
 
           // Try both encoded and decoded versions

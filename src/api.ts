@@ -51,7 +51,7 @@ const getApiBaseURL = () => {
   if (isDevEnv) {
     return process.env.POLY_API_BASE_URL;
   } else {
-    return process.env.POLY_API_BASE_URL!.replace(/^http:/, 'https://');
+    return process.env.POLY_API_BASE_URL.replace(/^http:/, 'https://');
   }
 };
 
@@ -96,12 +96,12 @@ export const createOrUpdateServerFunction = async (
   name: string,
   description: string | null,
   code: string,
-  visibility: string | undefined,
+  visibility: string,
   typeSchemas: Record<string, any>,
-  externalDependencies?: Record<string, string> | undefined,
-  internalDependencies?: Record<string, Array<{ path: string; id: string }>> | undefined,
+  externalDependencies: Record<string, string> | undefined,
+  internalDependencies: Record<string, Array<{ path: string; id: string }>> | undefined,
   other?: Record<string, any>,
-  executionApiKey?: string | null,
+  executionApiKey?: string,
 ) => {
   return (
     await axios.post<any, AxiosResponse<CreateServerCustomFunctionResponseDto>>(
@@ -114,7 +114,7 @@ export const createOrUpdateServerFunction = async (
         visibility,
         typeSchemas,
         // Keeping backwards compatability on requirements
-        requirements: externalDependencies ? Object.keys(externalDependencies) : null,
+        requirements: Object.keys(externalDependencies),
         externalDependencies,
         internalDependencies,
         executionApiKey,
@@ -179,7 +179,7 @@ export const createOrUpdateClientFunction = async (
   name: string,
   description: string | null,
   code: string,
-  visibility: string | undefined,
+  visibility: string,
   typeSchemas: Record<string, any>,
   externalDependencies: Record<string, string> | undefined,
   internalDependencies: Record<string, Array<{ path: string; id: string }>> | undefined,

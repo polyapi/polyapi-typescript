@@ -33,22 +33,22 @@ const fillInMissingFunctionDetails = async (
   code: string,
 ): Promise<DeployableRecord> => {
   const isMissingDescriptions =
-    !deployable.types!.description ||
-    !deployable.types!.returns.description ||
-    deployable.types!.params.some((p) => !p.description);
+    !deployable.types.description ||
+    !deployable.types.returns.description ||
+    deployable.types.params.some((p) => !p.description);
   if (isMissingDescriptions) {
     try {
       const aiGenerated = await getFunctionDescription(
         deployable.type,
-        deployable.types!.description,
-        deployable.types!.params.map((p) => ({ ...p, key: p.name })),
+        deployable.types.description,
+        deployable.types.params.map((p) => ({ ...p, key: p.name })),
         code,
       );
-      if (!deployable.types!.description && aiGenerated.description) {
-        deployable.types!.description = aiGenerated.description;
+      if (!deployable.types.description && aiGenerated.description) {
+        deployable.types.description = aiGenerated.description;
         deployable.dirty = true;
       }
-      deployable.types!.params = deployable.types!.params.map((p) => {
+      deployable.types.params = deployable.types.params.map((p) => {
         if (p.description) return p;
         const aiArg = aiGenerated.arguments.find((a) => a.name === p.name);
         if (!aiArg || !aiArg.description) return p;
@@ -89,13 +89,11 @@ const getAllDeployables = async (
   const found = new Map<string, DeployableRecord>();
   for (const possible of possibleDeployables) {
     try {
-      const result = await parseDeployable(
+      const [deployable, code] = await parseDeployable(
         possible,
         baseUrl,
         gitRevision,
       );
-      if (!result) throw new Error("Failed to parse a deployable record");
-      const [deployable, code] = result;
       const fullName = `${deployable.context}.${deployable.name}`;
       if (found.has(fullName)) {
         shell.echo(chalk.redBright(
