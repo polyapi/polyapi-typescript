@@ -275,13 +275,13 @@ export const getDependencies = async (
 
   // Finalize any external dependencies
   if (dependencies.length) {
-    // Read dependency versions from package.json
-    let packageJson: any = fs.readFileSync(
-      path.join(process.cwd(), 'package.json'),
-      'utf-8',
-    );
-
+    let packageJson: any = {};
     try {
+      // Read dependency versions from package.json
+      packageJson = fs.readFileSync(
+        path.join(process.cwd(), 'package.json'),
+        'utf-8',
+      );
       packageJson = JSON.parse(packageJson);
     } catch (error) {
       shell.echo(
