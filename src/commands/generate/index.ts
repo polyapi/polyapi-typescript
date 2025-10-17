@@ -252,7 +252,7 @@ const generateCustomFunctionJSFiles = async (
           customFunctionJSTemplate(spec),
         ).catch((error) => {
           codeGenerationErrors[spec.id] = {
-            stack: (error as Error).stack,
+            stack: (error as Error).stack || '',
             specification: spec,
           };
         }),
@@ -328,7 +328,7 @@ const generateServerVariableJSFiles = async (
   const contextPaths = getContextPaths(contextData);
   const template = handlebars.compile(loadTemplate('vari/index.js.hbs'));
 
-  const arrPaths = [];
+  const arrPaths: Array<{ context: string; paths: string[] }> = [];
 
   for (const specification of specifications) {
     if (
@@ -412,7 +412,7 @@ const generateAuthFunctionJSFiles = async (
         }),
       ).catch((error) => {
         codeGenerationErrors[spec.id] = {
-          stack: (error as Error).stack,
+          stack: (error as Error).stack || '',
           specification: spec,
         };
       }),
@@ -483,7 +483,7 @@ const generateSingleCustomFunction = async (
     return;
   }
 
-  const [customFunction] = specs;
+  const [customFunction] = specs as [Specification];
 
   if (prevSpecs.some((prevSpec) => prevSpec.id === customFunction.id)) {
     specs = prevSpecs.map((prevSpec) => {
@@ -610,6 +610,7 @@ const tryAsync = async <R = unknown>(
       ),
     );
   }
+  return undefined as R;
 };
 
 export const generateSpecs = async (
@@ -624,7 +625,7 @@ export const generateSpecs = async (
         acc[s.name.trim() ? 1 : 0].push(s);
         return acc;
       },
-      [[], []],
+      [[], []] as [Specification[], Specification[]],
     );
     const jsFilesCodeGenerationErrors = await generateJSFiles(libPath, specs);
 

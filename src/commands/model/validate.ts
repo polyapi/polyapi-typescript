@@ -18,10 +18,10 @@ const getDuplicatedIdentifier = (
   apiFunctions: { name: string; context: string }[],
 ): string | null => {
   for (let i = 0; i < apiFunctions.length; i++) {
-    const firstApiFunction = apiFunctions[i];
+    const firstApiFunction = apiFunctions[i]!;
 
     for (let c = 0; c < apiFunctions.length; c++) {
-      const secondApiFunction = apiFunctions[c];
+      const secondApiFunction = apiFunctions[c]!;
 
       if (
         firstApiFunction.name &&

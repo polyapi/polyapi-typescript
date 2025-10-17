@@ -113,7 +113,9 @@ export const getStringPaths = (data: Record<string, any> | any[]) => {
 
   for (let i = 0; i < paths.length; i++) {
     let stringPath = '';
-    for (const part of paths[i]) {
+    const parts = paths[i];
+    if (!parts) continue;
+    for (const part of parts) {
       const isString = typeof part === 'string';
       const delimiter = stringPath.length > 0 && isString ? '.' : '';
       if (isString) {

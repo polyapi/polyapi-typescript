@@ -50,7 +50,7 @@ export const addOrUpdateCustomFunction = async (
   try {
     let customFunction: FunctionDetailsDto;
 
-    const specs = await getSpecs([context], [name]);
+    const specs = await getSpecs(context ? [context] : undefined, [name]);
     const functionSpec = specs.find(
       (spec) => spec.name === name && spec.context === context,
     );
@@ -150,7 +150,7 @@ export const addOrUpdateCustomFunction = async (
       shell.echo(`Client Function ID: ${customFunction.id}`);
     }
 
-    await generateSingleCustomFunction(polyPath, customFunction.id, updating);
+    await generateSingleCustomFunction(polyPath, customFunction!.id, updating);
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));
     shell.echo(chalk.red((e instanceof Error ? e.message : e.response?.data?.message) || 'Unexpected error.'));
