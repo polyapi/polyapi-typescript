@@ -53,8 +53,9 @@ const getApiBaseUrl = () =>
 
 const getApiKey = () => process.env.POLY_API_KEY;
 
-const prepareDir = async (polyPath: string) => {
-  const libPath = getPolyLibPath(polyPath);
+const prepareDir = async (polyPath: string, temp = false) => {
+  let libPath = getPolyLibPath(polyPath);
+  if (temp) libPath = libPath.replace('/lib', '/temp');
 
   fs.rmSync(libPath, { recursive: true, force: true });
   fs.mkdirSync(libPath, { recursive: true });
@@ -461,7 +462,7 @@ const generateSingleCustomFunction = async (
     updated ? 'Regenerating TypeScript SDK...' : 'Generating TypeScript SDK...',
   );
 
-  const libPath = getPolyLibPath(polyPath);
+  let libPath = getPolyLibPath(polyPath);
   let prevSpecs: Specification[] = [];
 
   try {
@@ -497,13 +498,18 @@ const generateSingleCustomFunction = async (
     specs = prevSpecs;
   }
 
-  await prepareDir(polyPath);
+  await prepareDir(polyPath, true);
+  libPath = getPolyLibPath(polyPath);
+  const tempPath = libPath.replace('/lib', '/temp');
 
-  writeCachedSpecs(libPath, specs);
+  writeCachedSpecs(tempPath, specs);
 
   setGenerationErrors(false);
 
-  await generateSpecs(libPath, specs, noTypes);
+  await generateSpecs(tempPath, specs, noTypes);
+  // Now remove old lib and rename temp directory to force a switchover in typescript
+  fs.rmSync(libPath, { recursive: true, force: true });
+  fs.renameSync(tempPath, libPath);
 
   if (getGenerationErrors()) {
     shell.echo(
@@ -568,14 +574,15 @@ const generate = async ({
     : 'Generating Poly TypeScript SDK...';
   shell.echo('-n', generateMsg);
 
-  await prepareDir(polyPath);
+  await prepareDir(polyPath, true);
   loadConfig(polyPath);
 
   const libPath = getPolyLibPath(polyPath);
+  const tempPath = libPath.replace('/lib', '/temp');
 
   try {
     specs = await getSpecs(contexts, names, ids, noTypes);
-    writeCachedSpecs(libPath, specs);
+    writeCachedSpecs(tempPath, specs);
     updateLocalConfig(polyPath, contexts, names, ids, noTypes);
   } catch (error) {
     showErrGettingSpecs(error);
@@ -583,8 +590,10 @@ const generate = async ({
   }
 
   setGenerationErrors(false);
-  await generateSpecs(libPath, specs, noTypes);
-
+  await generateSpecs(tempPath, specs, noTypes);
+  // Now remove old lib and rename temp directory to force a switchover in typescript
+  fs.rmSync(libPath, { recursive: true, force: true });
+  fs.renameSync(tempPath, libPath);
 
   if (getGenerationErrors()) {
     shell.echo(
