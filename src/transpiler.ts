@@ -220,7 +220,7 @@ export const getDependencies = async (
                 // Track assignments of poly imports to follow aliases
                 if (ts.isVariableDeclaration(node) && node.initializer) {
                   const initializer = unwrapExpression(node.initializer);
-                  // Simple variable assignments (aliases)
+                  // Simple variable assignments (aliases), ex. `const OOB = polyapi.OOB;`
                   if (ts.isIdentifier(node.name) && ts.isPropertyAccessExpression(initializer)) {
                     const path = getPropertyPath(initializer);
 
@@ -240,7 +240,7 @@ export const getDependencies = async (
                       }
                     }
                   }
-                  // Destructuring assignments (aliases)
+                  // Destructuring assignments (aliases), ex. `const { OOB } = polyapi;`
                   else if (ts.isObjectBindingPattern(node.name)) {
                     let basePath: string | undefined;
                     if (ts.isPropertyAccessExpression(initializer)) {
