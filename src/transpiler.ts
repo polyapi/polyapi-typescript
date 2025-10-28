@@ -95,6 +95,8 @@ export const getDependencies = async (
   let variImportIdentifier: string | null = null;
   let tabiImportIdentifier: string | null = null;
   let schemasImportIdentifier: string | null = null;
+  const otherImportIdentifiers: string[] = [];
+  let lookForInternalDependencies = false;
   // Users can alias references to parts of the poly tree by assigning to a variable
   // So this map holds those references 
   const aliasMap = new Map<string, string>();
@@ -119,6 +121,17 @@ export const getDependencies = async (
       parts.unshift(current.text);
     }
     return parts.join('.');
+  }
+
+  const unwrapExpression = (expr: ts.Expression): ts.Expression => {
+    while (
+      ts.isParenthesizedExpression(expr) ||
+      ts.isAsExpression(expr) ||
+      ts.isTypeAssertionExpression(expr)
+    ) {
+      expr = expr.expression;
+    }
+    return expr;
   }
 
   const flattenTypeName = (name: ts.EntityName): string => {
@@ -155,17 +168,28 @@ export const getDependencies = async (
                   // Get name of polyapi default import if defined
                   if (node.importClause.name) {
                     polyImportIdentifier = `${node.importClause.name.text}.`;
+                    lookForInternalDependencies = true;
                   }
 
-                  // Look for any other named imports (like vari or tabi)
+                  // Look for any other named imports (like vari, tabi, schemas, and other top-level namespaces (like OOB, etc))
                   if (node.importClause.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
                     for (const element of node.importClause.namedBindings.elements) {
                       const imported = element.propertyName ? element.propertyName.text : element.name.text;
                       const local = element.name.text;
 
-                      if (imported === "vari") variImportIdentifier = `${local}.`;
-                      if (imported === "tabi") tabiImportIdentifier = `${local}.`;
-                      if (imported === "schemas") schemasImportIdentifier = `${local}.`;
+                      if (imported === "vari") {
+                        variImportIdentifier = `${local}.`;
+                        lookForInternalDependencies = true;
+                      } else if (imported === "tabi") {
+                        tabiImportIdentifier = `${local}.`;
+                        lookForInternalDependencies = true;
+                      } else if (imported === "schemas") {
+                        schemasImportIdentifier = `${local}.`;
+                        lookForInternalDependencies = true;
+                      } else if (local !== 'polyCustom') {
+                        otherImportIdentifiers.push(`${local}.`);
+                        lookForInternalDependencies = true;
+                      }
                     }
                   }
                 }
@@ -192,38 +216,69 @@ export const getDependencies = async (
 
 
               // Pull out internal dependencies
-              if (polyImportIdentifier || variImportIdentifier || tabiImportIdentifier) {
-
-                // Track variable assignments (aliases)
+              if (lookForInternalDependencies) {
+                // Track assignments of poly imports to follow aliases
                 if (ts.isVariableDeclaration(node) && node.initializer) {
-                  if (ts.isPropertyAccessExpression(node.initializer)) {
-                    const path = getPropertyPath(node.initializer);
+                  const initializer = unwrapExpression(node.initializer);
+                  // Simple variable assignments (aliases)
+                  if (ts.isIdentifier(node.name) && ts.isPropertyAccessExpression(initializer)) {
+                    const path = getPropertyPath(initializer);
 
-                    // Capture poly reference aliases
-                    if (polyImportIdentifier && path.startsWith(polyImportIdentifier)) {
-                      if (node.name && ts.isIdentifier(node.name)) {
-                        aliasMap.set(node.name.text, path);
-                        return node; // Don't recurse into assignment, just move on
-                      }
-                    }
-
-                    // Capture vari reference aliases
-                    if (variImportIdentifier && path.startsWith(variImportIdentifier)) {
-                      if (node.name && ts.isIdentifier(node.name)) {
-                        aliasMap.set(node.name.text, path);
-                        return node; // Don't recurse into assignment, just move on
-                      }
-                    }
-
-                    // Capture tabi reference aliases
-                    if (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) {
+                    if (
+                      // Capture poly reference aliases
+                      (polyImportIdentifier && path.startsWith(polyImportIdentifier)) ||
+                      // Capture vari reference aliases
+                      (variImportIdentifier && path.startsWith(variImportIdentifier)) ||
+                      // Capture tabi reference aliases
+                      (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) ||
+                      // Capture other top-level namespace reference aliases
+                      (otherImportIdentifiers.length && otherImportIdentifiers.some(other => path.startsWith(other)))
+                     ) {
                       if (node.name && ts.isIdentifier(node.name)) {
                         aliasMap.set(node.name.text, path);
                         return node; // Don't recurse into assignment, just move on
                       }
                     }
                   }
-                } else if (ts.isPropertyAccessExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
+                  // Destructuring assignments (aliases)
+                  else if (ts.isObjectBindingPattern(node.name)) {
+                    let basePath: string | undefined;
+                    if (ts.isPropertyAccessExpression(initializer)) {
+                      basePath = getPropertyPath(initializer);
+                    } else if (ts.isIdentifier(initializer)) {
+                      basePath = initializer.text;
+                    }
+                    if (!basePath) return node;
+                    
+                    for (const element of node.name.elements) {
+                      if (!ts.isBindingElement(element)) continue;
+
+                      // Handle `propertyName: alias` and shorthand `{ prop }`
+                      const propName = element.propertyName
+                        ? element.propertyName.getText()
+                        : element.name.getText();
+                      const localName = element.name.getText();
+                      let path = `${basePath}.${propName}`;
+                      const root = path.split('.')[0];
+                      // Check for alias to handle case where we're destructuring something from an aliased import
+                      if (aliasMap.has(root)) {
+                          const aliasBase = aliasMap.get(root);
+                          path = aliasBase.split(".").concat(path.split('.').slice(1)).join('.');
+                      }
+                      if (
+                        (polyImportIdentifier && path.startsWith(polyImportIdentifier)) ||
+                        (variImportIdentifier && path.startsWith(variImportIdentifier)) ||
+                        (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) ||
+                        (otherImportIdentifiers.length && otherImportIdentifiers.some(other => path.startsWith(other)))
+                      ) {
+                        aliasMap.set(localName, path);
+                      }
+                    }
+                    return node;
+                  }
+                }
+                // Look for use of imported poly dep!
+                else if (ts.isPropertyAccessExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
                   let path = getPropertyPath(node);
                   const root = path.split('.')[0];
                   // If root is an alias, substitute
@@ -231,20 +286,22 @@ export const getDependencies = async (
                     const aliasBase = aliasMap.get(root)!;
                     path = aliasBase.split(".").concat(path.split('.').slice(1)).join('.');
                   }
-
                   // Capture poly references (all function types, webhooks, and subscriptions)
                   if (polyImportIdentifier && path.startsWith(polyImportIdentifier)) {
                     internalReferences.add(path.replace(polyImportIdentifier, ''));
                   }
-
                   // Capture vari references
-                  if (variImportIdentifier && path.startsWith(variImportIdentifier)) {
+                  else if (variImportIdentifier && path.startsWith(variImportIdentifier)) {
                     internalReferences.add(path.replace(VariMethods, '').replace(variImportIdentifier, ''));
                   }
-
                   // Capture tabi references
-                  if (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) {
+                  else if (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) {
                     internalReferences.add(path.replace(TabiMethods, '').replace(tabiImportIdentifier, ''));
+                  }
+                  // Capture other top-level namespace references
+                  else if (otherImportIdentifiers.length) {
+                    const match = otherImportIdentifiers.find(other => path.startsWith(other));
+                    if (match) internalReferences.add(path);
                   }
                 }
               }
