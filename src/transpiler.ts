@@ -17,6 +17,7 @@ import { getCachedSpecs, getPolyLibPath, writeCachedSpecs } from './utils';
 import { DEFAULT_POLY_PATH } from './constants';
 import { Specification } from './types';
 import { getSpecs } from './api';
+import { toPascalCase } from '@guanghechen/helper-string';
 
 // NodeJS built-in libraries + polyapi
 // https://www.w3schools.com/nodejs/ref_modules.asp
@@ -94,7 +95,7 @@ export const getDependencies = async (
   let polyImportIdentifier: string | null = null;
   let variImportIdentifier: string | null = null;
   let tabiImportIdentifier: string | null = null;
-  let schemasImportIdentifier: string | null = null;
+  let schemasImportIdentifier = 'schemas.';
   const otherImportIdentifiers: string[] = [];
   let lookForInternalDependencies = false;
   // Users can alias references to parts of the poly tree by assigning to a variable
@@ -233,7 +234,7 @@ export const getDependencies = async (
                       (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) ||
                       // Capture other top-level namespace reference aliases
                       (otherImportIdentifiers.length && otherImportIdentifiers.some(other => path.startsWith(other)))
-                     ) {
+                    ) {
                       if (node.name && ts.isIdentifier(node.name)) {
                         aliasMap.set(node.name.text, path);
                         return node; // Don't recurse into assignment, just move on
@@ -249,7 +250,7 @@ export const getDependencies = async (
                       basePath = initializer.text;
                     }
                     if (!basePath) return node;
-                    
+
                     for (const element of node.name.elements) {
                       if (!ts.isBindingElement(element)) continue;
 
@@ -262,8 +263,8 @@ export const getDependencies = async (
                       const root = path.split('.')[0];
                       // Check for alias to handle case where we're destructuring something from an aliased import
                       if (aliasMap.has(root)) {
-                          const aliasBase = aliasMap.get(root);
-                          path = aliasBase.split(".").concat(path.split('.').slice(1)).join('.');
+                        const aliasBase = aliasMap.get(root);
+                        path = aliasBase.split(".").concat(path.split('.').slice(1)).join('.');
                       }
                       if (
                         (polyImportIdentifier && path.startsWith(polyImportIdentifier)) ||
@@ -288,15 +289,15 @@ export const getDependencies = async (
                   }
                   // Capture poly references (all function types, webhooks, and subscriptions)
                   if (polyImportIdentifier && path.startsWith(polyImportIdentifier)) {
-                    internalReferences.add(path.replace(polyImportIdentifier, ''));
+                    internalReferences.add(path);
                   }
                   // Capture vari references
                   else if (variImportIdentifier && path.startsWith(variImportIdentifier)) {
-                    internalReferences.add(path.replace(VariMethods, '').replace(variImportIdentifier, ''));
+                    internalReferences.add(path.replace(VariMethods, ''));
                   }
                   // Capture tabi references
                   else if (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) {
-                    internalReferences.add(path.replace(TabiMethods, '').replace(tabiImportIdentifier, ''));
+                    internalReferences.add(path.replace(TabiMethods, ''));
                   }
                   // Capture other top-level namespace references
                   else if (otherImportIdentifiers.length) {
@@ -310,7 +311,7 @@ export const getDependencies = async (
               if (schemasImportIdentifier && ts.isTypeReferenceNode(node)) {
                 const path = flattenTypeName(node.typeName);
                 if (path.startsWith(schemasImportIdentifier)) {
-                  internalReferences.add(path.replace(schemasImportIdentifier, ''));
+                  internalReferences.add(path);
                   return node;
                 }
               }
@@ -343,7 +344,7 @@ export const getDependencies = async (
     } catch (error) {
       shell.echo(
         chalk.yellow('\nWarning:'),
-        'Failed to parse package.json file in order to read dependencies, there could be issues with some dependencies at the time of deploying the server function.',
+        'Failed to parse package.json file in order to read dependencies, there could be issues with some dependencies at the time of deploying the server function. Rerun command with \'--ignore-dependencies\' to skip parsing dependencies.',
       );
     }
 
@@ -387,8 +388,30 @@ export const getDependencies = async (
     let missing: string[] = [];
 
     const findReferencedSpecs = (toFind: string[] | Set<string>) => {
-      for (const path of internalReferences) {
-        const spec = specs.find(s => s.contextName.toLowerCase() === path.toLowerCase());
+      for (let path of toFind) {
+        let type;
+        if (path.startsWith(polyImportIdentifier)) {
+          path = path.replace(polyImportIdentifier, '');
+        } else if (path.startsWith(variImportIdentifier)) {
+          type = "serverVariable";
+          path = path.replace(variImportIdentifier, '');
+        } else if (path.startsWith(tabiImportIdentifier)) {
+          type = "table";
+          path = path.replace(tabiImportIdentifier, '');
+        } else if (path.startsWith(schemasImportIdentifier)) {
+          type = "schema";
+          path = path.replace(schemasImportIdentifier, '');
+        }
+        const spec = specs.find(s => {
+          if (type) {
+            if (type !== s.type) return false;
+          } else if (['serverVariable', 'table', 'schema'].includes(s.type)) return false;
+          if (s.type === 'schema') {
+            // Schema names are munged too much to just compare by lowercase
+            return s.contextName.split('.').map(s => toPascalCase(s)).join('.') === path;
+          }
+          return s.contextName.toLowerCase() === path.toLowerCase();
+        });
         if (spec) {
           found.push(spec);
           let type: string = spec.type;
@@ -420,7 +443,7 @@ export const getDependencies = async (
     }
 
     if (missing.length) {
-      throw new Error(`Cannot resolve all poly resources referenced within function.\nMissing:\n${missing.map(n => `'${n}'`).join('\n')}`)
+      throw new Error(`Cannot resolve all poly resources referenced within function.\n\nMissing:\n${missing.map(n => `  '${n}'`).join('\n')}\n\nRerun command with '--ignore-dependencies' to skip resolving dependencies.`)
     }
   }
 

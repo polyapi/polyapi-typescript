@@ -245,6 +245,10 @@ void yargs
           .option('visibility', {
             describe: 'Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive',
             type: 'string',
+          })
+          .option('ignore-dependencies', {
+            describe: 'Skip parsing internal and external dependencies referenced within function. It\'s best not to use this option if you can help it.',
+            type: 'boolean',
           }),
       async ({
         name,
@@ -258,6 +262,7 @@ void yargs
         executionApiKey,
         cachePolyLibrary,
         visibility,
+        ignoreDependencies,
       }) => {
         const logsEnabled =
           logs === 'enabled' ? true : logs === 'disabled' ? false : undefined;
@@ -304,6 +309,7 @@ void yargs
           executionApiKey,
           cachePolyLibrary,
           visibility,
+          ignoreDependencies,
         );
       },
     );

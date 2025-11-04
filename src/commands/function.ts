@@ -33,6 +33,7 @@ export const addOrUpdateCustomFunction = async (
   executionApiKey: string | null | undefined,
   cachePolyLibrary: boolean | undefined,
   visibility: string | undefined,
+  ignoreDependencies: boolean | undefined
 ) => {
   loadConfig(polyPath);
 
@@ -79,7 +80,7 @@ export const addOrUpdateCustomFunction = async (
     }
 
     const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]), name);
-    const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl);
+    const [externalDependencies, internalDependencies] = ignoreDependencies ? [undefined, undefined] : await getDependencies(code, file, tsConfigBaseUrl);
 
     if (server) {
       shell.echo(
