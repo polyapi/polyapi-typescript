@@ -71,10 +71,11 @@ void yargs
           demandOption: false,
           type: 'string',
         },
-        functionIds: {
-          describe: 'Function IDs to generate',
+        ids: {
+          describe: 'Resource IDs to generate',
           demandOption: false,
           type: 'string',
+          alias: 'functionIds',
         },
         customPath: {
           describe: 'Custom path to .poly directory (internal use only)',
@@ -93,7 +94,7 @@ void yargs
       exitWhenNoConfig,
       contexts,
       names,
-      functionIds,
+      ids,
       customPath = DEFAULT_POLY_PATH,
       noTypes = false,
     }) => {
@@ -113,7 +114,7 @@ void yargs
         polyPath: customPath,
         contexts: contexts?.split(','),
         names: names?.split(','),
-        functionIds: functionIds?.split(','),
+        ids: ids?.split(','),
         noTypes,
       });
     },

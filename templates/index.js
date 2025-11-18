@@ -3,6 +3,7 @@ const { io } = require('socket.io-client');
 const apiFunctions = require('./api');
 const clientFunctions = require('./client');
 const webhooks = require('./webhooks');
+const subscriptions = require('./subscriptions');
 const authFunctions = require('./auth');
 const serverFunctions = require('./server');
 const vari = require('./vari');
@@ -68,6 +69,7 @@ merge(
   serverFunctions(CLIENT_ID, polyCustom),
   authFunctions(CLIENT_ID, getSocket, getApiKey),
   webhooks(CLIENT_ID, getSocket, getApiKey),
+  subscriptions(CLIENT_ID, getSocket, getApiKey),
 ),
 module.exports = {
   ...poly,

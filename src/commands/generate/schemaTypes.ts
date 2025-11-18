@@ -558,7 +558,7 @@ const printSchemaTreeAsTypes = (
           depth + 1,
         );
       } catch (err) {
-        console.error(err);
+        shell.echo(chalk.red(err));
         echoGenerationError(child as SchemaSpec);
         setGenerationErrors(true);
       }

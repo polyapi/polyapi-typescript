@@ -78,7 +78,9 @@ export type DeployableRecord = ParsedDeployableConfig & {
     };
   };
   typeSchemas?: Record<string, any>;
-  dependencies?: string[];
+  dependencies?: string[]; // old version of external dependencies
+  externalDependencies?: Record<string, string>,
+  internalDependencies?: Record<string, Array<{ path: string; id: string }>>,
   description?: string;
   deployments: Deployment[];
   deploymentCommentRanges?: Array<[startIndex: number, endIndex: number]>;

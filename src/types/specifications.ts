@@ -14,6 +14,7 @@ export type SpecificationType =
   | 'serverVariable'
   | 'snippet'
   | 'table'
+  | 'graphqlSubscription'
   | 'schema';
 
 export interface ISpecification {
@@ -126,6 +127,12 @@ export interface WebhookHandleSpecification extends ISpecification {
   function: FunctionSpecification;
 }
 
+export interface GraphQLSubscriptionSpecification extends ISpecification {
+  type: 'graphqlSubscription';
+  description: string;
+  function: FunctionSpecification;
+}
+
 export interface ServerVariableSpecification extends ISpecification {
   type: 'serverVariable';
   variable: VariableSpecification;
@@ -170,6 +177,7 @@ export type Specification =
   | ServerVariableSpecification
   | SnippetSpecification
   | SchemaSpecification
+  | GraphQLSubscriptionSpecification
   | TableSpecification;
 
 interface CreateWebhookHandleDtoForSpecificationInput
