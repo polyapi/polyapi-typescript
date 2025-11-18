@@ -4,7 +4,6 @@ import chalk from 'chalk';
 import shell from 'shelljs';
 
 import { upsertSnippet } from '../api';
-import { upsertResourceInSpec } from '../utils';
 
 const readFile = promisify(fs.readFile);
 
@@ -56,11 +55,6 @@ export const addSnippet = async (
     );
 
     shell.echo(`Snippet ID: ${response.data.id}`);
-    upsertResourceInSpec(polyPath, {
-      updated: response.status === 200,
-      resourceId: response.data.id,
-      resourceName: 'snippet',
-    });
   } catch (error) {
     const httpStatusCode = error.response?.status;
 
