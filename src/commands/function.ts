@@ -1,6 +1,7 @@
 import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
+import { toPascalCase } from '@guanghechen/helper-string';
 import {
   CreateServerCustomFunctionResponseDto,
   FunctionDetailsDto,
@@ -79,8 +80,14 @@ export const addOrUpdateCustomFunction = async (
       }
     }
 
-    const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]), name);
-    const [externalDependencies, internalDependencies] = ignoreDependencies ? [undefined, undefined] : await getDependencies(code, file, tsConfigBaseUrl);
+    const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl, ignoreDependencies);
+    const referencedSchemas = internalDependencies && "schema" in internalDependencies
+      ? Object.fromEntries(internalDependencies.schema.map(schema => [
+        `schemas.${schema.path.split('.').map(s => toPascalCase(s)).join('.')}`,
+        { 'x-poly-ref': { path: schema.path } }
+      ]))
+      : null;
+    const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]), name, referencedSchemas);
 
     if (server) {
       shell.echo(
@@ -108,7 +115,7 @@ export const addOrUpdateCustomFunction = async (
         visibility,
         typeSchemas,
         externalDependencies,
-        internalDependencies,
+        ignoreDependencies ? undefined : internalDependencies,
         other,
         executionApiKey,
       );
@@ -145,7 +152,7 @@ export const addOrUpdateCustomFunction = async (
         visibility,
         typeSchemas,
         externalDependencies,
-        internalDependencies,
+        ignoreDependencies ? undefined : internalDependencies,
       );
       shell.echo(chalk.green('DONE'));
       shell.echo(`Client Function ID: ${customFunction.id}`);

@@ -4,6 +4,7 @@ import shell from 'shelljs';
 import ts from 'typescript';
 import path from 'path';
 import { createGenerator } from 'ts-json-schema-generator';
+import { toPascalCase } from '@guanghechen/helper-string';
 import {
   DeployableRecord,
   DeployableTsTypeToName,
@@ -17,7 +18,6 @@ import { getCachedSpecs, getPolyLibPath, writeCachedSpecs } from './utils';
 import { DEFAULT_POLY_PATH } from './constants';
 import { Specification } from './types';
 import { getSpecs } from './api';
-import { toPascalCase } from '@guanghechen/helper-string';
 
 // NodeJS built-in libraries + polyapi
 // https://www.w3schools.com/nodejs/ref_modules.asp
@@ -85,11 +85,19 @@ const loadTsSourceFile = (filePath: string): ts.SourceFile => {
 
 let fetchedSpecs = false;
 
+type InternalDependencyReference = {
+  id: string;
+  path: string;
+  tenantName?: string;
+  environmentName?: string;
+}
+
 export const getDependencies = async (
   code: string,
   fileName: string,
   baseUrl: string | undefined,
-) => {
+  ignoreDependencies?: boolean,
+): Promise<[external: undefined | Record<string, string>, internal: undefined | Record<string, InternalDependencyReference[]>]> => {
   const importedLibraries = new Set<string>();
   const internalReferences = new Set<string>();
   let polyImportIdentifier: string | null = null;
@@ -328,8 +336,8 @@ export const getDependencies = async (
   const dependencies = Array.from(importedLibraries).filter(
     (library) => !EXCLUDED_REQUIREMENTS.includes(library),
   );
-  const externalDependencies = {};
-  const internalDependencies = {};
+  const externalDependencies: Record<string, string> = {};
+  const internalDependencies: Record<string, InternalDependencyReference[]> = {};
 
   // Finalize any external dependencies
   if (dependencies.length) {
@@ -342,10 +350,11 @@ export const getDependencies = async (
       );
       packageJson = JSON.parse(packageJson);
     } catch (error) {
-      shell.echo(
-        chalk.yellow('\nWarning:'),
-        'Failed to parse package.json file in order to read dependencies, there could be issues with some dependencies at the time of deploying the server function. Rerun command with \'--ignore-dependencies\' to skip parsing dependencies.',
-      );
+      if (!ignoreDependencies)
+        shell.echo(
+          chalk.yellow('\nWarning:'),
+          'Failed to parse package.json file in order to read dependencies, there could be issues with some dependencies at the time of deploying the server function. Rerun command with \'--ignore-dependencies\' to skip parsing dependencies.',
+        );
     }
 
     const packageJsonDependencies = packageJson.dependencies || {};
@@ -442,7 +451,7 @@ export const getDependencies = async (
       findReferencedSpecs(toFind);
     }
 
-    if (missing.length) {
+    if (missing.length && !ignoreDependencies) {
       throw new Error(`Cannot resolve all poly resources referenced within function.\n\nMissing:\n${missing.map(n => `  '${n}'`).join('\n')}\n\nRerun command with '--ignore-dependencies' to skip resolving dependencies.`)
     }
   }
@@ -692,7 +701,13 @@ const parseDeployableFunction = async (
     polyConfig.description = functionDetails.types.description || '';
   }
   const [externalDependencies, internalDependencies] = await getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl);
-  const typeSchemas = generateTypeSchemas(sourceFile.fileName, DeployableTypeEntries.map(d => d[0]), polyConfig.name);
+  const referencedSchemas = internalDependencies && "schema" in internalDependencies
+    ? Object.fromEntries(internalDependencies.schema.map(schema => [
+      `schemas.${schema.path.split('.').map(s => toPascalCase(s)).join('.')}`,
+      { 'x-poly-ref': { path: schema.path } }
+    ]))
+    : null;
+  const typeSchemas = generateTypeSchemas(sourceFile.fileName, DeployableTypeEntries.map(d => d[0]), polyConfig.name, referencedSchemas);
   return {
     ...polyConfig,
     ...functionDetails,
@@ -989,6 +1004,7 @@ export const generateTypeSchemas = (
   filePath: string,
   ignoredTypeNames: string[] = [],
   functionName?: string,
+  referencedSchemas: Record<string, any> | null = null,
 ): Record<string, any> => {
   const tsconfigPath = path.resolve('tsconfig.json');
   // Use provided function name or default to filename
@@ -1006,6 +1022,10 @@ export const generateTypeSchemas = (
 
   for (const typeName of typeNames) {
     if (ignoredTypeNames.includes(typeName)) continue;
+    if (referencedSchemas[typeName]) {
+      output[typeName] = referencedSchemas[typeName];
+      continue;
+    }
 
     try {
       const generator = createGenerator({
