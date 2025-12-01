@@ -80,7 +80,7 @@ export const addOrUpdateCustomFunction = async (
     }
 
     const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]), name);
-    const [externalDependencies, internalDependencies] = ignoreDependencies ? [undefined, undefined] : await getDependencies(code, file, tsConfigBaseUrl);
+    const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl, ignoreDependencies);
 
     if (server) {
       shell.echo(
