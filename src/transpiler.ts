@@ -96,7 +96,7 @@ export const getDependencies = async (
   code: string,
   fileName: string,
   baseUrl: string | undefined,
-  ignoreDependencies?: boolean,
+  ignoreDependencies: boolean,
 ): Promise<[external: undefined | Record<string, string>, internal: undefined | Record<string, InternalDependencyReference[]>]> => {
   const importedLibraries = new Set<string>();
   const internalReferences = new Set<string>();
@@ -173,7 +173,7 @@ export const getDependencies = async (
                 const moduleName = (node.moduleSpecifier as ts.StringLiteral).text;
 
                 // Capture poly imports
-                if (moduleName === "polyapi" && node.importClause) {
+                if (!ignoreDependencies && moduleName === "polyapi" && node.importClause) {
                   // Get name of polyapi default import if defined
                   if (node.importClause.name) {
                     polyImportIdentifier = `${node.importClause.name.text}.`;
@@ -225,7 +225,7 @@ export const getDependencies = async (
 
 
               // Pull out internal dependencies
-              if (lookForInternalDependencies) {
+              if (!ignoreDependencies && lookForInternalDependencies) {
                 // Track assignments of poly imports to follow aliases
                 if (ts.isVariableDeclaration(node) && node.initializer) {
                   const initializer = unwrapExpression(node.initializer);
@@ -316,7 +316,7 @@ export const getDependencies = async (
               }
 
               // Capture type references
-              if (schemasImportIdentifier && ts.isTypeReferenceNode(node)) {
+              if (!ignoreDependencies && schemasImportIdentifier && ts.isTypeReferenceNode(node)) {
                 const path = flattenTypeName(node.typeName);
                 if (path.startsWith(schemasImportIdentifier)) {
                   internalReferences.add(path);
@@ -350,11 +350,10 @@ export const getDependencies = async (
       );
       packageJson = JSON.parse(packageJson);
     } catch (error) {
-      if (!ignoreDependencies)
-        shell.echo(
-          chalk.yellow('\nWarning:'),
-          'Failed to parse package.json file in order to read dependencies, there could be issues with some dependencies at the time of deploying the server function. Rerun command with \'--ignore-dependencies\' to skip parsing dependencies.',
-        );
+      shell.echo(
+        chalk.yellow('\nWarning:'),
+        'Failed to parse package.json file in order to read dependencies, there could be issues with some dependencies at the time of deploying the server function.',
+      );
     }
 
     const packageJsonDependencies = packageJson.dependencies || {};
@@ -456,7 +455,7 @@ export const getDependencies = async (
     }
   }
 
-  return [dependencies.length ? externalDependencies : undefined, internalReferences.size ? internalDependencies : undefined];
+  return [dependencies.length ? externalDependencies : undefined, internalReferences.size && !ignoreDependencies ? internalDependencies : undefined];
 };
 
 export const parseDeployComment = (comment: string): Deployment => {
@@ -700,7 +699,8 @@ const parseDeployableFunction = async (
   } else {
     polyConfig.description = functionDetails.types.description || '';
   }
-  const [externalDependencies, internalDependencies] = await getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl);
+  // TODO: Remove final argument setting ignoreDependencies to true once we have the kinks worked out dependency tracking
+  const [externalDependencies, internalDependencies] = await getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl, true);
   const referencedSchemas = internalDependencies && "schema" in internalDependencies
     ? Object.fromEntries(internalDependencies.schema.map(schema => [
       `schemas.${schema.path.split('.').map(s => toPascalCase(s)).join('.')}`,

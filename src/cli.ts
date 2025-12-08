@@ -247,8 +247,9 @@ void yargs
             type: 'string',
           })
           .option('ignore-dependencies', {
-            describe: 'Skip parsing internal and external dependencies referenced within function. It\'s best not to use this option if you can help it.',
+            describe: 'Skip parsing internal dependencies referenced within function.',
             type: 'boolean',
+            default: true // TODO: Remove me once we have the internal dependency tracking kinks worked out!
           }),
       async ({
         name,
