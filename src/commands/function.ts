@@ -114,8 +114,8 @@ export const addOrUpdateCustomFunction = async (
         code,
         visibility,
         typeSchemas,
-        externalDependencies,
-        ignoreDependencies ? undefined : internalDependencies,
+        externalDependencies || null,
+        internalDependencies || null,
         other,
         executionApiKey,
       );
@@ -151,8 +151,8 @@ export const addOrUpdateCustomFunction = async (
         code,
         visibility,
         typeSchemas,
-        externalDependencies,
-        ignoreDependencies ? undefined : internalDependencies,
+        externalDependencies || null,
+        internalDependencies || null,
       );
       shell.echo(chalk.green('DONE'));
       shell.echo(`Client Function ID: ${customFunction.id}`);
