@@ -77,11 +77,11 @@ interface AuthData {
   canSwitchEnvironments: boolean;
   createdAt: Date;
   expiresAt: Date | null;
-  tenant: schemas.Tenant;
-  environment: schemas.Environment;
-  application: schemas.Application | null;
-  user: schemas.User | null;
-  permissions: schemas.Permissions;
+  tenant: poly.Oob.Polyapi.Tenant.Get.ReturnType;
+  environment: poly.Oob.Polyapi.Environments.Get.ReturnType;
+  application: poly.Oob.Polyapi.Applications.Get.ReturnType | null;
+  user: poly.Oob.Polyapi.Users.Get.ReturnType | null;
+  permissions: poly.Oob.Polyapi.PermissionPolicies.Get.ReturnType;
   claims: Record<string, any>;
 }
 
