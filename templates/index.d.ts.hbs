@@ -69,6 +69,22 @@ export const tabi: tabi.Tabi;
  */
 export type schemas = schemas.Schemas
 
+interface AuthData {
+  apiKeyId: string;
+  apiKeyName: string;
+  ssoUserId: string | null;
+  identityProviderId: string | null;
+  canSwitchEnvironments: boolean;
+  createdAt: Date;
+  expiresAt: Date | null;
+  tenant: poly.Oob.Polyapi.Tenant.Get.ReturnType;
+  environment: poly.Oob.Polyapi.Environments.Get.ReturnType;
+  application: poly.Oob.Polyapi.Applications.Get.ReturnType | null;
+  user: poly.Oob.Polyapi.Users.Get.ReturnType | null;
+  permissions: poly.Oob.Polyapi.PermissionPolicies.Get.ReturnType;
+  claims: Record<string, any>;
+}
+
 interface PolyCustom {
   readonly executionId?: string;
   executionApiKey: string | undefined | null;
@@ -76,5 +92,6 @@ interface PolyCustom {
   responseStatusCode: number;
   responseContentType: string;
   responseHeaders: Record<string, string | string[]>;
+  authData: Partial<AuthData>;
 }
 export const polyCustom: PolyCustom;
