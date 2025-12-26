@@ -72,7 +72,7 @@
     "ts-json-schema-generator": "2.4.0",
     "typescript": "5.1.6",
     "uuid": "9.0.0",
-    "validator": "13.11.0",
+    "validator": "13.15.22",
     "yargs": "17.7.1"
   },
   "overrides": {
