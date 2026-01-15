@@ -77,11 +77,183 @@ interface AuthData {
   canSwitchEnvironments: boolean;
   createdAt: Date;
   expiresAt: Date | null;
-  tenant: poly.Oob.Polyapi.Tenant.Get.ReturnType;
-  environment: poly.Oob.Polyapi.Environments.Get.ReturnType;
-  application: poly.Oob.Polyapi.Applications.Get.ReturnType | null;
-  user: poly.Oob.Polyapi.Users.Get.ReturnType | null;
-  permissions: poly.Oob.Polyapi.PermissionPolicies.Get.ReturnType;
+  tenant: {
+    id: string;
+    name: string;
+    email: string;
+    ssoId: string;
+    publicVisibilityAllowed: boolean;
+    tierId: string;
+    publicNamespace: string;
+    enabled: boolean;
+    identityProviders: {
+      [k: string]: unknown;
+    }[];
+    [k: string]: unknown;
+  };
+  environment: {
+    id: string;
+    name: string;
+    context: string;
+    contextName: string;
+    description: string;
+    subdomain: string;
+    logsDefault: boolean;
+    metricsEnabled: boolean;
+  };
+  application: {
+    id: string;
+    name: string;
+    subpath: string;
+    description: string;
+    visibility: 'ENVIRONMENT' | 'TENANT' | 'PUBLIC';
+    config: {
+      name: string;
+      subpath?: string;
+      icon?: string;
+      collections: {
+        id: string;
+        name: string;
+        properties: {};
+        list: {
+          propertyMapping: {
+            id: string;
+            name: string;
+            description: string;
+          };
+          function: {
+            id?: string;
+            path?: string;
+            type: {};
+            arguments?: {};
+          };
+        };
+        get: {
+          function: {
+            id?: string;
+            path?: string;
+            type: {};
+            arguments?: {};
+          };
+        };
+        create: {
+          function: {
+            id?: string;
+            path?: string;
+            type: {};
+            arguments?: {};
+          };
+        };
+        update: {
+          function: {
+            id?: string;
+            path?: string;
+            type: {};
+            arguments?: {};
+          };
+        };
+        delete: {
+          function: {
+            id?: string;
+            path?: string;
+            type: {};
+            arguments?: {};
+          };
+        };
+      }[];
+      login?: {
+        logoSrc?: string;
+        title?: string;
+        additionalInfo?: string[];
+      };
+      signUp?: {
+        logoSrc?: string;
+        title: string;
+        steps: {
+          name?: string;
+          title?: string;
+          subtitle: string;
+          fields?: {
+            name: string;
+            type: 'text' | 'checkbox' | 'enum';
+            label?: string;
+            labelHtml?: string;
+            placeholder?: string;
+            required?: boolean;
+            requiredError?: string;
+            helperText?: string;
+            values?: {
+              name: string;
+              value: string;
+              readOnly?: boolean;
+            }[];
+          }[];
+          submit: {
+            label: string;
+            function: {
+              id?: string;
+              path?: string;
+              type: {};
+              arguments?: {};
+            };
+            redirectTo?: string;
+          };
+        }[];
+      };
+    };
+  };
+  user: {
+    id: string;
+    name: string;
+    ssoId: string;
+    role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+  } | null;
+  permissions: {
+    id: string;
+    createdAt: string;
+    name: string;
+    permissions: {
+      execute?: boolean;
+      libraryGenerate?: boolean;
+      useApplications?: boolean;
+      manageApiFunctions?: boolean;
+      manageWebhooks?: boolean;
+      manageTriggers?: boolean;
+      customDev?: boolean;
+      manageGraphQLSubscriptions?: boolean;
+      manageApplications?: boolean;
+      manageSchemas?: boolean;
+      authConfig?: boolean;
+      manageSnippets?: boolean;
+      manageVariables?: boolean;
+      manageSecretVariables?: boolean;
+      manageJobs?: boolean;
+      manageUsers?: boolean;
+      manageTenant?: boolean;
+      manageTables?: boolean;
+      queryTables?: boolean;
+      [k: string]: unknown;
+    };
+    policyEnvironments: {
+      id: string;
+      createdAt: string;
+      environmentId: string;
+      [k: string]: unknown;
+    }[];
+    policyUsers: {
+      id: string;
+      createdAt: string;
+      userId: string;
+      [k: string]: unknown;
+    }[];
+    policyIdentityProviders: {
+      id: string;
+      createdAt: string;
+      identityProviderId: string;
+      [k: string]: unknown;
+    }[];
+    [k: string]: unknown;
+  };
   claims: Record<string, any>;
 }
 
