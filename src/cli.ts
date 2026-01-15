@@ -168,8 +168,12 @@ void yargs
           describe: 'Custom path to .poly directory (internal use only)',
           default: DEFAULT_POLY_PATH,
           type: 'string',
-        }),
-    async ({ dryRun, customPath = DEFAULT_POLY_PATH }) => {
+        })
+        .option('execution-api-key', {
+            describe: 'Optional API key for server functions',
+            type: 'string',
+          }),
+    async ({ dryRun, executionApiKey, customPath = DEFAULT_POLY_PATH }) => {
       if (!checkPolyConfig(customPath)) {
         return shell.echo(
           'Poly is not configured. Please run `poly setup` to configure it.',
@@ -186,7 +190,7 @@ void yargs
       );
       shell.echo('Syncing Poly deployments...');
       const { syncDeployables } = await import('./commands/sync');
-      await syncDeployables(dryRun);
+      await syncDeployables(dryRun, executionApiKey);
       shell.echo('Poly deployments synced.');
     },
   )
