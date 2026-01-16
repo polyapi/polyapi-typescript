@@ -75,8 +75,8 @@ interface AuthData {
   ssoUserId: string | null;
   identityProviderId: string | null;
   canSwitchEnvironments: boolean;
-  createdAt: Date;
-  expiresAt: Date | null;
+  createdAt: string;
+  expiresAt: string | null;
   tenant: {
     id: string;
     name: string;
@@ -86,10 +86,6 @@ interface AuthData {
     tierId: string;
     publicNamespace: string;
     enabled: boolean;
-    identityProviders: {
-      [k: string]: unknown;
-    }[];
-    [k: string]: unknown;
   };
   environment: {
     id: string;
@@ -111,95 +107,9 @@ interface AuthData {
       name: string;
       subpath?: string;
       icon?: string;
-      collections: {
-        id: string;
-        name: string;
-        properties: {};
-        list: {
-          propertyMapping: {
-            id: string;
-            name: string;
-            description: string;
-          };
-          function: {
-            id?: string;
-            path?: string;
-            type: {};
-            arguments?: {};
-          };
-        };
-        get: {
-          function: {
-            id?: string;
-            path?: string;
-            type: {};
-            arguments?: {};
-          };
-        };
-        create: {
-          function: {
-            id?: string;
-            path?: string;
-            type: {};
-            arguments?: {};
-          };
-        };
-        update: {
-          function: {
-            id?: string;
-            path?: string;
-            type: {};
-            arguments?: {};
-          };
-        };
-        delete: {
-          function: {
-            id?: string;
-            path?: string;
-            type: {};
-            arguments?: {};
-          };
-        };
-      }[];
-      login?: {
-        logoSrc?: string;
-        title?: string;
-        additionalInfo?: string[];
-      };
-      signUp?: {
-        logoSrc?: string;
-        title: string;
-        steps: {
-          name?: string;
-          title?: string;
-          subtitle: string;
-          fields?: {
-            name: string;
-            type: 'text' | 'checkbox' | 'enum';
-            label?: string;
-            labelHtml?: string;
-            placeholder?: string;
-            required?: boolean;
-            requiredError?: string;
-            helperText?: string;
-            values?: {
-              name: string;
-              value: string;
-              readOnly?: boolean;
-            }[];
-          }[];
-          submit: {
-            label: string;
-            function: {
-              id?: string;
-              path?: string;
-              type: {};
-              arguments?: {};
-            };
-            redirectTo?: string;
-          };
-        }[];
-      };
+      collections: Record<string, unknown>[];
+      login?: Record<string, unknown>;
+      signUp?: Record<string, unknown>;
     };
   };
   user: {
@@ -208,51 +118,27 @@ interface AuthData {
     ssoId: string;
     role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
   } | null;
-  permissions: {
-    id: string;
-    createdAt: string;
-    name: string;
-    permissions: {
-      execute?: boolean;
-      libraryGenerate?: boolean;
-      useApplications?: boolean;
-      manageApiFunctions?: boolean;
-      manageWebhooks?: boolean;
-      manageTriggers?: boolean;
-      customDev?: boolean;
-      manageGraphQLSubscriptions?: boolean;
-      manageApplications?: boolean;
-      manageSchemas?: boolean;
-      authConfig?: boolean;
-      manageSnippets?: boolean;
-      manageVariables?: boolean;
-      manageSecretVariables?: boolean;
-      manageJobs?: boolean;
-      manageUsers?: boolean;
-      manageTenant?: boolean;
-      manageTables?: boolean;
-      queryTables?: boolean;
-      [k: string]: unknown;
-    };
-    policyEnvironments: {
-      id: string;
-      createdAt: string;
-      environmentId: string;
-      [k: string]: unknown;
-    }[];
-    policyUsers: {
-      id: string;
-      createdAt: string;
-      userId: string;
-      [k: string]: unknown;
-    }[];
-    policyIdentityProviders: {
-      id: string;
-      createdAt: string;
-      identityProviderId: string;
-      [k: string]: unknown;
-    }[];
-    [k: string]: unknown;
+  permissions: {  
+    execute?: boolean;  
+    libraryGenerate?: boolean;  
+    useApplications?: boolean;  
+    manageApiFunctions?: boolean;  
+    manageWebhooks?: boolean;  
+    manageTriggers?: boolean;  
+    customDev?: boolean;  
+    manageGraphQLSubscriptions?: boolean;  
+    manageApplications?: boolean;  
+    manageSchemas?: boolean;  
+    authConfig?: boolean;  
+    manageSnippets?: boolean;  
+    manageVariables?: boolean;  
+    manageSecretVariables?: boolean;  
+    manageJobs?: boolean;  
+    manageUsers?: boolean;  
+    manageTenant?: boolean;  
+    manageTables?: boolean;  
+    queryTables?: boolean;  
+    [k: string]: unknown;  
   };
   claims: Record<string, any>;
 }
