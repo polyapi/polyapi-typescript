@@ -111,7 +111,7 @@ interface AuthData {
       login?: Record<string, unknown>;
       signUp?: Record<string, unknown>;
     };
-  };
+  } | null;
   user: {
     id: string;
     name: string;
