@@ -723,10 +723,13 @@ const replaceJsonSchemasWithPolyAPISchemas = (
   mapping: Map<string, string>,
 ): void => {
   if (schema['$ref'] && mapping.has(schema['$ref'])) {
-    schema['x-poly-ref'] = {
-      path: mapping.get(schema['$ref']),
-    };
-    delete schema['$ref'];
+    const ref = schema['ref'] && typeof schema['ref'] === 'string' ? decodeURI(schema['ref']) : '';
+    if (ref && mapping.has(ref)) {
+      schema['x-poly-ref'] = {
+        path: mapping.get(ref),
+      };
+      delete schema['$ref'];
+    }
   }
   let toSearch = [];
   if (schema.schemas) toSearch = toSearch.concat(Object.values(schema.schemas));
