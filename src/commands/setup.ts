@@ -24,7 +24,7 @@ const setup = async (
 ) => {
   try {
     loadConfig(polyPath);
-    process.env.POLY_API_KEY = process.env.POLY_API_KEY || apiVersion;
+    process.env.POLY_API_VERSION = process.env.POLY_API_VERSION || apiVersion;
 
     const isNonInteractive = baseUrl && apiKey;
     baseUrl = validateBaseUrl(baseUrl);
