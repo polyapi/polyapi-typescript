@@ -54,8 +54,8 @@ describe('checkForClientVersionUpdate', () => {
     process.env = originalEnv;
   });
 
-  test('updates when newer tenant tag is available and user confirms', async () => {
-    process.env.POLY_TENANT_TAG = 'na1';
+  test('updates when newer instance tag is available and user confirms', async () => {
+    process.env.POLY_INSTANCE_TAG = 'na1';
     execSyncMock.mockReturnValue(
       JSON.stringify({ na1: '0.25.17', latest: '0.25.17' }),
     );
@@ -71,7 +71,7 @@ describe('checkForClientVersionUpdate', () => {
   });
 
   test('does not prompt when current version is up to date', async () => {
-    process.env.POLY_TENANT_TAG = 'na1';
+    process.env.POLY_INSTANCE_TAG = 'na1';
     mockPackageVersion('0.25.17');
     execSyncMock.mockReturnValue(
       JSON.stringify({ na1: '0.25.17' }),
@@ -84,7 +84,7 @@ describe('checkForClientVersionUpdate', () => {
     expect(shellExecMock).not.toHaveBeenCalled();
   });
 
-  test('derives tenant tag from base URL and continues when user declines', async () => {
+  test('derives instance tag from base URL and continues when user declines', async () => {
     loadConfigMock.mockReturnValue({
       POLY_API_BASE_URL: 'https://na2.polyapi.io',
     } as any);
@@ -103,7 +103,7 @@ describe('checkForClientVersionUpdate', () => {
     );
   });
 
-  test('skips check when tenant tag cannot be resolved', async () => {
+  test('skips check when instance tag cannot be resolved', async () => {
     loadConfigMock.mockReturnValue({
       POLY_API_BASE_URL: 'https://unknown.polyapi.io',
     } as any);

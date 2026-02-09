@@ -41,7 +41,7 @@ const getDistTags = (): DistTags | undefined => {
   }
 };
 
-const getTenantTagFromBaseUrl = (baseUrl?: string): string | undefined => {
+const getInstanceTagFromBaseUrl = (baseUrl?: string): string | undefined => {
   if (!baseUrl) return undefined;
 
   try {
@@ -81,10 +81,10 @@ export const checkForClientVersionUpdate = async (polyPath: string) => {
   const config = loadConfig(polyPath) ?? {};
   const baseUrl =
     config.POLY_API_BASE_URL || process.env.POLY_API_BASE_URL || '';
-  const tenantTag =
-    process.env.POLY_TENANT_TAG || getTenantTagFromBaseUrl(baseUrl);
+  const instanceTag =
+    process.env.POLY_INSTANCE_TAG || getInstanceTagFromBaseUrl(baseUrl);
 
-  if (!tenantTag) return;
+  if (!instanceTag) return;
 
   const currentVersion = getClientVersion();
   const normalizedCurrent = normalizeVersion(currentVersion);
@@ -93,19 +93,19 @@ export const checkForClientVersionUpdate = async (polyPath: string) => {
   const distTags = getDistTags();
   if (!distTags) return;
 
-  const availableVersion = distTags[tenantTag];
+  const availableVersion = distTags[instanceTag];
   const normalizedAvailable = normalizeVersion(availableVersion);
   if (!normalizedAvailable) return;
 
   if (!semver.gt(normalizedAvailable, normalizedCurrent)) return;
 
   const shouldUpdate = await confirm({
-    message: `A newer Poly client version is available for tenant "${tenantTag}". Current: ${currentVersion}, available: ${availableVersion}. Update now?`,
+    message: `A newer Poly client version is available for instance "${instanceTag}". Current: ${currentVersion}, available: ${availableVersion}. Update now?`,
     default: true,
   });
 
   if (shouldUpdate) {
-    await updateClient(tenantTag);
+    await updateClient(instanceTag);
   } else {
     shell.echo(
       chalk.yellow(
