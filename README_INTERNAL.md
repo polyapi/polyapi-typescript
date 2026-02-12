@@ -36,7 +36,13 @@ https://github.com/polyapi/poly-alpha/tree/develop/packages/client
 
 Let's make a tiny tweak to the `README.md`. Just so we can make sure we are installing our local changes.
 
-Add the line "HELLO WORLD" to the end of `README.md`
+Add the line "HELLO WORLD" to the end of README.md and bump the PolyAPI's version in package.json so it is higher than the currently published version (e.g., from 1.0.0 to 1.0.1).
+
+Build the PolyAPI Typescript library
+
+```bash
+npm run build
+```
 
 Then run this command to publish to your local Verdaccio instance:
 
