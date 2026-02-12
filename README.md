@@ -8,7 +8,7 @@ Make sure you have set your npm registry in .npmrc file.
 
 Install the package with `npm install polyapi`.
 
-Run `npx poly generate` to set up your Poly connection (only for the first time) and generate Poly functions.
+Run `npx poly setup` to set up your Poly connection (only for the first time) and generate Poly functions.
 Whenever you update your Poly functions, run `npx poly generate` again to update your local functions.
 
 You will need an API Key to to access Poly. Please head to https://polyapi.io to request an API key!
@@ -76,4 +76,3 @@ unregister();
 ```
 
 Happy hacking!
-.
