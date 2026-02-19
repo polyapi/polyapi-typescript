@@ -6,8 +6,7 @@ export interface AuthData {
     id: string;
   };
 
-  // Returned by /auth in newer API versions
-  permissions?: string[] | Record<string, boolean>;
+  permissions?: Record<string, boolean>;
 }
 
 export interface SignUpDto {
