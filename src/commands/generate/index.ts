@@ -163,7 +163,10 @@ const generateJSFiles = async (
     'custom functions',
   );
   await tryAsync(generateWebhooksJSFiles(libPath, webhookHandles), 'webhooks');
-  await tryAsync(generateGraphQLSubscriptionJSFiles(libPath, gqlSubscriptions), 'GraphQL subscriptions');
+  await tryAsync(
+    generateGraphQLSubscriptionJSFiles(libPath, gqlSubscriptions),
+    'GraphQL subscriptions',
+  );
   await tryAsync(
     generateAuthFunctionJSFiles(libPath, authFunctions),
     'auth functions',
@@ -176,10 +179,7 @@ const generateJSFiles = async (
     generateServerVariableJSFiles(libPath, serverVariables),
     'variables',
   );
-  await tryAsync(
-    generateTableJSFiles(libPath, tables),
-    'tables',
-  );
+  await tryAsync(generateTableJSFiles(libPath, tables), 'tables');
 
   return customFnCodeGenerationErrors;
 };
@@ -215,7 +215,10 @@ const generateAxiosJSFile = async (libPath: string) => {
 };
 
 const generateErrorHandlerFile = async (libPath: string) => {
-  fs.copyFileSync(templateUrl('error-handler.js'), `${libPath}/error-handler.js`);
+  fs.copyFileSync(
+    templateUrl('error-handler.js'),
+    `${libPath}/error-handler.js`,
+  );
 };
 
 const generateApiFunctionJSFiles = async (
@@ -287,14 +290,19 @@ const generateWebhooksJSFiles = async (
       apiKey: getApiKey(),
     }),
   );
-  fs.copyFileSync(templateUrl('webhooks-index.js'), `${libPath}/webhooks/index.js`);
+  fs.copyFileSync(
+    templateUrl('webhooks-index.js'),
+    `${libPath}/webhooks/index.js`,
+  );
 };
 
 const generateGraphQLSubscriptionJSFiles = async (
   libPath: string,
   specifications: GraphQLSubscriptionSpecification[],
 ) => {
-  const template = handlebars.compile(loadTemplate('graphql-subscriptions.js.hbs'));
+  const template = handlebars.compile(
+    loadTemplate('graphql-subscriptions.js.hbs'),
+  );
   fs.writeFileSync(
     `${libPath}/subscriptions/subscriptions.js`,
     template({
@@ -302,8 +310,11 @@ const generateGraphQLSubscriptionJSFiles = async (
       apiKey: getApiKey(),
     }),
   );
-  fs.copyFileSync(templateUrl('graphql-subscriptions-index.js'), `${libPath}/subscriptions/index.js`);
-}
+  fs.copyFileSync(
+    templateUrl('graphql-subscriptions-index.js'),
+    `${libPath}/subscriptions/index.js`,
+  );
+};
 
 const generateServerFunctionJSFiles = async (
   libPath: string,
@@ -358,7 +369,9 @@ const generateTableJSFiles = async (
   libPath: string,
   specifications: TableSpecification[],
 ) => {
-  const tablesJSTemplate = handlebars.compile(loadTemplate('tabi/tables.js.hbs'));
+  const tablesJSTemplate = handlebars.compile(
+    loadTemplate('tabi/tables.js.hbs'),
+  );
   fs.writeFileSync(
     `${libPath}/tabi/tables.js`,
     tablesJSTemplate({ specifications }),
@@ -664,7 +677,9 @@ export const generateSpecs = async (
       await tryAsync(
         generateTableTSDeclarationFiles(
           libPath,
-          filteredSpecs.filter((s) => s.type === 'table') as TableSpecification[],
+          filteredSpecs.filter(
+            (s) => s.type === 'table',
+          ) as TableSpecification[],
         ),
         'table types',
       );

@@ -64,11 +64,11 @@ const axios = Axios.create({
   httpAgent: httpProxy ? new HttpProxyAgent(httpProxy) : undefined,
   httpsAgent: httpsProxy
     ? new HttpsProxyAgent(httpsProxy, {
-      rejectUnauthorized: !isDevEnv,
-    })
+        rejectUnauthorized: !isDevEnv,
+      })
     : isDevEnv
-      ? new https.Agent({ rejectUnauthorized: false })
-      : undefined,
+    ? new https.Agent({ rejectUnauthorized: false })
+    : undefined,
   proxy: false,
 });
 
@@ -99,7 +99,10 @@ export const createOrUpdateServerFunction = async (
   visibility: string,
   typeSchemas: Record<string, any>,
   externalDependencies: Record<string, string> | null,
-  internalDependencies: Record<string, Array<{ path: string; id: string }>> | null,
+  internalDependencies: Record<
+    string,
+    Array<{ path: string; id: string }> | string[]
+  > | null,
   other?: Record<string, any>,
   executionApiKey?: string,
 ) => {
@@ -114,7 +117,9 @@ export const createOrUpdateServerFunction = async (
         visibility,
         typeSchemas,
         // Keeping backwards compatability on requirements
-        requirements: externalDependencies ? Object.keys(externalDependencies) : null,
+        requirements: externalDependencies
+          ? Object.keys(externalDependencies)
+          : null,
         externalDependencies,
         internalDependencies,
         executionApiKey,
@@ -147,11 +152,13 @@ export const getServerFunctionById = async (id: string) => {
 export const getServerFunctionByName = async (
   context: string,
   name: string,
-  detail = false
+  detail = false,
 ) => {
   const basic = (
     await axios.get<any, AxiosResponse<{ results: FunctionBasicDto[] }>>(
-      `${getApiBaseURL()}/functions/server?search=${encodeURIComponent(`${context}${context && name ? '.' : ''}${name}`)}`,
+      `${getApiBaseURL()}/functions/server?search=${encodeURIComponent(
+        `${context}${context && name ? '.' : ''}${name}`,
+      )}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -182,7 +189,10 @@ export const createOrUpdateClientFunction = async (
   visibility: string,
   typeSchemas: Record<string, any>,
   externalDependencies: Record<string, string> | null,
-  internalDependencies: Record<string, Array<{ path: string; id: string }>> | null,
+  internalDependencies: Record<
+    string,
+    Array<{ path: string; id: string }> | string[]
+  > | null,
   other?: Record<string, any>,
 ) => {
   return (
@@ -230,7 +240,9 @@ export const getClientFunctionByName = async (
 ) => {
   const basic = (
     await axios.get<any, AxiosResponse<{ results: FunctionBasicDto[] }>>(
-      `${getApiBaseURL()}/functions/client?search=${encodeURIComponent(`${context}${context && name ? '.' : ''}${name}`)}`,
+      `${getApiBaseURL()}/functions/client?search=${encodeURIComponent(
+        `${context}${context && name ? '.' : ''}${name}`,
+      )}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -545,7 +557,11 @@ export const getWebhookById = async (id: string) => {
   ).data;
 };
 
-export const getWebhookByName = async (context: string, name: string, detail = false) => {
+export const getWebhookByName = async (
+  context: string,
+  name: string,
+  detail = false,
+) => {
   const basic = (
     await axios.get<any, AxiosResponse<WebhookHandleBasicDto[]>>(
       `${getApiBaseURL()}/webhooks`,

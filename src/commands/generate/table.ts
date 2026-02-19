@@ -9,7 +9,10 @@ import { set } from 'lodash';
 import { JsonSchema, printSchemaAsType, ws } from './schemaTypes';
 import { setGenerationErrors } from './types';
 
-type TableTree = Record<string, TableSpecification | Record<string, TableSpecification>>;
+type TableTree = Record<
+  string,
+  TableSpecification | Record<string, TableSpecification>
+>;
 
 type TableRoot = {
   path: string;
@@ -54,7 +57,14 @@ const buildTableTree = (specs: TableSpecification[]): TableRoot[] => {
       schemas[parent].interfaces[name] = interfaceName;
       set(schemas[parent].namespaces, path, {});
     }
-    set(schemas[spec.context].namespaces, spec.contextName.split('.').map(v => toPascalCase(v)).join('.'), spec);
+    set(
+      schemas[spec.context].namespaces,
+      spec.contextName
+        .split('.')
+        .map((v) => toPascalCase(v))
+        .join('.'),
+      spec,
+    );
     schemas[spec.context].interfaces[spec.name] = spec;
     schemas[spec.context].hasTypes = true;
   }
@@ -64,7 +74,10 @@ const buildTableTree = (specs: TableSpecification[]): TableRoot[] => {
 const printTableInterface = (table: TableSpecification | string): string => {
   if (typeof table === 'string') return `${table};`;
   const _ws = ws(1);
-  const formattedName = table.contextName.split('.').map(v => toPascalCase(v)).join('.');
+  const formattedName = table.contextName
+    .split('.')
+    .map((v) => toPascalCase(v))
+    .join('.');
   return [
     '{',
     `${_ws}count(query: ${formattedName}.CountQuery): Promise<${formattedName}.CountResult>;`,
@@ -82,25 +95,29 @@ const printTableInterface = (table: TableSpecification | string): string => {
   ].join(`${EOL}${ws(2)}`);
 };
 
-const printTableNamespace = (schema: JsonSchema, name: string, depth = 1): string => {
-  return `${ws(depth)}namespace ${toPascalCase(name)} {${EOL}${
-    printSchemaAsType(schema, 'Row', depth + 1)
-  }${EOL}${EOL}${ws(depth + 1)}${
-    [
-      'type CountQuery = PolyCountQuery<Row>;',
-      'type SelectManyQuery = PolySelectManyQuery<Row>;',
-      'type SelectOneQuery = PolySelectOneQuery<Row>;',
-      'type InsertManyQuery = PolyInsertManyQuery<Row>;',
-      'type InsertOneQuery = PolyInsertOneQuery<Row>;',
-      'type UpdateQuery = PolyUpdateQuery<Row>;',
-      'type DeleteQuery = PolyDeleteQuery<Row>;',
-      'type QueryResults = PolyQueryResults<Row>;',
-      'type QueryResult = PolyQueryResult<Row>;',
-      'type DeleteResults = PolyDeleteResults;',
-      'type DeleteResult = PolyDeleteResult;',
-      'type CountResult = PolyCountResult;',
-    ].join(`${EOL}${ws(depth + 1)}`)
-  }${EOL}${ws(depth)}}`;
+const printTableNamespace = (
+  schema: JsonSchema,
+  name: string,
+  depth = 1,
+): string => {
+  return `${ws(depth)}namespace ${toPascalCase(
+    name,
+  )} {${EOL}${printSchemaAsType(schema, 'Row', depth + 1)}${EOL}${EOL}${ws(
+    depth + 1,
+  )}${[
+    'type CountQuery = PolyCountQuery<Row>;',
+    'type SelectManyQuery = PolySelectManyQuery<Row>;',
+    'type SelectOneQuery = PolySelectOneQuery<Row>;',
+    'type InsertManyQuery = PolyInsertManyQuery<Row>;',
+    'type InsertOneQuery = PolyInsertOneQuery<Row>;',
+    'type UpdateQuery = PolyUpdateQuery<Row>;',
+    'type DeleteQuery = PolyDeleteQuery<Row>;',
+    'type QueryResults = PolyQueryResults<Row>;',
+    'type QueryResult = PolyQueryResult<Row>;',
+    'type DeleteResults = PolyDeleteResults;',
+    'type DeleteResult = PolyDeleteResult;',
+    'type CountResult = PolyCountResult;',
+  ].join(`${EOL}${ws(depth + 1)}`)}${EOL}${ws(depth)}}`;
 };
 
 const printTableTreeAsTypes = (
@@ -150,16 +167,20 @@ const printTableRoot = (root: TableRoot): string => {
     result = `${result}${EOL}`;
   }
   // print the interfaces
-  result = `${result}${EOL}${ws(1)}interface ${root.interfaceName} {${
-    Object.entries(root.interfaces).map(([k, v]) => `${EOL}${ws(2)}${k}: ${printTableInterface(v)}`).join('')
-  }${EOL}${ws(1)}}`;
+  result = `${result}${EOL}${ws(1)}interface ${
+    root.interfaceName
+  } {${Object.entries(root.interfaces)
+    .map(([k, v]) => `${EOL}${ws(2)}${k}: ${printTableInterface(v)}`)
+    .join('')}${EOL}${ws(1)}}`;
 
   // close the module
   result = `${result}${EOL}}`;
   return result;
 };
 
-const printTableSpecs = (specs: TableSpecification[]): Record<string, string> => {
+const printTableSpecs = (
+  specs: TableSpecification[],
+): Record<string, string> => {
   const tables = buildTableTree(specs);
   // then print all the schema types as strings ready to be saved to disk
   const fileMap = Object.fromEntries(

@@ -5,7 +5,7 @@ import { EOL } from 'node:os';
 import { SchemaRef, SchemaSpecification } from '../../types';
 import { echoGenerationError } from '../../utils';
 import { setGenerationErrors } from './types';
-import shell from 'shelljs'
+import shell from 'shelljs';
 import chalk from 'chalk';
 
 const unsafeCharacters = /(?:^\d)|[^0-9a-zA-Z_]/gi;
@@ -284,7 +284,9 @@ const printTupleSchema: PrintSchemaFn = (
   nested,
   optional = false,
 ) => {
-  if (!Array.isArray(schema.items)) { throw new Error('schema.items should be an array to use this function'); }
+  if (!Array.isArray(schema.items)) {
+    throw new Error('schema.items should be an array to use this function');
+  }
   let result = `${printComment(
     schema.description,
     depth,
@@ -327,7 +329,9 @@ const printArraySchema: PrintSchemaFn = (
   nested,
   optional = false,
 ) => {
-  if (Array.isArray(schema.items)) { return printTupleSchema(schema, key, depth, nested, optional); }
+  if (Array.isArray(schema.items)) {
+    return printTupleSchema(schema, key, depth, nested, optional);
+  }
 
   let result = `${printComment(
     schema.description,
@@ -513,12 +517,24 @@ export const printSchemaAsType: PrintSchemaFn = (
   nested,
   optional = false,
 ): string => {
-  if (schema['x-poly-ref']) { return printPolyRefSchema(schema, key, depth, nested, optional); }
-  if (schema.const !== undefined) { return printConstSchema(schema, key, depth, nested, optional); }
-  if (Array.isArray(schema.enum) && schema.enum.length) { return printEnumSchema(schema, key, depth, nested, optional); }
-  if (Array.isArray(schema.type) && schema.type.length) { return printMultiTypeSchema(schema, key, depth, nested, optional); }
-  if (Array.isArray(schema.anyOf) && schema.anyOf.length) { return printUnionSchema(schema, key, depth, nested, optional); }
-  if (Array.isArray(schema.allOf) && schema.allOf.length) { return printIntersectionSchema(schema, key, depth, nested, optional); }
+  if (schema['x-poly-ref']) {
+    return printPolyRefSchema(schema, key, depth, nested, optional);
+  }
+  if (schema.const !== undefined) {
+    return printConstSchema(schema, key, depth, nested, optional);
+  }
+  if (Array.isArray(schema.enum) && schema.enum.length) {
+    return printEnumSchema(schema, key, depth, nested, optional);
+  }
+  if (Array.isArray(schema.type) && schema.type.length) {
+    return printMultiTypeSchema(schema, key, depth, nested, optional);
+  }
+  if (Array.isArray(schema.anyOf) && schema.anyOf.length) {
+    return printUnionSchema(schema, key, depth, nested, optional);
+  }
+  if (Array.isArray(schema.allOf) && schema.allOf.length) {
+    return printIntersectionSchema(schema, key, depth, nested, optional);
+  }
   switch (schema.type) {
     case 'object':
       return printObjectSchema(schema, key, depth, nested, optional);
@@ -638,8 +654,12 @@ const getPolySchemaRefs = (schema: JsonSchema): string[] => {
   if (schema['x-poly-ref']) return [schema['x-poly-ref'].path];
   let toSearch = [];
   if (schema.schemas) toSearch = toSearch.concat(Object.values(schema.schemas));
-  if (schema.properties) { toSearch = toSearch.concat(Object.values(schema.properties)); }
-  if (schema.patternProperties) { toSearch = toSearch.concat(Object.values(schema.patternProperties)); }
+  if (schema.properties) {
+    toSearch = toSearch.concat(Object.values(schema.properties));
+  }
+  if (schema.patternProperties) {
+    toSearch = toSearch.concat(Object.values(schema.patternProperties));
+  }
   if (schema.items) {
     if (Array.isArray(schema.items)) {
       toSearch = toSearch.concat(schema.items);
@@ -648,7 +668,9 @@ const getPolySchemaRefs = (schema: JsonSchema): string[] => {
     }
   }
   if (typeof schema.additionalItems === 'object') toSearch.push(schema.items);
-  if (typeof schema.additionalProperties === 'object') { toSearch.push(schema.additionalProperties); }
+  if (typeof schema.additionalProperties === 'object') {
+    toSearch.push(schema.additionalProperties);
+  }
   if (Array.isArray(schema.allOf)) toSearch = toSearch.concat(schema.allOf);
   if (Array.isArray(schema.anyOf)) toSearch = toSearch.concat(schema.anyOf);
   return toSearch.flatMap((s) => getPolySchemaRefs(s));
@@ -722,16 +744,24 @@ const replaceJsonSchemasWithPolyAPISchemas = (
   schema: JsonSchema,
   mapping: Map<string, string>,
 ): void => {
-  if (schema['$ref'] && mapping.has(schema['$ref'])) {
+  const ref =
+    schema['ref'] && typeof schema['ref'] === 'string'
+      ? decodeURI(schema['ref'])
+      : '';
+  if (ref && mapping.has(ref)) {
     schema['x-poly-ref'] = {
-      path: mapping.get(schema['$ref']),
+      path: mapping.get(ref),
     };
     delete schema['$ref'];
   }
   let toSearch = [];
   if (schema.schemas) toSearch = toSearch.concat(Object.values(schema.schemas));
-  if (schema.properties) { toSearch = toSearch.concat(Object.values(schema.properties)); }
-  if (schema.patternProperties) { toSearch = toSearch.concat(Object.values(schema.patternProperties)); }
+  if (schema.properties) {
+    toSearch = toSearch.concat(Object.values(schema.properties));
+  }
+  if (schema.patternProperties) {
+    toSearch = toSearch.concat(Object.values(schema.patternProperties));
+  }
   if (schema.items) {
     if (Array.isArray(schema.items)) {
       toSearch = toSearch.concat(schema.items);
@@ -740,7 +770,9 @@ const replaceJsonSchemasWithPolyAPISchemas = (
     }
   }
   if (typeof schema.additionalItems === 'object') toSearch.push(schema.items);
-  if (typeof schema.additionalProperties === 'object') { toSearch.push(schema.additionalProperties); }
+  if (typeof schema.additionalProperties === 'object') {
+    toSearch.push(schema.additionalProperties);
+  }
   if (Array.isArray(schema.allOf)) toSearch = toSearch.concat(schema.allOf);
   if (Array.isArray(schema.anyOf)) toSearch = toSearch.concat(schema.anyOf);
   for (const s of toSearch) replaceJsonSchemasWithPolyAPISchemas(s, mapping);

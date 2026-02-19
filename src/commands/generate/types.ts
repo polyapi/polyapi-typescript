@@ -446,9 +446,9 @@ const getSpecificationWithFunctionComment = (
 ) => {
   const descriptionComment = specification.description
     ? specification.description
-      .split('\n')
-      .map((line) => `* ${line}`)
-      .join('\n')
+        .split('\n')
+        .map((line) => `* ${line}`)
+        .join('\n')
     : null;
   const toArgumentComment = (arg: PropertySpecification, prefix = '') => {
     if (
@@ -489,9 +489,9 @@ const getSpecificationWithVariableComment = (
 ) => {
   const descriptionComment = specification.description
     ? specification.description
-      .split('\n')
-      .map((line) => `* ${line}`)
-      .join('\n')
+        .split('\n')
+        .map((line) => `* ${line}`)
+        .join('\n')
     : null;
   const secretComment =
     specification.variable.secrecy === 'SECRET'

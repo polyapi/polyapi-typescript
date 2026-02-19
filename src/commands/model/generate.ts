@@ -374,7 +374,10 @@ export const generateModel = async (
         hostUrlAsArgument,
       );
 
-      await processResources<(typeof specificationInputDto.functions)[number], ApiFunctionDescriptionGenerationDto>({
+      await processResources<
+        (typeof specificationInputDto.functions)[number],
+        ApiFunctionDescriptionGenerationDto
+      >({
         resources: specificationInputDto.functions,
         aiDataProcessor(resource, aiData) {
           resource.name = aiData.name;
@@ -404,7 +407,10 @@ export const generateModel = async (
         resourceName: 'function',
       });
 
-      await processResources<(typeof specificationInputDto.webhooks)[number], WebhookHandleDescriptionGenerationDto>({
+      await processResources<
+        (typeof specificationInputDto.webhooks)[number],
+        WebhookHandleDescriptionGenerationDto
+      >({
         resources: specificationInputDto.webhooks,
         aiDataProcessor(resource, aiData) {
           resource.name = aiData.name;

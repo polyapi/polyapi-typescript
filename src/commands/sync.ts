@@ -86,7 +86,9 @@ const syncDeployableAndGetId = async (deployable, code) => {
   }
   let { externalDependencies, dependencies } = deployable;
   if (Array.isArray(dependencies) && !externalDependencies) {
-    externalDependencies = Object.fromEntries(dependencies.map(d => [d, "latest"]));
+    externalDependencies = Object.fromEntries(
+      dependencies.map((d) => [d, 'latest']),
+    );
   }
   if (deployable.type === 'server-function') {
     return (
@@ -120,31 +122,41 @@ const syncDeployableAndGetId = async (deployable, code) => {
   throw new Error(`Unsupported deployable type: '${deployable.type}'`);
 };
 
-const getDeployableFromServer = async <T = FunctionDetailsDto | WebhookHandleDto>(
+const getDeployableFromServer = async <
+  T = FunctionDetailsDto | WebhookHandleDto,
+>(
   deployable: SyncDeployment,
 ): Promise<T | null | undefined> => {
   try {
-    switch(deployable.type) {
+    switch (deployable.type) {
       case 'server-function': {
         return deployable.id
-          ? getServerFunctionById(deployable.id) as T
-          : getServerFunctionByName(deployable.context, deployable.name, true) as T;
+          ? (getServerFunctionById(deployable.id) as T)
+          : (getServerFunctionByName(
+              deployable.context,
+              deployable.name,
+              true,
+            ) as T);
       }
       case 'client-function': {
         return deployable.id
-          ? getClientFunctionById(deployable.id) as T
-          : getClientFunctionByName(deployable.context, deployable.name, true) as T;
+          ? (getClientFunctionById(deployable.id) as T)
+          : (getClientFunctionByName(
+              deployable.context,
+              deployable.name,
+              true,
+            ) as T);
       }
       case 'webhook': {
         return deployable.id
-          ? getWebhookById(deployable.id) as T
-          : getWebhookByName(deployable.context, deployable.name, true) as T;
+          ? (getWebhookById(deployable.id) as T)
+          : (getWebhookByName(deployable.context, deployable.name, true) as T);
       }
     }
   } catch (err) {
     return null;
   }
-}
+};
 
 const syncDeployable = async (
   deployable: SyncDeployment,
@@ -202,20 +214,22 @@ export const syncDeployables = async (
       const deployed = await getDeployableFromServer(syncDeployment);
       const gitRevisionChanged = gitRevision !== deployable.gitRevision;
       const serverFileRevision = !deployed
-      ? ''
-      : type === 'webhook'
-      // TODO: Actually calculate real revision on webhook
-      ? getRandomString(8)
-      : ((deployed as FunctionDetailsDto).hash || getDeployableFileRevision((deployed as FunctionDetailsDto).code));
-      const fileRevisionChanged = serverFileRevision !== deployable.fileRevision;
+        ? ''
+        : type === 'webhook'
+        ? // TODO: Actually calculate real revision on webhook
+          getRandomString(8)
+        : (deployed as FunctionDetailsDto).hash ||
+          getDeployableFileRevision((deployed as FunctionDetailsDto).code);
+      const fileRevisionChanged =
+        serverFileRevision !== deployable.fileRevision;
       // TODO: If deployed variabnt exists AND was deployed after timestamp on previousDeployment then sync it back to the repo
       let action = gitRevisionChanged
         ? 'REMOVED'
         : !previousDeployment?.id && !deployed
-            ? 'ADDED'
-            : fileRevisionChanged
-              ? 'UPDATED'
-              : 'SKIPPED';
+        ? 'ADDED'
+        : fileRevisionChanged
+        ? 'UPDATED'
+        : 'SKIPPED';
 
       if (!dryRun && action !== 'SKIPPED') {
         // if user is changing type, ex. server -> client function or vice versa

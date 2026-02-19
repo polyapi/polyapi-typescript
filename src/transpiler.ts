@@ -90,14 +90,21 @@ type InternalDependencyReference = {
   path: string;
   tenantName?: string;
   environmentName?: string;
-}
+};
 
 export const getDependencies = async (
   code: string,
   fileName: string,
   baseUrl: string | undefined,
   ignoreDependencies: boolean,
-): Promise<[external: undefined | Record<string, string>, internal: undefined | Record<string, InternalDependencyReference[]>]> => {
+): Promise<
+  [
+    external: undefined | Record<string, string>,
+    internal:
+      | undefined
+      | Record<string, InternalDependencyReference[] | string[]>,
+  ]
+> => {
   const importedLibraries = new Set<string>();
   const internalReferences = new Set<string>();
   let polyImportIdentifier: string | null = null;
@@ -107,7 +114,7 @@ export const getDependencies = async (
   const otherImportIdentifiers: string[] = [];
   let lookForInternalDependencies = false;
   // Users can alias references to parts of the poly tree by assigning to a variable
-  // So this map holds those references 
+  // So this map holds those references
   const aliasMap = new Map<string, string>();
 
   const compilerOptions = {
@@ -117,20 +124,45 @@ export const getDependencies = async (
     baseUrl,
   };
 
-
   // Helper to extract dotted path
-  const getPropertyPath = (expr: ts.PropertyAccessExpression): string => {
+  const getPropertyPath = (expr: ts.Expression): string => {
     const parts: string[] = [];
     let current: ts.Expression = expr;
-    while (ts.isPropertyAccessExpression(current)) {
-      parts.unshift(current.name.text);
-      current = current.expression;
+
+    while (true) {
+      // Handle foo.bar
+      if (ts.isPropertyAccessExpression(current)) {
+        parts.unshift(current.name.text);
+        current = current.expression;
+        continue;
+      }
+
+      // Handle foo["bar"] or foo[clientId]
+      if (ts.isElementAccessExpression(current)) {
+        const arg = current.argumentExpression;
+
+        if (arg && ts.isStringLiteral(arg)) {
+          parts.unshift(arg.text); // static: foo["bar"] → "bar"
+        } else if (arg && ts.isNumericLiteral(arg)) {
+          parts.unshift(arg.text); // static: foo[0] → "0"
+        } else {
+          parts.unshift('*'); // dynamic: foo[clientId] → "*"
+        }
+
+        current = current.expression;
+        continue;
+      }
+
+      // Final identifier (root)
+      if (ts.isIdentifier(current)) {
+        parts.unshift(current.text);
+      }
+
+      break;
     }
-    if (ts.isIdentifier(current)) {
-      parts.unshift(current.text);
-    }
+
     return parts.join('.');
-  }
+  };
 
   const unwrapExpression = (expr: ts.Expression): ts.Expression => {
     while (
@@ -141,7 +173,7 @@ export const getDependencies = async (
       expr = expr.expression;
     }
     return expr;
-  }
+  };
 
   const flattenTypeName = (name: ts.EntityName): string => {
     const parts: string[] = [];
@@ -152,13 +184,14 @@ export const getDependencies = async (
       } else {
         parts.push(n.text);
       }
-    }
+    };
     recurse(name);
     return parts.join('.');
-  }
+  };
 
   const VariMethods = /\.(?:(?:get)|(?:update)|(?:onUpdate)|(?:inject))$/;
-  const TabiMethods = /\.(?:(?:count)|(?:selectMany)|(?:selectOne)|(?:insertMany)|(?:insertOne)|(?:upsertMany)|(?:upsertOne)|(?:updateMany)|(?:updateOne)|(?:deleteMany)|(?:deleteOne))$/;
+  const TabiMethods =
+    /\.(?:(?:count)|(?:selectMany)|(?:selectOne)|(?:insertMany)|(?:insertOne)|(?:upsertMany)|(?:upsertOne)|(?:updateMany)|(?:updateOne)|(?:deleteMany)|(?:deleteOne))$/;
 
   const compilerHost = ts.createCompilerHost(compilerOptions);
   ts.transpileModule(code, {
@@ -170,10 +203,11 @@ export const getDependencies = async (
             const visitor = (node: ts.Node): ts.Node => {
               // Pull out external dependencies
               if (ts.isImportDeclaration(node)) {
-                const moduleName = (node.moduleSpecifier as ts.StringLiteral).text;
+                const moduleName = (node.moduleSpecifier as ts.StringLiteral)
+                  .text;
 
                 // Capture poly imports
-                if (!ignoreDependencies && moduleName === "polyapi" && node.importClause) {
+                if (moduleName === 'polyapi' && node.importClause) {
                   // Get name of polyapi default import if defined
                   if (node.importClause.name) {
                     polyImportIdentifier = `${node.importClause.name.text}.`;
@@ -181,18 +215,24 @@ export const getDependencies = async (
                   }
 
                   // Look for any other named imports (like vari, tabi, schemas, and other top-level namespaces (like OOB, etc))
-                  if (node.importClause.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
-                    for (const element of node.importClause.namedBindings.elements) {
-                      const imported = element.propertyName ? element.propertyName.text : element.name.text;
+                  if (
+                    node.importClause.namedBindings &&
+                    ts.isNamedImports(node.importClause.namedBindings)
+                  ) {
+                    for (const element of node.importClause.namedBindings
+                      .elements) {
+                      const imported = element.propertyName
+                        ? element.propertyName.text
+                        : element.name.text;
                       const local = element.name.text;
 
-                      if (imported === "vari") {
+                      if (imported === 'vari') {
                         variImportIdentifier = `${local}.`;
                         lookForInternalDependencies = true;
-                      } else if (imported === "tabi") {
+                      } else if (imported === 'tabi') {
                         tabiImportIdentifier = `${local}.`;
                         lookForInternalDependencies = true;
-                      } else if (imported === "schemas") {
+                      } else if (imported === 'schemas') {
                         schemasImportIdentifier = `${local}.`;
                         lookForInternalDependencies = true;
                       } else if (local !== 'polyCustom') {
@@ -223,25 +263,33 @@ export const getDependencies = async (
                 return node;
               }
 
-
               // Pull out internal dependencies
-              if (!ignoreDependencies && lookForInternalDependencies) {
+              if (lookForInternalDependencies) {
                 // Track assignments of poly imports to follow aliases
                 if (ts.isVariableDeclaration(node) && node.initializer) {
                   const initializer = unwrapExpression(node.initializer);
                   // Simple variable assignments (aliases), ex. `const OOB = polyapi.OOB;`
-                  if (ts.isIdentifier(node.name) && ts.isPropertyAccessExpression(initializer)) {
+                  if (
+                    ts.isIdentifier(node.name) &&
+                    ts.isPropertyAccessExpression(initializer)
+                  ) {
                     const path = getPropertyPath(initializer);
 
                     if (
                       // Capture poly reference aliases
-                      (polyImportIdentifier && path.startsWith(polyImportIdentifier)) ||
+                      (polyImportIdentifier &&
+                        path.startsWith(polyImportIdentifier)) ||
                       // Capture vari reference aliases
-                      (variImportIdentifier && path.startsWith(variImportIdentifier)) ||
+                      (variImportIdentifier &&
+                        path.startsWith(variImportIdentifier)) ||
                       // Capture tabi reference aliases
-                      (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) ||
+                      (tabiImportIdentifier &&
+                        path.startsWith(tabiImportIdentifier)) ||
                       // Capture other top-level namespace reference aliases
-                      (otherImportIdentifiers.length && otherImportIdentifiers.some(other => path.startsWith(other)))
+                      (otherImportIdentifiers.length &&
+                        otherImportIdentifiers.some((other) =>
+                          path.startsWith(other),
+                        ))
                     ) {
                       if (node.name && ts.isIdentifier(node.name)) {
                         aliasMap.set(node.name.text, path);
@@ -272,13 +320,22 @@ export const getDependencies = async (
                       // Check for alias to handle case where we're destructuring something from an aliased import
                       if (aliasMap.has(root)) {
                         const aliasBase = aliasMap.get(root);
-                        path = aliasBase.split(".").concat(path.split('.').slice(1)).join('.');
+                        path = aliasBase
+                          .split('.')
+                          .concat(path.split('.').slice(1))
+                          .join('.');
                       }
                       if (
-                        (polyImportIdentifier && path.startsWith(polyImportIdentifier)) ||
-                        (variImportIdentifier && path.startsWith(variImportIdentifier)) ||
-                        (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) ||
-                        (otherImportIdentifiers.length && otherImportIdentifiers.some(other => path.startsWith(other)))
+                        (polyImportIdentifier &&
+                          path.startsWith(polyImportIdentifier)) ||
+                        (variImportIdentifier &&
+                          path.startsWith(variImportIdentifier)) ||
+                        (tabiImportIdentifier &&
+                          path.startsWith(tabiImportIdentifier)) ||
+                        (otherImportIdentifiers.length &&
+                          otherImportIdentifiers.some((other) =>
+                            path.startsWith(other),
+                          ))
                       ) {
                         aliasMap.set(localName, path);
                       }
@@ -287,36 +344,104 @@ export const getDependencies = async (
                   }
                 }
                 // Look for use of imported poly dep!
-                else if (ts.isPropertyAccessExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
+                else if (
+                  ts.isPropertyAccessExpression(node) &&
+                  !ts.isPropertyAccessExpression(node.parent) &&
+                  !ts.isElementAccessExpression(node.parent)
+                ) {
                   let path = getPropertyPath(node);
                   const root = path.split('.')[0];
                   // If root is an alias, substitute
                   if (aliasMap.has(root)) {
                     const aliasBase = aliasMap.get(root)!;
-                    path = aliasBase.split(".").concat(path.split('.').slice(1)).join('.');
+                    path = aliasBase
+                      .split('.')
+                      .concat(path.split('.').slice(1))
+                      .join('.');
                   }
                   // Capture poly references (all function types, webhooks, and subscriptions)
-                  if (polyImportIdentifier && path.startsWith(polyImportIdentifier)) {
+                  if (
+                    polyImportIdentifier &&
+                    path.startsWith(polyImportIdentifier)
+                  ) {
                     internalReferences.add(path);
                   }
                   // Capture vari references
-                  else if (variImportIdentifier && path.startsWith(variImportIdentifier)) {
-                    internalReferences.add(path.replace(VariMethods, ''));
+                  else if (
+                    variImportIdentifier &&
+                    path.startsWith(variImportIdentifier)
+                  ) {
+                    if (VariMethods.test(path)) {
+                      internalReferences.add(path.replace(VariMethods, ''));
+                    }
                   }
                   // Capture tabi references
-                  else if (tabiImportIdentifier && path.startsWith(tabiImportIdentifier)) {
-                    internalReferences.add(path.replace(TabiMethods, ''));
+                  else if (
+                    tabiImportIdentifier &&
+                    path.startsWith(tabiImportIdentifier)
+                  ) {
+                    if (TabiMethods.test(path)) {
+                      internalReferences.add(path.replace(TabiMethods, ''));
+                    }
                   }
                   // Capture other top-level namespace references
                   else if (otherImportIdentifiers.length) {
-                    const match = otherImportIdentifiers.find(other => path.startsWith(other));
+                    const match = otherImportIdentifiers.find((other) =>
+                      path.startsWith(other),
+                    );
                     if (match) internalReferences.add(path);
+                  }
+                } else if (ts.isCallExpression(node)) {
+                  const target = unwrapExpression(node.expression);
+
+                  // Only process if the callee is a property or element access
+                  if (
+                    ts.isPropertyAccessExpression(target) ||
+                    ts.isElementAccessExpression(target)
+                  ) {
+                    let path = getPropertyPath(target);
+
+                    const root = path.split('.')[0];
+                    if (aliasMap.has(root)) {
+                      const aliasBase = aliasMap.get(root)!;
+                      path = aliasBase
+                        .split('.')
+                        .concat(path.split('.').slice(1))
+                        .join('.');
+                    }
+
+                    if (
+                      polyImportIdentifier &&
+                      path.startsWith(polyImportIdentifier)
+                    ) {
+                      internalReferences.add(path);
+                    } else if (
+                      variImportIdentifier &&
+                      path.startsWith(variImportIdentifier)
+                    ) {
+                      if (VariMethods.test(path)) {
+                        internalReferences.add(path.replace(VariMethods, ''));
+                      }
+                    } else if (
+                      tabiImportIdentifier &&
+                      path.startsWith(tabiImportIdentifier)
+                    ) {
+                      if (TabiMethods.test(path)) {
+                        internalReferences.add(path.replace(TabiMethods, ''));
+                      }
+                    } else if (
+                      otherImportIdentifiers.some((other) =>
+                        path.startsWith(other),
+                      )
+                    ) {
+                      internalReferences.add(path);
+                    }
                   }
                 }
               }
 
               // Capture type references
-              if (!ignoreDependencies && schemasImportIdentifier && ts.isTypeReferenceNode(node)) {
+              if (schemasImportIdentifier && ts.isTypeReferenceNode(node)) {
                 const path = flattenTypeName(node.typeName);
                 if (path.startsWith(schemasImportIdentifier)) {
                   internalReferences.add(path);
@@ -337,7 +462,9 @@ export const getDependencies = async (
     (library) => !EXCLUDED_REQUIREMENTS.includes(library),
   );
   const externalDependencies: Record<string, string> = {};
-  const internalDependencies: Record<string, InternalDependencyReference[]> = {};
+  const internalDependencies: Record<string, InternalDependencyReference[]> =
+    {};
+  let internalContexts: string[] = [];
 
   // Finalize any external dependencies
   if (dependencies.length) {
@@ -361,7 +488,9 @@ export const getDependencies = async (
 
     for (const dependency of dependencies) {
       let dependencyName = dependency;
-      let version = packageJsonDependencies[dependencyName] || packageJsonDevDependencies[dependencyName];
+      let version =
+        packageJsonDependencies[dependencyName] ||
+        packageJsonDevDependencies[dependencyName];
       if (version) {
         externalDependencies[dependency] = version;
         continue;
@@ -373,7 +502,9 @@ export const getDependencies = async (
         dependencyParts.pop();
 
         dependencyName = dependencyParts.join('/');
-        version = packageJsonDependencies[dependencyName] || packageJsonDevDependencies[dependencyName];
+        version =
+          packageJsonDependencies[dependencyName] ||
+          packageJsonDevDependencies[dependencyName];
 
         if (version) {
           externalDependencies[dependencyName] = version;
@@ -396,50 +527,89 @@ export const getDependencies = async (
     let missing: string[] = [];
 
     const findReferencedSpecs = (toFind: string[] | Set<string>) => {
-      for (let path of toFind) {
+      for (const originalPath of toFind) {
         let type;
+        let path = originalPath;
         if (path.startsWith(polyImportIdentifier)) {
           path = path.replace(polyImportIdentifier, '');
         } else if (path.startsWith(variImportIdentifier)) {
-          type = "serverVariable";
+          type = 'serverVariable';
           path = path.replace(variImportIdentifier, '');
         } else if (path.startsWith(tabiImportIdentifier)) {
-          type = "table";
+          type = 'table';
           path = path.replace(tabiImportIdentifier, '');
         } else if (path.startsWith(schemasImportIdentifier)) {
-          type = "schema";
+          type = 'schema';
           path = path.replace(schemasImportIdentifier, '');
         }
-        const spec = specs.find(s => {
-          if (type) {
-            if (type !== s.type) return false;
-          } else if (['serverVariable', 'table', 'schema'].includes(s.type)) return false;
-          if (s.type === 'schema') {
-            // Schema names are munged too much to just compare by lowercase
-            return s.contextName.split('.').map(s => toPascalCase(s)).join('.') === path;
+        if (path.includes('.*')) {
+          // Dynamic path!
+          path = path.split('.*')[0];
+          // We've already captured a global reference so skip all other dynamic references
+          if (internalContexts.includes('*')) continue;
+          if (!path) {
+            // If there's no path left over that means we had a top-level dynamic path reference, ex. `vari[clientContext].config.get()` -> '*'
+            // Global context path reference--so we might track internalDependencies but ultimately when we generate the SDK we're going to generate everything
+            internalContexts = ['*'];
+          } else {
+            // Otherwise we have a context to capture, ex. `vari.configurations[clientId].get()` -> `configurations`
+            internalContexts.push(path);
           }
-          return s.contextName.toLowerCase() === path.toLowerCase();
-        });
-        if (spec) {
-          found.push(spec);
-          let type: string = spec.type;
-          const dep = { path: spec.contextName, id: spec.id };
-          if (
-            spec.visibilityMetadata.visibility === 'PUBLIC' &&
-            ['apiFunction', 'customFunction', 'serverFunction'].includes(type)
-          ) {
-            type = `public${type.substring(0, 1).toUpperCase()}${type.substring(1)}`;
-            dep['tenantName'] = spec.visibilityMetadata.foreignTenantName;
-            dep['environmentName'] = spec.visibilityMetadata.foreignEnvironmentName;
-          }
-          internalDependencies[type] = internalDependencies[type] || [];
-          internalDependencies[type].push(dep);
         } else {
-          missing.push(path);
+          // Static path!
+          const spec = specs.find((s) => {
+            if (type) {
+              if (type !== s.type) return false;
+            } else if (['serverVariable', 'table', 'schema'].includes(s.type))
+              return false;
+            if (s.type === 'schema') {
+              // Schema names are munged too much to just compare by lowercase
+              return (
+                s.contextName
+                  .split('.')
+                  .map((s) => toPascalCase(s))
+                  .join('.') === path
+              );
+            }
+            return s.contextName.toLowerCase() === path.toLowerCase();
+          });
+          if (spec) {
+            found.push(spec);
+            let type: string = spec.type;
+            const dep = { path: spec.contextName, id: spec.id };
+            if (
+              spec.visibilityMetadata.visibility === 'PUBLIC' &&
+              ['apiFunction', 'customFunction', 'serverFunction'].includes(type)
+            ) {
+              type = `public${type
+                .substring(0, 1)
+                .toUpperCase()}${type.substring(1)}`;
+              dep['tenantName'] = spec.visibilityMetadata.foreignTenantName;
+              dep['environmentName'] =
+                spec.visibilityMetadata.foreignEnvironmentName;
+            }
+            internalDependencies[type] = internalDependencies[type] || [];
+            internalDependencies[type].push(dep);
+          } else {
+            missing.push(path);
+          }
         }
       }
-    }
+    };
     findReferencedSpecs(internalReferences);
+    if (internalContexts.length) {
+      // Dedupe any contexts to only keep the shortest, most universal ones.
+      // ex. if we have `foo.bar` and `foo` then we only keep `foo` since all `.bar` specs will be included under `foo`
+      internalContexts.sort();
+      const toKeep = [];
+      for (const context of internalContexts) {
+        if (toKeep.find((c) => context.startsWith(c))) continue;
+        toKeep.push(context);
+      }
+      if (toKeep.length) {
+        internalDependencies.contexts = toKeep;
+      }
+    }
     if (missing.length && !fetchedSpecs) {
       // In case user generated the library with only a subset of the specs needed, grab them fresh from the api and try again
       specs = await getSpecs();
@@ -451,11 +621,20 @@ export const getDependencies = async (
     }
 
     if (missing.length && !ignoreDependencies) {
-      throw new Error(`Cannot resolve all poly resources referenced within function.\n\nMissing:\n${missing.map(n => `  '${n}'`).join('\n')}\n\nRerun command with '--ignore-dependencies' to skip resolving dependencies.`)
+      throw new Error(
+        `Cannot resolve all poly resources referenced within function.\n\nMissing:\n${missing
+          .map((n) => `  '${n}'`)
+          .join(
+            '\n',
+          )}\n\nRerun command with '--ignore-dependencies' to skip resolving dependencies.`,
+      );
     }
   }
 
-  return [dependencies.length ? externalDependencies : undefined, internalReferences.size && !ignoreDependencies ? internalDependencies : undefined];
+  return [
+    dependencies.length ? externalDependencies : undefined,
+    internalReferences.size ? internalDependencies : undefined,
+  ];
 };
 
 export const parseDeployComment = (comment: string): Deployment => {
@@ -699,22 +878,41 @@ const parseDeployableFunction = async (
   } else {
     polyConfig.description = functionDetails.types.description || '';
   }
-  // TODO: Remove final argument setting ignoreDependencies to true once we have the kinks worked out dependency tracking
-  const [externalDependencies, internalDependencies] = await getDependencies(sourceFile.getFullText(), sourceFile.fileName, baseUrl, true);
-  const referencedSchemas = internalDependencies && "schema" in internalDependencies
-    ? Object.fromEntries(internalDependencies.schema.map(schema => [
-      `schemas.${schema.path.split('.').map(s => toPascalCase(s)).join('.')}`,
-      { 'x-poly-ref': { path: schema.path } }
-    ]))
-    : null;
-  const typeSchemas = generateTypeSchemas(sourceFile.fileName, DeployableTypeEntries.map(d => d[0]), polyConfig.name, referencedSchemas);
+
+  // TODO: Stop ignoring dependencies once we have the kinks worked out dependency tracking
+  const [externalDependencies, internalDependencies] = await getDependencies(
+    sourceFile.getFullText(),
+    sourceFile.fileName,
+    baseUrl,
+    true,
+  );
+  const referencedSchemas =
+    internalDependencies && 'schema' in internalDependencies
+      ? Object.fromEntries(
+          internalDependencies.schema.map((schema) => [
+            `schemas.${schema.path
+              .split('.')
+              .map((s) => toPascalCase(s))
+              .join('.')}`,
+            { 'x-poly-ref': { path: schema.path } },
+          ]),
+        )
+      : null;
+  const typeSchemas = generateTypeSchemas(
+    sourceFile.fileName,
+    DeployableTypeEntries.map((d) => d[0]),
+    polyConfig.name,
+    referencedSchemas,
+  );
   return {
     ...polyConfig,
     ...functionDetails,
     deployments,
     deploymentCommentRanges,
     externalDependencies,
-    internalDependencies,
+    // TODO: Resume passing internalDependencies once we have the kinks worked out dependency tracking
+    // internalDependencies,
+    internalDependencies: null,
     typeSchemas,
     fileRevision,
     gitRevision,
@@ -781,19 +979,31 @@ export const parseDeployable = async (
     }
     throw new Error('Invalid Poly deployment with unsupported type');
   } catch (e) {
-    shell.echo(chalk.redBright(
-      `Prepared ${polyConfig.type.replaceAll('-', ' ')} ${polyConfig.context}.${polyConfig.name
-      }: ERROR`,
-    ));
-    shell.echo(chalk.red((e instanceof Error ? e.message : e.response?.data?.message) || 'Unexpected error.'));
+    shell.echo(
+      chalk.redBright(
+        `Prepared ${polyConfig.type.replaceAll('-', ' ')} ${
+          polyConfig.context
+        }.${polyConfig.name}: ERROR`,
+      ),
+    );
+    shell.echo(
+      chalk.red(
+        (e instanceof Error ? e.message : e.response?.data?.message) ||
+          'Unexpected error.',
+      ),
+    );
   }
 };
 
-const dereferenceSchema = (obj: any, definitions: any, visited: Set<string> = new Set()): any => {
+const dereferenceSchema = (
+  obj: any,
+  definitions: any,
+  visited: Set<string> = new Set(),
+): any => {
   if (!obj || typeof obj !== 'object') return obj;
 
   if (Array.isArray(obj)) {
-    return obj.map(item => dereferenceSchema(item, definitions, visited));
+    return obj.map((item) => dereferenceSchema(item, definitions, visited));
   }
 
   const result: any = {};
@@ -802,7 +1012,7 @@ const dereferenceSchema = (obj: any, definitions: any, visited: Set<string> = ne
     if (key === '$ref' && typeof value === 'string') {
       const match = value.match(/^#\/definitions\/(.+)$/);
       if (match) {
-        const defName = match[1];
+        const defName = decodeURIComponent(match[1]);
 
         // Prevent infinite recursion
         if (visited.has(defName)) {
@@ -811,7 +1021,7 @@ const dereferenceSchema = (obj: any, definitions: any, visited: Set<string> = ne
 
         const definition = definitions[defName];
         if (definition) {
-          // Inspired by old flattenDefinitions logic: Check if this looks like a "real" type 
+          // Inspired by old flattenDefinitions logic: Check if this looks like a "real" type
           // vs a utility type by examining the definition structure
           const shouldInline = isInlineableDefinition(definition, defName);
 
@@ -841,14 +1051,21 @@ const isInlineableDefinition = (definition: any, defName: string): boolean => {
   const decodedDefName = decodeURIComponent(defName);
 
   // If it has "real" object properties, it's probably a real interface that should be inlined
-  if (definition.type === 'object' && definition.properties &&
-    Object.keys(definition.properties).length > 0) {
+  if (
+    definition.type === 'object' &&
+    definition.properties &&
+    Object.keys(definition.properties).length > 0
+  ) {
     return true;
   }
 
   // If it has array items with concrete structure, inline it
-  if (definition.type === 'array' && definition.items &&
-    typeof definition.items === 'object' && definition.items.type) {
+  if (
+    definition.type === 'array' &&
+    definition.items &&
+    typeof definition.items === 'object' &&
+    definition.items.type
+  ) {
     return true;
   }
 
@@ -868,8 +1085,12 @@ const isInlineableDefinition = (definition: any, defName: string): boolean => {
   }
 
   // Keep as reference if it looks like a utility type (contains < > or other TypeScript operators)
-  if (decodedDefName.includes('<') || decodedDefName.includes('>') ||
-    decodedDefName.includes('|') || decodedDefName.includes('&')) {
+  if (
+    decodedDefName.includes('<') ||
+    decodedDefName.includes('>') ||
+    decodedDefName.includes('|') ||
+    decodedDefName.includes('&')
+  ) {
     return false;
   }
 
@@ -885,7 +1106,7 @@ const dereferenceRoot = (schema: any): any => {
   if (schema.$ref) {
     const match = schema.$ref.match(/^#\/definitions\/(.+)$/);
     if (match) {
-      const defName = match[1];
+      const defName = decodeURIComponent(match[1]);
       const root = schema.definitions[defName];
       if (root) {
         const { definitions, $schema, $ref, ...rest } = schema;
@@ -908,7 +1129,7 @@ const dereferenceRoot = (schema: any): any => {
   const findReferences = (obj: any, visited: Set<string> = new Set()): void => {
     if (!obj || typeof obj !== 'object') return;
     if (Array.isArray(obj)) {
-      obj.forEach(item => findReferences(item, visited));
+      obj.forEach((item) => findReferences(item, visited));
       return;
     }
     for (const [key, value] of Object.entries(obj)) {
@@ -919,8 +1140,11 @@ const dereferenceRoot = (schema: any): any => {
           const decodedDefName = decodeURIComponent(encodedDefName);
 
           // Try both encoded and decoded versions
-          const actualDefName = definitions[encodedDefName] ? encodedDefName :
-            definitions[decodedDefName] ? decodedDefName : null;
+          const actualDefName = definitions[encodedDefName]
+            ? encodedDefName
+            : definitions[decodedDefName]
+            ? decodedDefName
+            : null;
 
           if (actualDefName && !visited.has(actualDefName)) {
             visited.add(actualDefName);
@@ -939,12 +1163,17 @@ const dereferenceRoot = (schema: any): any => {
 
   return {
     ...dereferencedRest,
-    ...(Object.keys(filteredDefinitions).length > 0 && { definitions: filteredDefinitions }),
+    ...(Object.keys(filteredDefinitions).length > 0 && {
+      definitions: filteredDefinitions,
+    }),
     $schema,
   };
 };
 
-export const extractTypesFromAST = (filePath: string, functionName: string): string[] => {
+export const extractTypesFromAST = (
+  filePath: string,
+  functionName: string,
+): string[] => {
   const program = ts.createProgram([filePath], {
     target: ts.ScriptTarget.ESNext,
     module: ts.ModuleKind.CommonJS,
@@ -960,7 +1189,20 @@ export const extractTypesFromAST = (filePath: string, functionName: string): str
       const typeName = typeNode.typeName.getText(sourceFile);
 
       // Skip primitive and built-in types
-      const primitives = ['Promise', 'Array', 'Record', 'string', 'number', 'boolean', 'void', 'any', 'unknown', 'object', 'undefined', 'null'];
+      const primitives = [
+        'Promise',
+        'Array',
+        'Record',
+        'string',
+        'number',
+        'boolean',
+        'void',
+        'any',
+        'unknown',
+        'object',
+        'undefined',
+        'null',
+      ];
       if (!primitives.includes(typeName)) {
         extractedTypes.add(typeName);
       }
@@ -971,7 +1213,10 @@ export const extractTypesFromAST = (filePath: string, functionName: string): str
           extractFromTypeNode(typeArg);
         }
       }
-    } else if (ts.isUnionTypeNode(typeNode) || ts.isIntersectionTypeNode(typeNode)) {
+    } else if (
+      ts.isUnionTypeNode(typeNode) ||
+      ts.isIntersectionTypeNode(typeNode)
+    ) {
       // Handle union/intersection types
       for (const type of typeNode.types) {
         extractFromTypeNode(type);
@@ -1014,15 +1259,15 @@ export const generateTypeSchemas = (
   const extractedTypes = extractTypesFromAST(filePath, actualFunctionName);
 
   // Filter ignored types
-  const typeNames = extractedTypes.filter(typeName =>
-    !ignoredTypeNames.includes(typeName)
+  const typeNames = extractedTypes.filter(
+    (typeName) => !ignoredTypeNames.includes(typeName),
   );
 
   const output: Record<string, any> = {};
 
   for (const typeName of typeNames) {
     if (ignoredTypeNames.includes(typeName)) continue;
-    if (referencedSchemas[typeName]) {
+    if (referencedSchemas?.[typeName]) {
       output[typeName] = referencedSchemas[typeName];
       continue;
     }
@@ -1041,7 +1286,10 @@ export const generateTypeSchemas = (
       output[typeName] = dereferenceRoot(schema);
     } catch (err: any) {
       if (!/No root type.*found/.test(err.message)) {
-        console.warn(`⚠️ Error generating schema for "${typeName}":`, err.message);
+        console.warn(
+          `⚠️ Error generating schema for "${typeName}":`,
+          err.message,
+        );
       }
     }
   }
