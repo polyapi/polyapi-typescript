@@ -67,8 +67,8 @@ const updateClient = async (tag: string) => {
   const packageManager = getPackageManager();
   const command =
     packageManager === 'yarn'
-      ? `yarn global add polyapi@${tag}`
-      : `npm install -g polyapi@${tag}`;
+      ? `yarn add polyapi@${tag}`
+      : `npm install polyapi@${tag}`;
 
   shell.echo(`Updating polyapi via: ${command}`);
   const result = shell.exec(command);
