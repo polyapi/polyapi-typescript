@@ -8,7 +8,7 @@ import { loadConfig } from './config';
 import { type RenameT } from './commands/model';
 import { DEFAULT_POLY_PATH } from './constants';
 import { isValidHttpUrl } from './utils';
-// import { checkForClientVersionUpdate } from './version';
+import { checkForClientVersionUpdate } from './version';
 
 if (process.env.NO_COLOR) {
   // Support NO_COLOR env variable https://no-color.org/
@@ -27,10 +27,10 @@ const checkPolyConfig = (polyPath: string) => {
 
 void yargs
   .usage('$0 <cmd> [args]')
-  // .middleware(async (argv) => {
-  //   if (!argv._?.length) return;
-  //   await checkForClientVersionUpdate(DEFAULT_POLY_PATH);
-  // })
+  .middleware(async (argv) => {
+    if (!argv._?.length) return;
+    await checkForClientVersionUpdate(DEFAULT_POLY_PATH);
+  })
   .command(
     'setup [baseUrl] [apiKey]',
     'Setups your Poly connection',
