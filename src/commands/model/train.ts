@@ -13,6 +13,7 @@ import {
   upsertWebhookHandle,
 } from '../../api';
 import { firstLetterToUppercase } from '../../utils';
+import { ensurePermissions, buildModelTrainingRequirements } from '../../permissions';
 
 const readFile = promisify(fs.readFile);
 const exec = promisify(execChildProcess);
@@ -301,6 +302,12 @@ export const train = async (polyPath: string, path: string) => {
     const specificationInput: SpecificationInputDto = JSON.parse(
       contents,
     ) as SpecificationInputDto;
+
+    const trainingRequirements = buildModelTrainingRequirements(
+        specificationInput
+      );
+
+      if (!(await ensurePermissions(trainingRequirements))) process.exit(1);
 
     const createdApiFunctionsCount = await executeTraining({
       resources: specificationInput.functions,

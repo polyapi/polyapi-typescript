@@ -5,6 +5,9 @@ export interface AuthData {
   environment: {
     id: string;
   };
+
+  // Returned by /auth in newer API versions
+  permissions?: string[] | Record<string, boolean>;
 }
 
 export interface SignUpDto {
