@@ -37,11 +37,11 @@ export const getCurrentPermissions = async (): Promise<Set<string>> => {
   const apiKey = process.env.POLY_API_KEY || '';
 
   if (!baseUrl) {
-    throw new Error('Missing POLY_API_BASE_URL. Please run `poly setup` first.');
+    throw new Error('Missing Poly API Base URL. Please run `poly setup` first.');
   }
 
   if (!apiKey) {
-    throw new Error('Missing POLY_API_KEY. Please run `poly setup` first.');
+    throw new Error('Missing Poly API Key. Please run `poly setup` first.');
   }
 
   const authData = await getAuthData(baseUrl, apiKey);
@@ -67,7 +67,7 @@ export const clearPermissionsCache = (): void => {
 // Centralized mapping from permission -> user-facing action
 export const PERMISSION_ACTIONS: Record<string, string> = {
   libraryGenerate: 'generate Poly library',
-  customDev: 'add / sync deployables',
+  customDev: 'add Client or Server functions',
   manageApiFunctions: 'add API functions',
   manageSchemas: 'add schemas',
   manageWebhooks: 'add webhooks',
