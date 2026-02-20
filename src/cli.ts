@@ -8,7 +8,8 @@ import { loadConfig } from './config';
 import { type RenameT } from './commands/model';
 import { DEFAULT_POLY_PATH } from './constants';
 import { isValidHttpUrl } from './utils';
-// import { checkForClientVersionUpdate } from './version';
+import { ensurePermissions, makeRequirement } from './permissions';
+import { checkForClientVersionUpdate } from './version';
 
 if (process.env.NO_COLOR) {
   // Support NO_COLOR env variable https://no-color.org/
@@ -114,6 +115,12 @@ void yargs
         await setup(customPath);
       }
 
+      if (
+        !(await ensurePermissions([makeRequirement('libraryGenerate')]))
+      ) {
+        process.exit(1);
+      }
+
       const { generate } = await import('./commands/generate');
       await generate({
         polyPath: customPath,
@@ -183,6 +190,12 @@ void yargs
         return shell.echo(
           'Poly is not configured. Please run `poly setup` to configure it.',
         );
+      }
+
+      if (
+        !(await ensurePermissions([makeRequirement('customDev')]))
+      ) {
+        process.exit(1);
       }
 
       const { prepareDeployables } = await import('./commands/prepare');
@@ -303,6 +316,19 @@ void yargs
           yargs.showHelp();
           return;
         }
+
+        if (!checkPolyConfig(DEFAULT_POLY_PATH)) {
+          return shell.echo(
+            'Poly is not configured. Please run `poly setup` to configure it.',
+          );
+        }
+
+        if (
+          !(await ensurePermissions([makeRequirement('customDev')]))
+        ) {
+          process.exit(1);
+        }
+
         const { addOrUpdateCustomFunction } = await import(
           './commands/function'
         );

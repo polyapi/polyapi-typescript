@@ -5,6 +5,8 @@ export interface AuthData {
   environment: {
     id: string;
   };
+
+  permissions?: Record<string, boolean>;
 }
 
 export interface SignUpDto {
