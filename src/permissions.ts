@@ -25,9 +25,7 @@ const extractPermissions = (authData: any): Set<string> => {
 
   if (!source) return new Set();
 
-  const enabled = Object.keys(source as Record<string, unknown>).filter(
-    (k) => Boolean((source as any)[k]),
-  );
+  const enabled = Object.keys(source).filter((k) => source[k] === true);
 
   return new Set(enabled);
 };
