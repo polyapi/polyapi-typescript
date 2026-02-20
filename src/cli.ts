@@ -28,10 +28,10 @@ const checkPolyConfig = (polyPath: string) => {
 
 void yargs
   .usage('$0 <cmd> [args]')
-  .middleware(async (argv) => {
-    if (!argv._?.length) return;
-    await checkForClientVersionUpdate(DEFAULT_POLY_PATH);
-  })
+  // .middleware(async (argv) => {
+  //   if (!argv._?.length) return;
+  //   await checkForClientVersionUpdate(DEFAULT_POLY_PATH);
+  // })
   .command(
     'setup [baseUrl] [apiKey]',
     'Setups your Poly connection',
