@@ -8,6 +8,7 @@ import { loadConfig } from './config';
 import { type RenameT } from './commands/model';
 import { DEFAULT_POLY_PATH } from './constants';
 import { isValidHttpUrl } from './utils';
+// import { checkForClientVersionUpdate } from './version';
 
 if (process.env.NO_COLOR) {
   // Support NO_COLOR env variable https://no-color.org/
@@ -26,6 +27,10 @@ const checkPolyConfig = (polyPath: string) => {
 
 void yargs
   .usage('$0 <cmd> [args]')
+  // .middleware(async (argv) => {
+  //   if (!argv._?.length) return;
+  //   await checkForClientVersionUpdate(DEFAULT_POLY_PATH);
+  // })
   .command(
     'setup [baseUrl] [apiKey]',
     'Setups your Poly connection',
@@ -168,8 +173,12 @@ void yargs
           describe: 'Custom path to .poly directory (internal use only)',
           default: DEFAULT_POLY_PATH,
           type: 'string',
-        }),
-    async ({ dryRun, customPath = DEFAULT_POLY_PATH }) => {
+        })
+        .option('execution-api-key', {
+            describe: 'Optional API key for server functions',
+            type: 'string',
+          }),
+    async ({ dryRun, executionApiKey, customPath = DEFAULT_POLY_PATH }) => {
       if (!checkPolyConfig(customPath)) {
         return shell.echo(
           'Poly is not configured. Please run `poly setup` to configure it.',
@@ -186,7 +195,7 @@ void yargs
       );
       shell.echo('Syncing Poly deployments...');
       const { syncDeployables } = await import('./commands/sync');
-      await syncDeployables(dryRun);
+      await syncDeployables(dryRun, executionApiKey);
       shell.echo('Poly deployments synced.');
     },
   )
@@ -245,6 +254,11 @@ void yargs
           .option('visibility', {
             describe: 'Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive',
             type: 'string',
+          })
+          .option('ignore-dependencies', {
+            describe: 'Skip parsing internal dependencies referenced within function.',
+            type: 'boolean',
+            default: true // TODO: Remove me once we have the internal dependency tracking kinks worked out!
           }),
       async ({
         name,
@@ -258,6 +272,7 @@ void yargs
         executionApiKey,
         cachePolyLibrary,
         visibility,
+        ignoreDependencies,
       }) => {
         const logsEnabled =
           logs === 'enabled' ? true : logs === 'disabled' ? false : undefined;
@@ -304,6 +319,7 @@ void yargs
           executionApiKey,
           cachePolyLibrary,
           visibility,
+          ignoreDependencies,
         );
       },
     );
