@@ -33,6 +33,7 @@ export const addOrUpdateCustomFunction = async (
   executionApiKey: string | null | undefined,
   cachePolyLibrary: boolean | undefined,
   visibility: string | undefined,
+  ignoreDependencies: boolean | undefined
 ) => {
   loadConfig(polyPath);
 
@@ -79,7 +80,7 @@ export const addOrUpdateCustomFunction = async (
     }
 
     const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]), name);
-    const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl);
+    const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl, ignoreDependencies);
 
     if (server) {
       shell.echo(
@@ -153,6 +154,11 @@ export const addOrUpdateCustomFunction = async (
     await generateSingleCustomFunction(polyPath, customFunction.id, updating);
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));
-    shell.echo(chalk.red((e instanceof Error ? e.message : e.response?.data?.message) || 'Unexpected error.'));
+
+    shell.echo(
+      `${chalk.redBright.bold(
+        e?.message ?? 'Unexpected error.',
+      )}:\n    ${chalk.red.italic(e?.response?.data?.message)}`,
+    );
   }
 };

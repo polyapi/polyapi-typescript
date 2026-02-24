@@ -30,6 +30,127 @@ type BaseResult = {
   context: string;
 };
 
+type SchemaRef = {
+  path: string;
+  publicNamespace?: string;
+};
+
+const getSchemaContextName = (schema: { name: string; context?: string }) =>
+  [schema.context, schema.name].filter(Boolean).join('.');
+
+const getPolySchemaRefs = (schema: Record<string, any>): SchemaRef[] => {
+  const ref = schema['x-poly-ref'] as SchemaRef | undefined;
+  if (ref && typeof ref === 'object' && !Array.isArray(ref) && ref.path) {
+    return [ref];
+  }
+
+  let toSearch: Record<string, any>[] = [];
+  if (schema.schemas) {
+    toSearch = toSearch.concat(Object.values(schema.schemas));
+  }
+  if (schema.properties) {
+    toSearch = toSearch.concat(Object.values(schema.properties));
+  }
+  if (schema.patternProperties) {
+    toSearch = toSearch.concat(Object.values(schema.patternProperties));
+  }
+  if (schema.items) {
+    if (Array.isArray(schema.items)) {
+      toSearch = toSearch.concat(schema.items);
+    } else {
+      toSearch.push(schema.items);
+    }
+  }
+  if (typeof schema.additionalItems === 'object') {
+    toSearch.push(schema.additionalItems);
+  }
+  if (typeof schema.additionalProperties === 'object') {
+    toSearch.push(schema.additionalProperties);
+  }
+  if (Array.isArray(schema.allOf)) {
+    toSearch = toSearch.concat(schema.allOf);
+  }
+  if (Array.isArray(schema.anyOf)) {
+    toSearch = toSearch.concat(schema.anyOf);
+  }
+  if (Array.isArray(schema.oneOf)) {
+    toSearch = toSearch.concat(schema.oneOf);
+  }
+
+  return toSearch.flatMap((s) => getPolySchemaRefs(s));
+};
+
+const orderSchemasByDependencies = <T extends { name: string; context?: string; definition: Record<string, any> }>(
+  schemas: T[],
+): T[] => {
+  if (schemas.length <= 1) return schemas;
+
+  const schemaByContextName = new Map<string, T>();
+  const originalOrder = schemas.map((schema) => {
+    const contextName = getSchemaContextName(schema);
+    schemaByContextName.set(contextName, schema);
+    return contextName;
+  });
+
+  const adjacency = new Map<string, Set<string>>();
+  const indegree = new Map<string, number>();
+
+  for (const contextName of originalOrder) {
+    adjacency.set(contextName, new Set());
+    indegree.set(contextName, 0);
+  }
+
+  for (const schema of schemas) {
+    const schemaContextName = getSchemaContextName(schema);
+    const refs = getPolySchemaRefs(schema.definition)
+      .filter((ref) => !ref.publicNamespace)
+      .map((ref) => ref.path)
+      .filter((refPath) => schemaByContextName.has(refPath));
+
+    for (const refPath of refs) {
+      const dependents = adjacency.get(refPath);
+      if (!dependents || dependents.has(schemaContextName)) continue;
+      dependents.add(schemaContextName);
+      indegree.set(
+        schemaContextName,
+        (indegree.get(schemaContextName) || 0) + 1,
+      );
+    }
+  }
+
+  const queue = originalOrder.filter(
+    (contextName) => (indegree.get(contextName) || 0) === 0,
+  );
+  const ordered: string[] = [];
+
+  while (queue.length) {
+    const current = queue.shift() as string;
+    ordered.push(current);
+    const dependents = adjacency.get(current);
+    if (!dependents) continue;
+    for (const dependent of dependents) {
+      const nextIndegree = (indegree.get(dependent) || 0) - 1;
+      indegree.set(dependent, nextIndegree);
+      if (nextIndegree === 0) {
+        queue.push(dependent);
+      }
+    }
+  }
+
+  if (ordered.length !== schemas.length) {
+    const orderedSet = new Set(ordered);
+    for (const contextName of originalOrder) {
+      if (!orderedSet.has(contextName)) {
+        ordered.push(contextName);
+      }
+    }
+  }
+
+  return ordered
+    .map((contextName) => schemaByContextName.get(contextName))
+    .filter((schema): schema is T => Boolean(schema));
+};
+
 const generateClientCode = async (polyPath: string) => {
   try {
     shell.echo('Re-generating poly library...');
@@ -198,7 +319,7 @@ export const train = async (polyPath: string, path: string) => {
     });
 
     const createdSchemasCount = await executeTraining({
-      resources: specificationInput.schemas,
+      resources: orderSchemasByDependencies(specificationInput.schemas),
       resourceName: 'schema',
       upsertFn(resource) {
         return upsertSchema(resource);
