@@ -79,7 +79,7 @@
     "axios": {
       "form-data": "^4.0.4"
     },
-    "minimatch": "^10.2.1"
+    "minimatch": "^10.2.3"
   },
   "engines": {
     "node": ">=18.20.5"
