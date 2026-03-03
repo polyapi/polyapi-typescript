@@ -73,7 +73,7 @@ const removeDeployable = async (
   }
 };
 
-const syncDeployableAndGetId = async (deployable, code) => {
+const syncDeployableAndGetId = async (deployable, code, apiKey) => {
   if (deployable.type === 'webhook') {
     return (
       await createOrUpdateWebhook(
@@ -102,6 +102,7 @@ const syncDeployableAndGetId = async (deployable, code) => {
         externalDependencies,
         deployable.internalDependencies,
         deployable.config,
+        apiKey
       )
     ).id;
   } else if (deployable.type === 'client-function') {
@@ -160,9 +161,10 @@ const getDeployableFromServer = async <
 
 const syncDeployable = async (
   deployable: SyncDeployment,
+  apiKey: string | null | undefined
 ): Promise<Deployment> => {
   const code = fs.readFileSync(deployable.file, 'utf8');
-  const id = await syncDeployableAndGetId(deployable, code);
+  const id = await syncDeployableAndGetId(deployable, code, apiKey);
   return {
     name: deployable.name,
     context: deployable.context,
@@ -178,6 +180,7 @@ type GroupedDeployables = Record<DeployableTypes, DeployableRecord[]>;
 
 export const syncDeployables = async (
   dryRun: boolean,
+  apiKey: string | null | undefined,
   instance = process.env.POLY_API_BASE_URL,
 ) => {
   await prepareDeployableDirectory();
@@ -249,7 +252,7 @@ export const syncDeployables = async (
           );
           toRemove.push(...allDeployables.splice(removeIndex, 1));
         } else {
-          const deployment = await syncDeployable(syncDeployment);
+          const deployment = await syncDeployable(syncDeployment, apiKey);
           if (previousDeployment) {
             previousDeployment.id = deployment.id;
             previousDeployment.context = deployment.context;

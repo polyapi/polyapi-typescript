@@ -24,7 +24,7 @@ const setup = async (
 ) => {
   try {
     loadConfig(polyPath);
-    process.env.POLY_API_KEY = process.env.POLY_API_KEY || apiVersion;
+    process.env.POLY_API_VERSION = process.env.POLY_API_VERSION || apiVersion;
 
     const isNonInteractive = baseUrl && apiKey;
     baseUrl = validateBaseUrl(baseUrl);
@@ -53,9 +53,10 @@ const setup = async (
       polyApiBaseUrl = validateBaseUrl(polyApiBaseUrl);
       polyApiKey = await input({
         message: 'Poly App Key or User Key:',
-        default: process.env.POLY_API_KEY,
+        default: process.env.POLY_API_KEY? '*'.repeat(8) + process.env.POLY_API_KEY.slice(-4): '',
         transformer: (value) => value.trim(),
       });
+      polyApiKey = polyApiKey[0] === '*'? process.env.POLY_API_KEY: polyApiKey;
 
       if (process.env.ENVIRONMENT_SETUP_COMPLETE !== 'true') {
         const {

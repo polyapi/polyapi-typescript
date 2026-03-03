@@ -180,11 +180,11 @@ export const addOrUpdateCustomFunction = async (
     await generateSingleCustomFunction(polyPath, customFunction.id, updating);
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));
+
     shell.echo(
-      chalk.red(
-        (e instanceof Error ? e.message : e.response?.data?.message) ||
-          'Unexpected error.',
-      ),
+      `${chalk.redBright.bold(
+        e?.message ?? 'Unexpected error.',
+      )}:\n    ${chalk.red.italic(e?.response?.data?.message)}`,
     );
   }
 };
