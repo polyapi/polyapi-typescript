@@ -53,14 +53,12 @@ const getInstanceTagFromBaseUrl = (baseUrl?: string): string | undefined => {
     if (hostPrefix === 'develop') return 'develop';
     if (hostPrefix === 'staging') return 'staging';
     if (hostPrefix === 'test') return 'test';
-    if (hostPrefix === 'na1') return 'na1';
     if (hostPrefix === 'na2') return 'na2';
     if (hostPrefix === 'eu1') return 'eu1';
+    return 'na1';
   } catch {
     return undefined;
   }
-
-  return undefined;
 };
 
 const updateClient = async (tag: string) => {
@@ -77,7 +75,7 @@ const updateClient = async (tag: string) => {
   }
 };
 
-export const checkForClientVersionUpdate = async (polyPath: string) => {
+export const checkForClientVersionUpdate = async (polyPath: string, nonInteractiveMode = false) => {
   const config = loadConfig(polyPath) ?? {};
   const baseUrl =
     config.POLY_API_BASE_URL || process.env.POLY_API_BASE_URL || '';
@@ -97,10 +95,24 @@ export const checkForClientVersionUpdate = async (polyPath: string) => {
   const normalizedAvailable = normalizeVersion(availableVersion);
   if (!normalizedAvailable) return;
 
-  if (!semver.gt(normalizedAvailable, normalizedCurrent)) return;
+  const usingOlderVersion = semver.gt(normalizedAvailable, normalizedCurrent);
+  const usingNewerVersion = semver.lt(normalizedAvailable, normalizedCurrent);
+
+  if (!usingNewerVersion && !usingOlderVersion) return;
+
+  const warningMessage = `Instance "${instanceTag}" uses ${usingOlderVersion ? 'a later' : 'an older'} version of the Poly client. Current: ${currentVersion}, Instance: ${availableVersion}.`;
+
+  if (nonInteractiveMode) {
+    shell.echo(
+      chalk.yellow(
+        `${warningMessage} Please update to avoid any issues.`,
+      ),
+    );
+    return;
+  }
 
   const shouldUpdate = await confirm({
-    message: `A newer Poly client version is available for instance "${instanceTag}". Current: ${currentVersion}, available: ${availableVersion}. Update now?`,
+    message: `${warningMessage} Update now?`,
     default: true,
   });
 
@@ -109,7 +121,7 @@ export const checkForClientVersionUpdate = async (polyPath: string) => {
   } else {
     shell.echo(
       chalk.yellow(
-        `Continuing with older Poly client version ${currentVersion}.`,
+        `Continuing with ${usingOlderVersion ? 'older' : 'newer'} Poly client version ${currentVersion}. Please update to avoid any issues.`,
       ),
     );
   }

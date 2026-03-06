@@ -8,7 +8,7 @@ import { loadConfig } from './config';
 import { type RenameT } from './commands/model';
 import { DEFAULT_POLY_PATH } from './constants';
 import { isValidHttpUrl } from './utils';
-// import { checkForClientVersionUpdate } from './version';
+import { checkForClientVersionUpdate } from './version';
 
 if (process.env.NO_COLOR) {
   // Support NO_COLOR env variable https://no-color.org/
@@ -27,10 +27,12 @@ const checkPolyConfig = (polyPath: string) => {
 
 void yargs
   .usage('$0 <cmd> [args]')
-  // .middleware(async (argv) => {
-  //   if (!argv._?.length) return;
-  //   await checkForClientVersionUpdate(DEFAULT_POLY_PATH);
-  // })
+  .middleware(async (argv) => {
+    // Ignore if not using positional arguments
+    if (!argv._?.length) return;
+    const nonInteractiveMode = !!(process.env.POLY_API_KEY || process.env.POLY_API_BASE_URL);
+    await checkForClientVersionUpdate(DEFAULT_POLY_PATH, nonInteractiveMode);
+  })
   .command(
     'setup [baseUrl] [apiKey]',
     'Setups your Poly connection',
@@ -248,17 +250,20 @@ void yargs
             type: 'string',
           })
           .option('cache-poly-library', {
-            describe: 'Server function only - cache the poly library to improve function performance',
+            describe:
+              'Server function only - cache the poly library to improve function performance',
             type: 'boolean',
           })
           .option('visibility', {
-            describe: 'Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive',
+            describe:
+              'Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive',
             type: 'string',
           })
           .option('ignore-dependencies', {
-            describe: 'Skip parsing internal dependencies referenced within function.',
+            describe:
+              'Skip parsing internal dependencies referenced within function.',
             type: 'boolean',
-            default: true // TODO: Remove me once we have the internal dependency tracking kinks worked out!
+            default: true, // TODO: Remove me once we have the internal dependency tracking kinks worked out!
           }),
       async ({
         name,
@@ -276,28 +281,28 @@ void yargs
       }) => {
         const logsEnabled =
           logs === 'enabled' ? true : logs === 'disabled' ? false : undefined;
-        visibility = visibility ? visibility.toUpperCase() : "ENVIRONMENT";
+        visibility = visibility ? visibility.toUpperCase() : 'ENVIRONMENT';
         const err = !name
           ? 'Missing function name.'
           : !file
-              ? 'Missing function file path.'
-              : !client && !server
-                  ? 'You must specify `--server` or `--client`.`'
-                  : client && server
-                    ? 'Specify either `--server` or `--client`. Found both.'
-                    : generateContexts && !server
-                      ? 'Option `generateContexts` is only for server functions (--server).'
-                      : logs && !server
-                        ? 'Option `logs` is only for server functions (--server).'
-                        : logs && logsEnabled === undefined
-                          ? 'Invalid value for `logs` option.'
-                          : executionApiKey && !uuidValidate(executionApiKey)
-                            ? 'Invalid value for `execution-api-key`. Must be a valid PolyAPI Key.'
-                            : cachePolyLibrary && !server
-                              ? 'Option `cache-poly-library` is only for server functions (--server).'
-                              : !["PUBLIC", "TENANT", "ENVIRONMENT"].includes(visibility)
-                                ? 'Option `visibility` must be either PUBLIC, TENANT, or ENVIRONMENT. Case insensitive.' 
-                                : '';
+          ? 'Missing function file path.'
+          : !client && !server
+          ? 'You must specify `--server` or `--client`.`'
+          : client && server
+          ? 'Specify either `--server` or `--client`. Found both.'
+          : generateContexts && !server
+          ? 'Option `generateContexts` is only for server functions (--server).'
+          : logs && !server
+          ? 'Option `logs` is only for server functions (--server).'
+          : logs && logsEnabled === undefined
+          ? 'Invalid value for `logs` option.'
+          : executionApiKey && !uuidValidate(executionApiKey)
+          ? 'Invalid value for `execution-api-key`. Must be a valid PolyAPI Key.'
+          : cachePolyLibrary && !server
+          ? 'Option `cache-poly-library` is only for server functions (--server).'
+          : !['PUBLIC', 'TENANT', 'ENVIRONMENT'].includes(visibility)
+          ? 'Option `visibility` must be either PUBLIC, TENANT, or ENVIRONMENT. Case insensitive.'
+          : '';
         if (err) {
           shell.echo(chalk.redBright('ERROR:'), err);
           yargs.showHelp();
