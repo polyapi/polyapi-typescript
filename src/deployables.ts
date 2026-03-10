@@ -79,8 +79,8 @@ export type DeployableRecord = ParsedDeployableConfig & {
   };
   typeSchemas?: Record<string, any>;
   dependencies?: string[]; // old version of external dependencies
-  externalDependencies?: Record<string, string>,
-  internalDependencies?: Record<string, Array<{ path: string; id: string }>>,
+  externalDependencies?: Record<string, string>;
+  internalDependencies?: Record<string, Array<{ path: string; id: string }>>;
   description?: string;
   deployments: Deployment[];
   deploymentCommentRanges?: Array<[startIndex: number, endIndex: number]>;
@@ -172,10 +172,8 @@ export const getAllDeployableFilesWindows = ({
   excludeDirs,
 }: PolyDeployConfig): string[] => {
   // To get the equivalent of grep in Windows we use a combination of `dir` and `findstr`
-  const excludePattern = excludeDirs.length > 0 
-      ? excludeDirs
-        .map((f) => `\\${f}`)
-        .join(' ') : '';
+  const excludePattern =
+    excludeDirs.length > 0 ? excludeDirs.map((f) => `\\${f}`).join(' ') : '';
   const pattern =
     typeNames.length > 0
       ? typeNames.map((name) => `/C:"polyConfig: ${name}"`).join(' ')
@@ -191,15 +189,15 @@ export const getAllDeployableFilesWindows = ({
     const includePattern =
       dir === '.'
         ? includeFilesOrExtensions
-          .map((f) => (f.includes('.') ? f : `*.${f}`))
-          .join(' ')
+            .map((f) => (f.includes('.') ? f : `*.${f}`))
+            .join(' ')
         : includeFilesOrExtensions
-          .map((f) => (f.includes('.') ? f : `${dir}*.${f}`))
-          .join(' ');
+            .map((f) => (f.includes('.') ? f : `${dir}*.${f}`))
+            .join(' ');
     const dirCommand = `dir ${includePattern} /S /P /B `;
     const fullCommand = `${dirCommand}${excludeCommand}${searchCommand}`;
     try {
-      const output = shell.exec(fullCommand, {silent:true}).toString('utf8');
+      const output = shell.exec(fullCommand, { silent: true }).toString('utf8');
       result = result.concat(output.split(/\r?\n/).filter(Boolean));
     } catch {}
   }
@@ -215,10 +213,10 @@ export const getAllDeployableFilesLinux = ({
   // In Linux we can just use `grep` to find possible poly deployables
   const include = includeFilesOrExtensions.length
     ? includeFilesOrExtensions
-      .map((f) => {
-        return `--include=${f.includes('.') ? f : `*.${f}`}`;
-      })
-      .join(' ')
+        .map((f) => {
+          return `--include=${f.includes('.') ? f : `*.${f}`}`;
+        })
+        .join(' ')
     : '';
   const excludeDir = excludeDirs.length
     ? excludeDirs.map((dir) => `--exclude-dir=${dir}`).join(' ')
@@ -276,7 +274,7 @@ export const getRandomString = (length = 8) => {
   return Array.from({ length }, () =>
     Math.floor(Math.random() * 16).toString(16),
   ).join('');
-}
+};
 
 export const getGitRevision = (branchOrTag = 'HEAD'): string => {
   try {
@@ -408,7 +406,9 @@ export const writeUpdatedDeployable = async (
       throw new Error(`Unsupported deployable type: '${deployable.type}'`);
   }
   // Then write/overwrite any deployment comments (must happen last to prevent the JSDoc comment ranges from breaking)
-  if (deployable.type !== 'webhook') { fileContents = updateDeploymentComments(fileContents, deployable); }
+  if (deployable.type !== 'webhook') {
+    fileContents = updateDeploymentComments(fileContents, deployable);
+  }
   await writeFile(deployable.file, fileContents, {
     flag: 'w',
     encoding: 'utf8',
