@@ -3,7 +3,7 @@ import { getStringPaths, isPlainObjectPredicate } from '../../utils';
 import { JsonSchema, normalizeSchema, printSchemaAsType } from './schemaTypes'
 
 // Combine all definitions into a single, simple JSONSchema
-function combineDefinitions(schema: Record<string, unknown>, mapping: Map<string, JsonSchema>): JsonSchema {
+const combineDefinitions = (schema: Record<string, unknown>, mapping: Map<string, JsonSchema>): JsonSchema => {
   for (const key of Object.keys(schema)) {
     if (key === "$ref" && typeof schema['$ref'] === 'string') {
       const ref = decodeURI(schema['$ref']);
@@ -21,7 +21,7 @@ function combineDefinitions(schema: Record<string, unknown>, mapping: Map<string
   return schema;
 }
 
-function normalizeVariSchema(schema: JsonSchema): JsonSchema {
+const normalizeVariSchema = (schema: JsonSchema): JsonSchema => {
   let normalized = normalizeSchema(schema);
   // remove nested definitions in favor of embedding the schemas directly in place
   if (normalized.definitions) {
