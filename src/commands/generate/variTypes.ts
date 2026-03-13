@@ -11,7 +11,7 @@ const combineDefinitions = (schema: Record<string, unknown>, mapping: Map<string
         return combineDefinitions(mapping.get(ref), mapping);
       }
     } else if (Array.isArray(schema[key])) {
-      for (let i = 0; i < schema[key].length; i++) {
+      for (let i = 0; i < (schema[key] as Array<unknown>).length; i++) {
         schema[key][i] = combineDefinitions(schema[key][i], mapping);
       }
     } else if (schema[key] && typeof schema[key] === 'object') {

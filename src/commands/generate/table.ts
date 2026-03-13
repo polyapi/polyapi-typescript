@@ -6,8 +6,9 @@ import { echoGenerationError, templateUrl } from '../../utils';
 import { TableSpecification } from '../../types';
 import { toPascalCase } from '@guanghechen/helper-string';
 import { set } from 'lodash';
-import { JsonSchema, printSchemaAsType, ws } from './schemaTypes';
+import { JsonSchema, printSchemaAsType } from './schemaTypes';
 import { setGenerationErrors } from './types';
+import { ws } from './shared';
 
 type TableTree = Record<
   string,
