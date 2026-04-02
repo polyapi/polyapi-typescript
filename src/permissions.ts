@@ -20,6 +20,31 @@ export type PermissionRequirement = {
 
 let cachedPermissions: Set<string>;
 
+const getPermissionsErrorMessage = (error: any): string => {
+  const responseData = error?.response?.data;
+
+  if (typeof responseData === 'string' && responseData.trim()) {
+    return responseData;
+  }
+
+  if (responseData && typeof responseData === 'object') {
+    if (typeof responseData.message === 'string' && responseData.message.trim()) {
+      return responseData.message;
+    }
+    if (typeof responseData.error === 'string' && responseData.error.trim()) {
+      return responseData.error;
+    }
+    if (typeof responseData.detail === 'string' && responseData.detail.trim()) {
+      return responseData.detail;
+    }
+  }
+
+  return (
+    error?.message ||
+    'Unknown error while validating permissions.'
+  );
+};
+
 const extractPermissions = (authData: any): Set<string> => {
   const source = authData?.permissions;
 
@@ -76,7 +101,7 @@ export const makeRequirement = (permission: PolyPermission): PermissionRequireme
   action: PERMISSION_ACTIONS[String(permission)] ?? String(permission),
 });
 
-export const buildModelTrainingRequirements = (spec: any): PermissionRequirement[] => {
+export const buildModelRequirements = (spec: any): PermissionRequirement[] => {
   const reqs: PermissionRequirement[] = [];
   if (spec?.functions?.length) reqs.push(makeRequirement('manageApiFunctions'));
   if (spec?.schemas?.length) reqs.push(makeRequirement('manageSchemas'));
@@ -117,10 +142,7 @@ export const ensurePermissions = async (
     return false;
   } catch (error: any) {
     const status = error?.response?.status;
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      'Unknown error while validating permissions.';
+    const message = getPermissionsErrorMessage(error);
 
     shell.echo(
       chalk.redBright('ERROR:'),
