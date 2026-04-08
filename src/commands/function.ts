@@ -1,6 +1,7 @@
 import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
+import { toPascalCase } from '@guanghechen/helper-string';
 import {
   CreateServerCustomFunctionResponseDto,
   FunctionDetailsDto,
@@ -33,7 +34,7 @@ export const addOrUpdateCustomFunction = async (
   executionApiKey: string | null | undefined,
   cachePolyLibrary: boolean | undefined,
   visibility: string | undefined,
-  ignoreDependencies: boolean | undefined
+  ignoreDependencies: boolean | undefined,
 ) => {
   loadConfig(polyPath);
 
@@ -79,8 +80,30 @@ export const addOrUpdateCustomFunction = async (
       }
     }
 
-    const typeSchemas = generateTypeSchemas(file, DeployableTypeEntries.map(d => d[0]), name);
-    const [externalDependencies, internalDependencies] = await getDependencies(code, file, tsConfigBaseUrl, ignoreDependencies);
+    const [externalDependencies, internalDependencies] = await getDependencies(
+      code,
+      file,
+      tsConfigBaseUrl,
+      ignoreDependencies,
+    );
+    const referencedSchemas =
+      internalDependencies && 'schema' in internalDependencies
+        ? Object.fromEntries(
+            internalDependencies.schema.map((schema) => [
+              `schemas.${schema.path
+                .split('.')
+                .map((s) => toPascalCase(s))
+                .join('.')}`,
+              { 'x-poly-ref': { path: schema.path } },
+            ]),
+          )
+        : null;
+    const typeSchemas = generateTypeSchemas(
+      file,
+      DeployableTypeEntries.map((d) => d[0]),
+      name,
+      referencedSchemas,
+    );
 
     if (server) {
       shell.echo(
@@ -97,9 +120,12 @@ export const addOrUpdateCustomFunction = async (
       }
 
       const other: Record<string, any> = {};
-      if (generateContexts) { other.generateContexts = generateContexts.split(','); }
+      if (generateContexts) {
+        other.generateContexts = generateContexts.split(',');
+      }
       if (logsEnabled !== undefined) other.logsEnabled = logsEnabled;
-      if (cachePolyLibrary !== undefined) other.cachePolyLibrary = cachePolyLibrary;
+      if (cachePolyLibrary !== undefined)
+        other.cachePolyLibrary = cachePolyLibrary;
       customFunction = await createOrUpdateServerFunction(
         context,
         name,
@@ -107,8 +133,8 @@ export const addOrUpdateCustomFunction = async (
         code,
         visibility,
         typeSchemas,
-        externalDependencies,
-        internalDependencies,
+        externalDependencies || null,
+        ignoreDependencies ? null : internalDependencies || null,
         other,
         executionApiKey,
       );
@@ -144,8 +170,8 @@ export const addOrUpdateCustomFunction = async (
         code,
         visibility,
         typeSchemas,
-        externalDependencies,
-        internalDependencies,
+        externalDependencies || null,
+        ignoreDependencies ? null : internalDependencies || null,
       );
       shell.echo(chalk.green('DONE'));
       shell.echo(`Client Function ID: ${customFunction.id}`);

@@ -75,4 +75,4 @@ const unregister = poly.myWebhookContext.paymentReceieved(event => {
 unregister();
 ```
 
-Happy hacking!!
+Happy hacking!
