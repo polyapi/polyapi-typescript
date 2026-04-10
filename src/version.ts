@@ -76,6 +76,8 @@ const updateClient = async (tag: string) => {
 };
 
 export const checkForClientVersionUpdate = async (polyPath: string, nonInteractiveMode = false) => {
+  if (process.env.POLY_SKIP_VERSION_CHECK === 'true') return;
+
   const config = loadConfig(polyPath) ?? {};
   const baseUrl =
     config.POLY_API_BASE_URL || process.env.POLY_API_BASE_URL || '';
