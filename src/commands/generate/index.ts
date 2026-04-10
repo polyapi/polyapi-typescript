@@ -573,12 +573,14 @@ const generate = async ({
   names,
   ids,
   noTypes,
+  noDocs,
 }: {
   polyPath: string;
   contexts?: string[];
   names?: string[];
   ids?: string[];
   noTypes: boolean;
+  noDocs?: boolean;
 }) => {
   let specs: Specification[] = [];
 
@@ -594,7 +596,7 @@ const generate = async ({
   const tempPath = libPath.replace('/lib', '/temp');
 
   try {
-    specs = await getSpecs(contexts, names, ids, noTypes);
+    specs = await getSpecs(contexts, names, ids, noTypes, noDocs);
     writeCachedSpecs(tempPath, specs);
     updateLocalConfig(polyPath, contexts, names, ids, noTypes);
   } catch (error) {

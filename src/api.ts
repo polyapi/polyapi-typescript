@@ -77,6 +77,7 @@ export const getSpecs = async (
   names?: string[],
   ids?: string[],
   noTypes?: boolean,
+  noDocs?: boolean,
 ) => {
   return (
     await axios.get<Specification[]>(`${getApiBaseURL()}/specs`, {
@@ -86,6 +87,7 @@ export const getSpecs = async (
         names,
         ids,
         noTypes,
+        noDocs,
       },
     })
   ).data;

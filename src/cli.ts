@@ -96,6 +96,12 @@ void yargs
           type: 'boolean',
           alias: 'no-types',
         },
+        noDocs: {
+          describe: 'Skip fetching documentation/display metadata (descriptions, otherReturnTypes, visibilityMetadata)',
+          demandOption: false,
+          type: 'boolean',
+          alias: 'no-docs',
+        },
       });
     },
     async ({
@@ -105,6 +111,7 @@ void yargs
       ids,
       customPath = DEFAULT_POLY_PATH,
       noTypes = false,
+      noDocs = false,
     }) => {
       if (!checkPolyConfig(customPath)) {
         if (exitWhenNoConfig) {
@@ -130,6 +137,7 @@ void yargs
         names: names?.split(','),
         ids: ids?.split(','),
         noTypes,
+        noDocs,
       });
     },
   )
