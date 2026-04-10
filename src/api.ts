@@ -79,9 +79,14 @@ export const getSpecs = async (
   noTypes?: boolean,
   noDocs?: boolean,
 ) => {
+  const gzipEnabled = process.env.POLY_DISABLE_GZIP !== 'true';
   return (
     await axios.get<Specification[]>(`${getApiBaseURL()}/specs`, {
-      headers: getApiHeaders(),
+      headers: {
+        ...getApiHeaders(),
+        'Accept-Encoding': gzipEnabled ? 'gzip' : 'identity',
+      },
+      decompress: gzipEnabled,
       params: {
         contexts,
         names,
