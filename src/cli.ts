@@ -258,6 +258,11 @@ void yargs
               'Server function only - only include certain contexts to speed up function execution',
             type: 'string',
           })
+          .option('skip-generate', {
+            describe:
+              'Skip running generate after function add command, especially useful if you are deploying a bunch of functions at once. Run generate manually at the end!',
+            type: 'boolean',
+          })
           .option('execution-api-key', {
             describe: 'Optional API key for server functions',
             type: 'string',
@@ -287,6 +292,7 @@ void yargs
         server,
         logs,
         generateContexts,
+        skipGenerate,
         executionApiKey,
         cachePolyLibrary,
         visibility,
@@ -351,6 +357,7 @@ void yargs
           cachePolyLibrary,
           visibility,
           ignoreDependencies,
+          skipGenerate,
         );
       },
     );

@@ -35,6 +35,7 @@ export const addOrUpdateCustomFunction = async (
   cachePolyLibrary: boolean | undefined,
   visibility: string | undefined,
   ignoreDependencies: boolean | undefined,
+  skipGenerate: boolean | undefined,
 ) => {
   loadConfig(polyPath);
 
@@ -177,14 +178,18 @@ export const addOrUpdateCustomFunction = async (
       shell.echo(`Client Function ID: ${customFunction.id}`);
     }
 
-    await generateSingleCustomFunction(polyPath, customFunction.id, updating);
+    if (skipGenerate) {
+      shell.echo('Flag --skip-generate received. Skipping generate step.');
+    } else {
+      await generateSingleCustomFunction(polyPath, customFunction.id, updating);
+    }
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));
 
     shell.echo(
       `${chalk.redBright.bold(
-        e?.message ?? 'Unexpected error.',
-      )}:\n    ${chalk.red.italic(e?.response?.data?.message)}`,
+        (e as any)?.message ?? 'Unexpected error.',
+      )}:\n    ${chalk.red.italic((e as any)?.response?.data?.message)}`,
     );
   }
 };
