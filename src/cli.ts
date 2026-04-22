@@ -97,7 +97,7 @@ void yargs
           alias: 'no-types',
         },
         noDocs: {
-          describe: 'Skip fetching documentation/display metadata (descriptions, otherReturnTypes, visibilityMetadata)',
+          describe: 'Skip fetching documentation/display metadata. Do not use if using function dependency tracking.',
           demandOption: false,
           type: 'boolean',
           alias: 'no-docs',
