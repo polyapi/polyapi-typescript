@@ -48,11 +48,12 @@ const nodeEnv = process.env.NODE_ENV;
 const isDevEnv = nodeEnv === 'development';
 
 const getApiBaseURL = () => {
-  if (isDevEnv) {
-    return process.env.POLY_API_BASE_URL;
-  } else {
-    return process.env.POLY_API_BASE_URL.replace(/^http:/, 'https://');
+  if (!isDevEnv && process.env.POLY_API_BASE_URL?.startsWith('http:')) {
+    console.warn(
+      `Using POLY_API_BASE_URL with http in production environment is not recommended. If you are using a custom base URL, please make sure it is using https.`,
+    );
   }
+  return process.env.POLY_API_BASE_URL;
 };
 
 const getApiHeaders = () => ({
