@@ -74,12 +74,10 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
     ).then(({ headers, data }) => {
       polyHeaders = headers;
       if (data && (data.status < 200 || data.status >= 300) && process.env.LOGS_ENABLED) {
-        let responseData = data.data;
-        try {
-          responseData = JSON.stringify(data.data);
-        } catch (err) {}
+        const responseData = safeStringify(data.data);
         requestArgs = scrub(requestArgs)
-        console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', scrubbedArgs, 'Response data:', responseData);
+        const requestData = safeStringify(requestArgs);
+        console.error('Error direct executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestData, 'Response data:', responseData);
       }
 
       serverPreperationTimeMs = Number(polyHeaders['x-poly-execution-duration']);
@@ -97,8 +95,10 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       })
     }).then(({ headers, data, status }) => {
       if (status && (status < 200 || status >= 300) && process.env.LOGS_ENABLED) {
+        const responseData = safeStringify(data.data);
         requestArgs = scrub(requestArgs)
-        console.error('Error direct executing api function with id:', id, 'Status code:', status, 'Request data:', requestArgs, 'Response data:', data.data);
+        const requestData = safeStringify(requestArgs);
+        console.error('Error direct executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestData, 'Response data:', responseData);
       }
       const apiExecutionTimeMs = Date.now() - requestApiStartTime;
       return {
@@ -125,12 +125,10 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
     }
   ).then(({ headers, data }) => {
     if (data && (data.status < 200 || data.status >= 300) && process.env.LOGS_ENABLED) {
-      let responseData = data.data;
-      try {
-        responseData = JSON.stringify(data.data);
-      } catch (err) {}
+      const responseData = safeStringify(data.data);
       requestArgs = scrub(requestArgs)
-      console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestArgs, 'Response data:', responseData);
+      const requestData = safeStringify(requestArgs);
+      console.error('Error executing api function with id:', id, 'Status code:', data.status, 'Request data:', requestData, 'Response data:', responseData);
     }
     const serverExecutionTimeMs = Number(headers['x-poly-execution-duration']);
     const roundTripNetworkLatencyMs = Date.now() - requestServerStartTime - serverExecutionTimeMs;
@@ -142,6 +140,14 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       }
     };
   }).catch(handleError);
+}
+
+function safeStringify(obj) {
+  try {
+    return JSON.stringify(obj, null, 2);
+  } catch (err) {
+    // silently swallow error and just log input
+  }
 }
 
 module.exports = (clientID, polyCustom) => functions.reduce(
