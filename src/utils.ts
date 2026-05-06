@@ -29,10 +29,7 @@ export const getCachedSpecs = (libPath: string) => {
   }
 };
 
-export const writeCachedSpecs = (
-  libPath: string,
-  specs: Specification[],
-) => {
+export const writeCachedSpecs = (libPath: string, specs: Specification[]) => {
   fs.mkdirSync(libPath, { recursive: true });
   fs.writeFileSync(
     `${libPath}/specs.json`,
@@ -53,7 +50,6 @@ export const writeCachedSpecs = (
   );
 };
 
-
 export type GenerationError = {
   specification: Specification;
   stack: string;
@@ -70,7 +66,7 @@ export const echoGenerationError = (specification: Specification) => {
     serverVariable: 'Variable',
     schema: 'Schema',
     snippet: 'Snippet',
-    table: 'Table'
+    table: 'Table',
   };
 
   const type = typeMap[specification.type];
@@ -82,7 +78,8 @@ export const echoGenerationError = (specification: Specification) => {
   );
 };
 
-export const templateUrl = (fileName: string): string => `${__dirname}/templates/${fileName}`;
+export const templateUrl = (fileName: string): string =>
+  `${__dirname}/templates/${fileName}`;
 
 export const loadTemplate = (fileName: string) =>
   fs.readFileSync(templateUrl(fileName), 'utf8');

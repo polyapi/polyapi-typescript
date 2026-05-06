@@ -28,6 +28,8 @@ import {
   iterateRefs,
   toTypeDeclaration,
 } from '../../utils';
+import { printSchemaAsType } from './schemaTypes';
+import { getVariableValueTypeDeclarations } from './variTypes';
 
 interface Context {
   name: string;
@@ -446,9 +448,9 @@ const getSpecificationWithFunctionComment = (
 ) => {
   const descriptionComment = specification.description
     ? specification.description
-      .split('\n')
-      .map((line) => `* ${line}`)
-      .join('\n')
+        .split('\n')
+        .map((line) => `* ${line}`)
+        .join('\n')
     : null;
   const toArgumentComment = (arg: PropertySpecification, prefix = '') => {
     if (
@@ -489,9 +491,9 @@ const getSpecificationWithVariableComment = (
 ) => {
   const descriptionComment = specification.description
     ? specification.description
-      .split('\n')
-      .map((line) => `* ${line}`)
-      .join('\n')
+        .split('\n')
+        .map((line) => `* ${line}`)
+        .join('\n')
     : null;
   const secretComment =
     specification.variable.secrecy === 'SECRET'
@@ -505,37 +507,13 @@ const getSpecificationWithVariableComment = (
   }${idComment ? `*\n${idComment}` : ''}`.trim();
 };
 
-const getVariableValueTypeDeclarations = async (
-  namespacePath: string,
-  namespace: string,
-  objectProperty: ObjectPropertyType,
-  value: any,
-): Promise<string> => {
-  const declarations = await schemaToDeclarations(
-    namespace,
-    'ValueType',
-    objectProperty.schema,
-    value,
-    {
-      unknownAny: false,
-    },
-  );
-
-  // setting typeName to be used when generating variable value type
-  objectProperty.typeName = `${
-    namespacePath ? `${namespacePath}.` : ''
-  }${namespace}.ValueType`;
-
-  return declarations;
-};
-
 const getSpecificationsTypeDeclarations = async (
   namespacePath: string,
   specifications: Specification[],
 ): Promise<string> => {
   const errors: GenerationError[] = [];
   const getDeclarationOrHandleError = async (
-    getDeclaration: () => Promise<string[] | string>,
+    getDeclaration: () => Promise<string[] | string> | string[] | string,
     specification: Specification,
   ): Promise<string[] | string> => {
     try {
@@ -620,7 +598,7 @@ const getSpecificationsTypeDeclarations = async (
                 namespacePath,
                 toPascalCase(spec.name),
                 spec.variable.valueType as ObjectPropertyType,
-                spec.variable.value,
+                spec.variable.value as Record<string, unknown> | Array<unknown>,
               ),
             spec,
           ) as Promise<string>,
