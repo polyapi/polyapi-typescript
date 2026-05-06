@@ -96,12 +96,14 @@ const getAllDeployables = async (
       );
       const fullName = `${deployable.context}.${deployable.name}`;
       if (found.has(fullName)) {
-        shell.echo(chalk.redBright(
-          `Prepared ${deployable.type.replaceAll(
-            '-',
-            ' ',
-          )} ${fullName}: DUPLICATE`,
-        ));
+        shell.echo(
+          chalk.redBright(
+            `Prepared ${deployable.type.replaceAll(
+              '-',
+              ' ',
+            )} ${fullName}: DUPLICATE`,
+          ),
+        );
       } else {
         found.set(
           fullName,
@@ -161,19 +163,23 @@ export const prepareDeployables = async (
         writeUpdatedDeployable(deployable, disableDocs),
       ),
     );
-    const staged = shell.exec('git diff --name-only --cached', {silent:true})
-      .toString().split('\n').filter(Boolean);
-    const rootPath: string = shell.exec('git rev-parse --show-toplevel', {silent:true})
-      .toString('utf8').replace('\n', '');
+    const staged = shell
+      .exec('git diff --name-only --cached', { silent: true })
+      .toString()
+      .split('\n')
+      .filter(Boolean);
+    const rootPath: string = shell
+      .exec('git rev-parse --show-toplevel', { silent: true })
+      .toString('utf8')
+      .replace('\n', '');
     for (const deployable of dirtyDeployables) {
-      try{
+      try {
         const deployableName = deployable.file.replace(`${rootPath}/`, '');
         if (staged.includes(deployableName)) {
           shell.echo(`Staging ${deployableName}`);
           shell.exec(`git add ${deployableName}`);
         }
-      } 
-      catch (error) {
+      } catch (error) {
         console.warn(error);
       }
     }

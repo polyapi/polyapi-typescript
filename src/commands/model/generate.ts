@@ -35,9 +35,24 @@ const slugify = (content: string) =>
 
 const axiosClient = Axios.create();
 
+const isRemoteSpecPath = (specPath: string) => {
+  try {
+    const parsed = new URL(specPath);
+    return parsed.protocol !== 'file:';
+  } catch {
+    return false;
+  }
+};
+
+const getOutputBaseDir = (sourcePath?: string) => {
+  if (!sourcePath || isRemoteSpecPath(sourcePath)) return '.';
+  return path.dirname(path.resolve(sourcePath));
+};
+
 const writeModelFile = async (
   title: string,
   specificationInput: SpecificationInputDto,
+  sourcePath?: string,
   destination?: string,
   rename: RenameT = [],
 ) => {
@@ -95,13 +110,21 @@ const writeModelFile = async (
     );
   }
 
+  const baseDir = getOutputBaseDir(sourcePath);
+
   const writeFile = (fileName: string) => {
-    return write(path.join('./', fileName), contents, { encoding: 'utf-8' });
+    const outputPath = path.isAbsolute(fileName)
+      ? fileName
+      : path.join(baseDir, fileName);
+
+    return write(outputPath, contents, { encoding: 'utf-8' });
   };
 
   if (destination) {
     await writeFile(destination);
-    return path.join('./', destination);
+    return path.isAbsolute(destination)
+      ? destination
+      : path.join(baseDir, destination);
   } else {
     const getFilename = (currentCount: number) => {
       return currentCount === 0
@@ -113,13 +136,13 @@ const writeModelFile = async (
     let foundSingleName = false;
 
     try {
-      await access(path.join('./', `${title}.json`));
+      await access(path.join(baseDir, `${title}.json`));
       foundSingleName = true;
     } catch (error) {
       // Do nothing.
     }
 
-    for (const file of await readDir('.')) {
+    for (const file of await readDir(baseDir)) {
       const matchResult = file.match(
         new RegExp(`${escapeRegExp(title)}-([0-9])+`),
       );
@@ -139,7 +162,7 @@ const writeModelFile = async (
 
     await writeFile(fileName);
 
-    return fileName;
+    return path.join(baseDir, fileName);
   }
 };
 
@@ -337,7 +360,7 @@ export const generateModel = async (
 
     let contents = '';
 
-    if (specPath.startsWith('https://')) {
+    if (isRemoteSpecPath(specPath)) {
       try {
         shell.echo('Fetching open api specs from provided url...');
         const response = await axiosClient.get(specPath);
@@ -359,8 +382,14 @@ export const generateModel = async (
         shell.echo('Ai generation is disabled.');
       }
 
-      if (destination && fs.existsSync(path.join('./', destination))) {
-        throw new Error('Destination file already exists.');
+      if (destination) {
+        const destinationPath = path.isAbsolute(destination)
+          ? destination
+          : path.join(getOutputBaseDir(specPath), destination);
+
+        if (fs.existsSync(destinationPath)) {
+          throw new Error('Destination file already exists.');
+        }
       }
 
       if (hostUrlAsArgument === '') {
@@ -374,7 +403,10 @@ export const generateModel = async (
         hostUrlAsArgument,
       );
 
-      await processResources<(typeof specificationInputDto.functions)[number], ApiFunctionDescriptionGenerationDto>({
+      await processResources<
+        (typeof specificationInputDto.functions)[number],
+        ApiFunctionDescriptionGenerationDto
+      >({
         resources: specificationInputDto.functions,
         aiDataProcessor(resource, aiData) {
           resource.name = aiData.name;
@@ -404,7 +436,10 @@ export const generateModel = async (
         resourceName: 'function',
       });
 
-      await processResources<(typeof specificationInputDto.webhooks)[number], WebhookHandleDescriptionGenerationDto>({
+      await processResources<
+        (typeof specificationInputDto.webhooks)[number],
+        WebhookHandleDescriptionGenerationDto
+      >({
         resources: specificationInputDto.webhooks,
         aiDataProcessor(resource, aiData) {
           resource.name = aiData.name;
@@ -435,6 +470,7 @@ export const generateModel = async (
       const createdFileName = await writeModelFile(
         specificationInputDto.title,
         specificationInputDto,
+        specPath,
         destination,
         rename,
       );

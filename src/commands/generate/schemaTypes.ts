@@ -5,22 +5,9 @@ import { EOL } from 'node:os';
 import { SchemaRef, SchemaSpecification } from '../../types';
 import { echoGenerationError } from '../../utils';
 import { setGenerationErrors } from './types';
-import shell from 'shelljs'
+import shell from 'shelljs';
 import chalk from 'chalk';
-
-const unsafeCharacters = /(?:^\d)|[^0-9a-zA-Z_]/gi;
-const unescapedSingleQuote = /\b'\b/gi;
-
-const wrapUnsafeNames = (name: string) => {
-  if (!name.match(unsafeCharacters)) return name;
-  if (name.includes("'")) name = name.replaceAll(unescapedSingleQuote, "'");
-  return `'${name}'`;
-};
-
-const formatName = (name: string, nested = false) =>
-  name === '[k: string]'
-    ? name
-    : wrapUnsafeNames(nested ? name : toPascalCase(name));
+import { end, formatName, NestedT, printComment, wrapParens, ws } from './shared';
 
 type JsonSchemaType =
   | 'string'
@@ -73,34 +60,6 @@ export type SchemaSpec = Omit<SchemaSpecification, 'definition'> & {
 
 type SchemaTree = Record<string, SchemaSpec | Record<string, SchemaSpec>>;
 
-export const ws = memoize((depth = 1) =>
-  depth < 0 ? '' : new Array(depth).fill('  ').join(''),
-);
-const end = memoize((nested?: NestedT) =>
-  !nested || nested === 'object' ? ';' : '',
-);
-
-const wrapParens = (v: string): string =>
-  v.includes('| ') || v.includes('& ') ? `(${v})` : v;
-
-const printComment = (comment = '', depth = 0, deprecated = false) => {
-  if (!comment && !deprecated) return '';
-
-  if (!comment && deprecated) {
-    return `${ws(depth)}/**${EOL}${ws(depth)} * @deprecated${EOL}${ws(
-      depth,
-    )} */${EOL}`;
-  }
-
-  const nl = comment.includes(EOL) ? EOL : '\n';
-  return [
-    `${ws(depth)}/**${deprecated ? `${EOL}${ws(depth)} * @deprecated` : ''}`,
-    ...comment.split(nl).map((line) => `${ws(depth)} * ${line}`),
-    `${ws(depth)} */${EOL}`,
-  ].join(EOL);
-};
-
-type NestedT = undefined | null | 'object' | 'array' | 'union' | 'intersection';
 type PrintSchemaFn = (
   schema: JsonSchema,
   key: string,
@@ -284,7 +243,9 @@ const printTupleSchema: PrintSchemaFn = (
   nested,
   optional = false,
 ) => {
-  if (!Array.isArray(schema.items)) { throw new Error('schema.items should be an array to use this function'); }
+  if (!Array.isArray(schema.items)) {
+    throw new Error('schema.items should be an array to use this function');
+  }
   let result = `${printComment(
     schema.description,
     depth,
@@ -327,7 +288,9 @@ const printArraySchema: PrintSchemaFn = (
   nested,
   optional = false,
 ) => {
-  if (Array.isArray(schema.items)) { return printTupleSchema(schema, key, depth, nested, optional); }
+  if (Array.isArray(schema.items)) {
+    return printTupleSchema(schema, key, depth, nested, optional);
+  }
 
   let result = `${printComment(
     schema.description,
@@ -513,12 +476,24 @@ export const printSchemaAsType: PrintSchemaFn = (
   nested,
   optional = false,
 ): string => {
-  if (schema['x-poly-ref']) { return printPolyRefSchema(schema, key, depth, nested, optional); }
-  if (schema.const !== undefined) { return printConstSchema(schema, key, depth, nested, optional); }
-  if (Array.isArray(schema.enum) && schema.enum.length) { return printEnumSchema(schema, key, depth, nested, optional); }
-  if (Array.isArray(schema.type) && schema.type.length) { return printMultiTypeSchema(schema, key, depth, nested, optional); }
-  if (Array.isArray(schema.anyOf) && schema.anyOf.length) { return printUnionSchema(schema, key, depth, nested, optional); }
-  if (Array.isArray(schema.allOf) && schema.allOf.length) { return printIntersectionSchema(schema, key, depth, nested, optional); }
+  if (schema['x-poly-ref']) {
+    return printPolyRefSchema(schema, key, depth, nested, optional);
+  }
+  if (schema.const !== undefined) {
+    return printConstSchema(schema, key, depth, nested, optional);
+  }
+  if (Array.isArray(schema.enum) && schema.enum.length) {
+    return printEnumSchema(schema, key, depth, nested, optional);
+  }
+  if (Array.isArray(schema.type) && schema.type.length) {
+    return printMultiTypeSchema(schema, key, depth, nested, optional);
+  }
+  if (Array.isArray(schema.anyOf) && schema.anyOf.length) {
+    return printUnionSchema(schema, key, depth, nested, optional);
+  }
+  if (Array.isArray(schema.allOf) && schema.allOf.length) {
+    return printIntersectionSchema(schema, key, depth, nested, optional);
+  }
   switch (schema.type) {
     case 'object':
       return printObjectSchema(schema, key, depth, nested, optional);
@@ -571,7 +546,7 @@ const printSchemaTreeAsTypes = (
   return result;
 };
 
-const normalizeSchema = <S extends SchemaSpec | JsonSchema>(schema: S): S => {
+export const normalizeSchema = <S extends SchemaSpec | JsonSchema>(schema: S): S => {
   if (schema.type === 'schema') {
     schema.definition.title = schema.name;
     schema.definition.description =
@@ -638,8 +613,12 @@ const getPolySchemaRefs = (schema: JsonSchema): string[] => {
   if (schema['x-poly-ref']) return [schema['x-poly-ref'].path];
   let toSearch = [];
   if (schema.schemas) toSearch = toSearch.concat(Object.values(schema.schemas));
-  if (schema.properties) { toSearch = toSearch.concat(Object.values(schema.properties)); }
-  if (schema.patternProperties) { toSearch = toSearch.concat(Object.values(schema.patternProperties)); }
+  if (schema.properties) {
+    toSearch = toSearch.concat(Object.values(schema.properties));
+  }
+  if (schema.patternProperties) {
+    toSearch = toSearch.concat(Object.values(schema.patternProperties));
+  }
   if (schema.items) {
     if (Array.isArray(schema.items)) {
       toSearch = toSearch.concat(schema.items);
@@ -648,7 +627,9 @@ const getPolySchemaRefs = (schema: JsonSchema): string[] => {
     }
   }
   if (typeof schema.additionalItems === 'object') toSearch.push(schema.items);
-  if (typeof schema.additionalProperties === 'object') { toSearch.push(schema.additionalProperties); }
+  if (typeof schema.additionalProperties === 'object') {
+    toSearch.push(schema.additionalProperties);
+  }
   if (Array.isArray(schema.allOf)) toSearch = toSearch.concat(schema.allOf);
   if (Array.isArray(schema.anyOf)) toSearch = toSearch.concat(schema.anyOf);
   return toSearch.flatMap((s) => getPolySchemaRefs(s));
@@ -722,19 +703,24 @@ const replaceJsonSchemasWithPolyAPISchemas = (
   schema: JsonSchema,
   mapping: Map<string, string>,
 ): void => {
-  if (schema['$ref'] && mapping.has(schema['$ref'])) {
-    const ref = schema['ref'] && typeof schema['ref'] === 'string' ? decodeURI(schema['ref']) : '';
-    if (ref && mapping.has(ref)) {
-      schema['x-poly-ref'] = {
-        path: mapping.get(ref),
-      };
-      delete schema['$ref'];
-    }
+  const ref =
+    schema['ref'] && typeof schema['ref'] === 'string'
+      ? decodeURI(schema['ref'])
+      : '';
+  if (ref && mapping.has(ref)) {
+    schema['x-poly-ref'] = {
+      path: mapping.get(ref),
+    };
+    delete schema['$ref'];
   }
   let toSearch = [];
   if (schema.schemas) toSearch = toSearch.concat(Object.values(schema.schemas));
-  if (schema.properties) { toSearch = toSearch.concat(Object.values(schema.properties)); }
-  if (schema.patternProperties) { toSearch = toSearch.concat(Object.values(schema.patternProperties)); }
+  if (schema.properties) {
+    toSearch = toSearch.concat(Object.values(schema.properties));
+  }
+  if (schema.patternProperties) {
+    toSearch = toSearch.concat(Object.values(schema.patternProperties));
+  }
   if (schema.items) {
     if (Array.isArray(schema.items)) {
       toSearch = toSearch.concat(schema.items);
@@ -743,7 +729,9 @@ const replaceJsonSchemasWithPolyAPISchemas = (
     }
   }
   if (typeof schema.additionalItems === 'object') toSearch.push(schema.items);
-  if (typeof schema.additionalProperties === 'object') { toSearch.push(schema.additionalProperties); }
+  if (typeof schema.additionalProperties === 'object') {
+    toSearch.push(schema.additionalProperties);
+  }
   if (Array.isArray(schema.allOf)) toSearch = toSearch.concat(schema.allOf);
   if (Array.isArray(schema.anyOf)) toSearch = toSearch.concat(schema.anyOf);
   for (const s of toSearch) replaceJsonSchemasWithPolyAPISchemas(s, mapping);
@@ -864,8 +852,6 @@ export const generateSchemaTSDeclarationFiles = async (
 };
 
 export const __test = {
-  formatName,
-  printComment,
   printSchemaAsType,
   buildSchemaTree,
   printSchemaSpecs,
