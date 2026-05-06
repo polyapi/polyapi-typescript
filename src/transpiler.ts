@@ -18,6 +18,7 @@ import { getCachedSpecs, getPolyLibPath, writeCachedSpecs } from './utils';
 import { DEFAULT_POLY_PATH } from './constants';
 import { Specification } from './types';
 import { getSpecs } from './api';
+import { toPascalCase } from '@guanghechen/helper-string';
 
 // NodeJS built-in libraries + polyapi
 // https://www.w3schools.com/nodejs/ref_modules.asp
@@ -264,7 +265,7 @@ export const getDependencies = async (
               }
 
               // Pull out internal dependencies
-              if (lookForInternalDependencies) {
+              if (!ignoreDependencies && lookForInternalDependencies) {
                 // Track assignments of poly imports to follow aliases
                 if (ts.isVariableDeclaration(node) && node.initializer) {
                   const initializer = unwrapExpression(node.initializer);
@@ -441,7 +442,7 @@ export const getDependencies = async (
               }
 
               // Capture type references
-              if (schemasImportIdentifier && ts.isTypeReferenceNode(node)) {
+              if (!ignoreDependencies && schemasImportIdentifier && ts.isTypeReferenceNode(node)) {
                 const path = flattenTypeName(node.typeName);
                 if (path.startsWith(schemasImportIdentifier)) {
                   internalReferences.add(path);
