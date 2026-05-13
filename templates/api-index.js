@@ -147,6 +147,7 @@ function safeStringify(obj) {
     return JSON.stringify(obj, null, 2);
   } catch (err) {
     // silently swallow error and just log input
+    return obj;
   }
 }
 
