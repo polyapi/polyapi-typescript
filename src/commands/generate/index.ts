@@ -150,38 +150,29 @@ const generateJSFiles = async (
     (spec) => spec.type === 'graphqlSubscription',
   ) as GraphQLSubscriptionSpecification[];
 
-  await generateIndexJSFile(libPath);
-  await generatePolyCustomJSFile(libPath);
-  await generateAxiosJSFile(libPath);
-  await generateErrorHandlerFile(libPath);
-  await tryAsync(
-    generateApiFunctionJSFiles(libPath, apiFunctions),
-    'api functions',
-  );
-  const customFnCodeGenerationErrors = await tryAsync(
+  // Each helper writes to its own subdirectory (created up-front by prepareDir),
+  // so they can all run in parallel.
+  const customFnPromise = tryAsync(
     generateCustomFunctionJSFiles(libPath, customFunctions),
     'custom functions',
   );
-  await tryAsync(generateWebhooksJSFiles(libPath, webhookHandles), 'webhooks');
-  await tryAsync(
-    generateGraphQLSubscriptionJSFiles(libPath, gqlSubscriptions),
-    'GraphQL subscriptions',
-  );
-  await tryAsync(
-    generateAuthFunctionJSFiles(libPath, authFunctions),
-    'auth functions',
-  );
-  await tryAsync(
-    generateServerFunctionJSFiles(libPath, serverFunctions),
-    'server functions',
-  );
-  await tryAsync(
-    generateServerVariableJSFiles(libPath, serverVariables),
-    'variables',
-  );
-  await tryAsync(generateTableJSFiles(libPath, tables), 'tables');
 
-  return customFnCodeGenerationErrors;
+  await Promise.all([
+    generateIndexJSFile(libPath),
+    generatePolyCustomJSFile(libPath),
+    generateAxiosJSFile(libPath),
+    generateErrorHandlerFile(libPath),
+    tryAsync(generateApiFunctionJSFiles(libPath, apiFunctions), 'api functions'),
+    customFnPromise,
+    tryAsync(generateWebhooksJSFiles(libPath, webhookHandles), 'webhooks'),
+    tryAsync(generateGraphQLSubscriptionJSFiles(libPath, gqlSubscriptions), 'GraphQL subscriptions'),
+    tryAsync(generateAuthFunctionJSFiles(libPath, authFunctions), 'auth functions'),
+    tryAsync(generateServerFunctionJSFiles(libPath, serverFunctions), 'server functions'),
+    tryAsync(generateServerVariableJSFiles(libPath, serverVariables), 'variables'),
+    tryAsync(generateTableJSFiles(libPath, tables), 'tables'),
+  ]);
+
+  return await customFnPromise;
 };
 
 const generateIndexJSFile = async (libPath: string) => {
