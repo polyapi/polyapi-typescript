@@ -7,7 +7,7 @@ on:
 jobs:
   develop:
     name: Build and deploy NPM package.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, staging, k8s-runner]
     environment: dev
     permissions:
       contents: read
@@ -26,7 +26,10 @@ jobs:
       with:
         node-version: '20'
         registry-url: 'https://registry.npmjs.org'
-        cache: 'npm'
+        # cache: 'npm'
+
+    - name: Enable yarn via Corepack
+      run: corepack enable
 
     - uses: dorny/paths-filter@v2
       id: changes
