@@ -47,7 +47,17 @@ jobs:
           echo "Local NPM version is the same as remote"
         else
           npm install --include=dev
-          npm publish --tag develop
+          PUBLISH_LOG=$(mktemp)
+          npm publish --tag develop 2>&1 | tee "$PUBLISH_LOG"
+          PUBLISH_EXIT=${PIPESTATUS[0]}
+
+          if [[ $PUBLISH_EXIT -ne 0 ]]; then
+            if grep -Eq "npm error code E404|Not Found - PUT .*registry\.npmjs\.org/polyapi|is not in this registry" "$PUBLISH_LOG"; then
+              echo "::warning::npm publish failed with a registry E404 signature that often indicates an expired NPM publishing token. Directions to rotate the token here: https://github.com/polyapi/poly-alpha/wiki/Rotate-NPM-Publishing-Token"
+            fi
+
+            exit $PUBLISH_EXIT
+          fi
         fi
 
     - name: Hit endpoint and build from scratch pre-built image
