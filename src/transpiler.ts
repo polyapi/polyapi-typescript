@@ -459,7 +459,9 @@ export const getDependencies = async (
   });
 
   const dependencies = Array.from(importedLibraries).filter(
-    (library) => !EXCLUDED_REQUIREMENTS.includes(library),
+    (library) =>
+      // exclude already included libraries and Node.js built-in modules
+      !EXCLUDED_REQUIREMENTS.includes(library) && !library.startsWith('node:')
   );
   const externalDependencies: Record<string, string> = {};
   const internalDependencies: Record<string, InternalDependencyReference[]> =
