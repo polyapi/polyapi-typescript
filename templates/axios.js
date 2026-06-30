@@ -41,6 +41,25 @@ axios.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+axios.interceptors.response.use(null, async (error) => {
+  const config = error.config;
+
+  if (error.code === 'ECONNRESET' && !config._didRetry) {
+    config._didRetry = true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  
+    return axios(config);
+
+  }
+
+  if (error.code === 'ECONNRESET' && config._retryCount < 3) {
+    config._retryCount += 1;
+
+    // Optional: exponential backoff delay
+  }
+
+  return Promise.reject(error);
+});
 
 
 const scrub = (data) => {
