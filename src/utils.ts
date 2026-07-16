@@ -67,6 +67,7 @@ export const echoGenerationError = (specification: Specification) => {
     schema: 'Schema',
     snippet: 'Snippet',
     table: 'Table',
+    aiFunction: 'AI Function',
   };
 
   const type = typeMap[specification.type];

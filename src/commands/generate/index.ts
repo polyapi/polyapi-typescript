@@ -5,6 +5,7 @@ import shell from 'shelljs';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
+  AiFunctionSpecification,
   ApiFunctionSpecification,
   AuthFunctionSpecification,
   CustomFunctionSpecification,
@@ -65,6 +66,7 @@ const prepareDir = async (polyPath: string, temp = false) => {
   fs.mkdirSync(`${libPath}/webhooks`);
   fs.mkdirSync(`${libPath}/subscriptions`);
   fs.mkdirSync(`${libPath}/server`);
+  fs.mkdirSync(`${libPath}/ai`);
   fs.mkdirSync(`${libPath}/vari`);
   fs.mkdirSync(`${libPath}/tabi`);
   fs.mkdirSync(`${libPath}/schemas`);
@@ -140,6 +142,9 @@ const generateJSFiles = async (
   const serverFunctions = specs.filter(
     (spec) => spec.type === 'serverFunction',
   ) as ServerFunctionSpecification[];
+  const aiFunctions = specs.filter(
+    (spec) => spec.type === 'aiFunction',
+  ) as AiFunctionSpecification[];
   const serverVariables = specs.filter(
     (spec) => spec.type === 'serverVariable',
   ) as ServerVariableSpecification[];
@@ -174,6 +179,10 @@ const generateJSFiles = async (
   await tryAsync(
     generateServerFunctionJSFiles(libPath, serverFunctions),
     'server functions',
+  );
+  await tryAsync(
+    generateAiFunctionJSFiles(libPath, aiFunctions),
+    'ai functions',
   );
   await tryAsync(
     generateServerVariableJSFiles(libPath, serverVariables),
@@ -330,6 +339,22 @@ const generateServerFunctionJSFiles = async (
     }),
   );
   fs.copyFileSync(templateUrl('server-index.js'), `${libPath}/server/index.js`);
+};
+
+const generateAiFunctionJSFiles = async (
+  libPath: string,
+  specifications: AiFunctionSpecification[],
+) => {
+  const aiFunctionsTemplate = handlebars.compile(
+    loadTemplate('ai-functions.js.hbs'),
+  );
+  fs.writeFileSync(
+    `${libPath}/ai/functions.js`,
+    aiFunctionsTemplate({
+      specifications,
+    }),
+  );
+  fs.copyFileSync(templateUrl('ai-index.js'), `${libPath}/ai/index.js`);
 };
 
 const generateServerVariableJSFiles = async (

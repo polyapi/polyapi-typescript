@@ -417,6 +417,7 @@ const getIDComment = (specification: Specification) => {
     case 'apiFunction':
     case 'serverFunction':
     case 'customFunction':
+    case 'aiFunction':
       return `* Function ID: ${specification.id}`;
     case 'authFunction':
       return `* Auth provider ID: ${specification.id}`;
@@ -696,7 +697,8 @@ const generateTSContextDeclarationFile = async (
       arguments: specification.function.arguments.map(toArgumentDeclaration),
       returnType: wrapInResponseType(computedReturnType),
       synchronous:
-        specification.type === 'serverFunction'
+        specification.type === 'serverFunction' ||
+        specification.type === 'aiFunction'
           ? false
           : specification.function.synchronous === true,
     };
