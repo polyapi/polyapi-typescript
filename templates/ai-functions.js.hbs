@@ -1,0 +1,7 @@
+module.exports = {
+  functions: [
+  {{#each specifications}}
+    ['{{#if context}}{{context}}.{{/if}}{{name}}', '{{id}}',{{#each function.arguments}}`{{name}}`,{{/each}}],
+  {{/each}}
+  ]
+}
