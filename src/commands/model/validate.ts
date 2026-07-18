@@ -5,6 +5,10 @@ import { promisify } from 'util';
 import { chunk } from 'lodash';
 import { SpecificationInputDto } from '../../types';
 import { validateApiFunctionDto, validateWebhookHandleDto } from '../../api';
+import {
+  buildModelRequirements,
+  ensurePermissions,
+} from '../../permissions';
 
 const readFile = promisify(fs.readFile);
 
@@ -63,6 +67,11 @@ export const validateModel = async (path: string) => {
         'Expected specification to contain "webhooks" and/or "functions", but found neither.',
       );
     }
+
+    const validationRequirements = buildModelRequirements(
+      specificationInput
+    );
+    if (!(await ensurePermissions(validationRequirements))) process.exit(1);
 
     if ('functions' in specificationInput) {
       const duplicatedIdentifier = getDuplicatedIdentifier(
