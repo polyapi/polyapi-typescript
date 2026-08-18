@@ -16,13 +16,19 @@ export const formatName = (name: string, nested = false) =>
     ? name
     : wrapUnsafeNames(nested ? name : toPascalCase(name));
 
-export type NestedT = undefined | null | 'object' | 'array' | 'union' | 'intersection';
+export type NestedT =
+  | undefined
+  | null
+  | 'object'
+  | 'array'
+  | 'union'
+  | 'intersection';
 
 export const ws = memoize((depth = 1) =>
-    depth < 0 ? '' : new Array(depth).fill('  ').join(''),
+  depth < 0 ? '' : new Array(depth).fill('  ').join(''),
 );
 export const end = memoize((nested?: NestedT) =>
-    !nested || nested === 'object' ? ';' : '',
+  !nested || nested === 'object' ? ';' : '',
 );
 
 export const wrapParens = (v: string): string =>
@@ -44,7 +50,6 @@ export const printComment = (comment = '', depth = 0, deprecated = false) => {
     `${ws(depth)} */${EOL}`,
   ].join(EOL);
 };
-
 
 export const __test = {
   formatName,
