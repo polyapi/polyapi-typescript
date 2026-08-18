@@ -13,7 +13,10 @@ import {
   upsertWebhookHandle,
 } from '../../api';
 import { firstLetterToUppercase } from '../../utils';
-import { ensurePermissions, buildModelTrainingRequirements } from '../../permissions';
+import {
+  ensurePermissions,
+  buildModelTrainingRequirements,
+} from '../../permissions';
 
 const readFile = promisify(fs.readFile);
 const exec = promisify(execChildProcess);
@@ -81,7 +84,9 @@ const getPolySchemaRefs = (schema: Record<string, any>): SchemaRef[] => {
   return toSearch.flatMap((s) => getPolySchemaRefs(s));
 };
 
-const orderSchemasByDependencies = <T extends { name: string; context?: string; definition: Record<string, any> }>(
+const orderSchemasByDependencies = <
+  T extends { name: string; context?: string; definition: Record<string, any> },
+>(
   schemas: T[],
 ): T[] => {
   if (schemas.length <= 1) return schemas;
@@ -303,11 +308,10 @@ export const train = async (polyPath: string, path: string) => {
       contents,
     ) as SpecificationInputDto;
 
-    const trainingRequirements = buildModelTrainingRequirements(
-        specificationInput
-      );
+    const trainingRequirements =
+      buildModelTrainingRequirements(specificationInput);
 
-      if (!(await ensurePermissions(trainingRequirements))) process.exit(1);
+    if (!(await ensurePermissions(trainingRequirements))) process.exit(1);
 
     const createdApiFunctionsCount = await executeTraining({
       resources: specificationInput.functions,

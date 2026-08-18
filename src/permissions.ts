@@ -35,7 +35,9 @@ export const getCurrentPermissions = async (): Promise<Set<string>> => {
   const apiKey = process.env.POLY_API_KEY || '';
 
   if (!baseUrl) {
-    throw new Error('Missing Poly API Base URL. Please run `poly setup` first.');
+    throw new Error(
+      'Missing Poly API Base URL. Please run `poly setup` first.',
+    );
   }
 
   if (!apiKey) {
@@ -43,7 +45,7 @@ export const getCurrentPermissions = async (): Promise<Set<string>> => {
   }
 
   const authData = await getAuthData(baseUrl, apiKey);
-  cachedPermissions = extractPermissions(authData)
+  cachedPermissions = extractPermissions(authData);
   return cachedPermissions;
 };
 
@@ -53,7 +55,9 @@ export const loadCurrentPermissions = async (): Promise<Set<string>> => {
   return cachedPermissions;
 };
 
-export const hasPermissionsSync = (requirements: PermissionRequirement[]): boolean => {
+export const hasPermissionsSync = (
+  requirements: PermissionRequirement[],
+): boolean => {
   if (!cachedPermissions) return false;
   return requirements.every((r) => cachedPermissions!.has(r.permission));
 };
@@ -71,12 +75,16 @@ export const PERMISSION_ACTIONS: Record<string, string> = {
   manageWebhooks: 'add webhooks',
 };
 
-export const makeRequirement = (permission: PolyPermission): PermissionRequirement => ({
+export const makeRequirement = (
+  permission: PolyPermission,
+): PermissionRequirement => ({
   permission,
   action: PERMISSION_ACTIONS[String(permission)] ?? String(permission),
 });
 
-export const buildModelTrainingRequirements = (spec: any): PermissionRequirement[] => {
+export const buildModelTrainingRequirements = (
+  spec: any,
+): PermissionRequirement[] => {
   const reqs: PermissionRequirement[] = [];
   if (spec?.functions?.length) reqs.push(makeRequirement('manageApiFunctions'));
   if (spec?.schemas?.length) reqs.push(makeRequirement('manageSchemas'));
@@ -124,7 +132,9 @@ export const ensurePermissions = async (
 
     shell.echo(
       chalk.redBright('ERROR:'),
-      `Unable to validate API key permissions via /auth${status ? ` (HTTP ${status})` : ''}. ${message}`,
+      `Unable to validate API key permissions via /auth${
+        status ? ` (HTTP ${status})` : ''
+      }. ${message}`,
     );
     if (axios.isAxiosError?.(error) && !error.response) {
       shell.echo(chalk.red('Network error:'), error.message);

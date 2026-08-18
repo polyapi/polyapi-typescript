@@ -102,7 +102,7 @@ const syncDeployableAndGetId = async (deployable, code, apiKey) => {
         externalDependencies,
         deployable.internalDependencies,
         deployable.config,
-        apiKey
+        apiKey,
       )
     ).id;
   } else if (deployable.type === 'client-function') {
@@ -161,7 +161,7 @@ const getDeployableFromServer = async <
 
 const syncDeployable = async (
   deployable: SyncDeployment,
-  apiKey: string | null | undefined
+  apiKey: string | null | undefined,
 ): Promise<Deployment> => {
   const code = fs.readFileSync(deployable.file, 'utf8');
   const id = await syncDeployableAndGetId(deployable, code, apiKey);

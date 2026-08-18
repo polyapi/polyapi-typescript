@@ -7,7 +7,14 @@ import { echoGenerationError } from '../../utils';
 import { setGenerationErrors } from './types';
 import shell from 'shelljs';
 import chalk from 'chalk';
-import { end, formatName, NestedT, printComment, wrapParens, ws } from './shared';
+import {
+  end,
+  formatName,
+  NestedT,
+  printComment,
+  wrapParens,
+  ws,
+} from './shared';
 
 type JsonSchemaType =
   | 'string'
@@ -546,7 +553,9 @@ const printSchemaTreeAsTypes = (
   return result;
 };
 
-export const normalizeSchema = <S extends SchemaSpec | JsonSchema>(schema: S): S => {
+export const normalizeSchema = <S extends SchemaSpec | JsonSchema>(
+  schema: S,
+): S => {
   if (schema.type === 'schema') {
     schema.definition.title = schema.name;
     schema.definition.description =
