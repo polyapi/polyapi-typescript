@@ -1,6 +1,5 @@
 import fs from 'fs';
 import handlebars from 'handlebars';
-import { toCamelCase, toPascalCase } from '@guanghechen/helper-string';
 import { compile } from 'json-schema-to-typescript';
 import * as ts from 'typescript';
 
@@ -27,8 +26,9 @@ import {
   isBinary,
   iterateRefs,
   toTypeDeclaration,
+  toPascalCase,
+  toCamelCase
 } from '../../utils';
-import { printSchemaAsType } from './schemaTypes';
 import { getVariableValueTypeDeclarations } from './variTypes';
 
 interface Context {
@@ -523,6 +523,7 @@ const getSpecificationsTypeDeclarations = async (
       setGenerationErrors(true);
       errors.push({
         specification,
+        // @ts-expect-error - it's fine
         stack: error.stack,
       });
       return Promise.resolve('');
