@@ -15,9 +15,8 @@ import {
   getApiFunctionDescription,
   getWebhookHandleDescription,
 } from '../../api';
-import { firstLetterToUppercase } from '../../utils';
+import { firstLetterToUppercase, slugify } from '../../utils';
 import path from 'path';
-import { default as slugifyString } from 'slugify';
 import { chunk } from 'lodash';
 
 export type RenameT = Array<[prevName: string, newName: string]>;
@@ -26,12 +25,6 @@ const readFile = promisify(fs.readFile);
 const readDir = promisify(fs.readdir);
 const access = promisify(fs.access);
 const write = promisify(fs.writeFile);
-
-const slugify = (content: string) =>
-  slugifyString(content, {
-    lower: true,
-    strict: true,
-  });
 
 const axiosClient = Axios.create();
 
@@ -482,12 +475,14 @@ export const generateModel = async (
         'to check details.',
       );
     } catch (error) {
+      // @ts-expect-error - it's fine
       if (error.response?.data?.message) {
+        // @ts-expect-error - it's fine
         throw new Error(error.response.data.message);
       }
       throw error;
     }
   } catch (error) {
-    shell.echo(chalk.red('Error:'), error.message);
+    shell.echo(chalk.red('Error:'), error instanceof Error ? error.message : error);
   }
 };

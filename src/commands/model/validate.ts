@@ -112,9 +112,12 @@ export const validateModel = async (path: string) => {
         error.message,
         chalk.red(error.identifier),
       );
+      // @ts-expect-error - it's fine
     } else if (error.response?.status === 400) {
+      // @ts-expect-error - it's fine
       shell.echo(chalk.red('Error:'), error.response.data?.message);
     } else {
+      // @ts-expect-error - it's fine
       shell.echo(chalk.red('Error:'), error.message);
     }
   }

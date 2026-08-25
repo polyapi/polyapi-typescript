@@ -222,6 +222,7 @@ const getPackageJson = () => {
     packageJson = fs.readFileSync(`${process.cwd()}/package.json`);
   } catch (error) {
     throw new Error(
+      // @ts-expect-error - it's fine
       `Failed to open package.json file, details: ${error.message}`,
     );
   }

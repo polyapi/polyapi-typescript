@@ -1,8 +1,8 @@
 import fs, { PathOrFileDescriptor } from 'fs';
+import crypto from 'crypto';
 import handlebars from 'handlebars';
 import chalk from 'chalk';
 import shell from 'shelljs';
-import { v4 as uuidv4 } from 'uuid';
 
 import {
   AiFunctionSpecification,
@@ -77,7 +77,7 @@ const prepareDir = async (polyPath: string, temp = false) => {
     } catch (err) {
       shell.echo(
         chalk.red(
-          `Could not generate redirect index files: ${err.message}, continuing...`,
+          `Could not generate redirect index files: ${err instanceof Error ? err.message : 'unexpected error'}, continuing...`,
         ),
       );
     }
@@ -198,7 +198,7 @@ const generateIndexJSFile = async (libPath: string) => {
   fs.writeFileSync(
     `${libPath}/constants.js`,
     indexJSTemplate({
-      clientID: uuidv4(),
+      clientID: crypto.randomUUID(),
       apiBaseUrl: getApiBaseUrl(),
       apiKey: getApiKey(),
     }),
@@ -508,8 +508,12 @@ const generateSingleCustomFunction = async (
   } catch (error) {
     shell.echo(chalk.red('ERROR'));
     shell.echo('Error while fetching local context data.');
-    shell.echo(chalk.red(error.message));
-    shell.echo(chalk.red(error.stack));
+    if (error instanceof Error) {
+      shell.echo(chalk.red(error.message));
+      shell.echo(chalk.red(error.stack));
+    } else {
+      shell.echo(chalk.red(error));
+    }
     return;
   }
 
