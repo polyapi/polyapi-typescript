@@ -31,9 +31,7 @@ void yargs
   .middleware(async (argv) => {
     // Ignore if not using positional arguments
     if (!argv._?.length) return;
-    const nonInteractiveMode = !!(
-      process.env.POLY_API_KEY || process.env.POLY_API_BASE_URL
-    );
+    const nonInteractiveMode = !!(process.env.POLY_API_KEY || process.env.POLY_API_BASE_URL);
     await checkForClientVersionUpdate(DEFAULT_POLY_PATH, nonInteractiveMode);
   })
   .command(
@@ -119,7 +117,9 @@ void yargs
         await setup(customPath);
       }
 
-      if (!(await ensurePermissions([makeRequirement('libraryGenerate')]))) {
+      if (
+        !(await ensurePermissions([makeRequirement('libraryGenerate')]))
+      ) {
         process.exit(1);
       }
 
@@ -184,9 +184,9 @@ void yargs
           type: 'string',
         })
         .option('execution-api-key', {
-          describe: 'Optional API key for server functions',
-          type: 'string',
-        }),
+            describe: 'Optional API key for server functions',
+            type: 'string',
+          }),
     async ({ dryRun, executionApiKey, customPath = DEFAULT_POLY_PATH }) => {
       if (!checkPolyConfig(customPath)) {
         return shell.echo(
@@ -194,7 +194,9 @@ void yargs
         );
       }
 
-      if (!(await ensurePermissions([makeRequirement('customDev')]))) {
+      if (
+        !(await ensurePermissions([makeRequirement('customDev')]))
+      ) {
         process.exit(1);
       }
 
@@ -271,8 +273,7 @@ void yargs
             type: 'boolean',
           })
           .option('image', {
-            describe:
-              'Server function only - Docker image to run the function in',
+            describe: 'Server function only - Docker image to run the function in',
             type: 'string',
           })
           .option('visibility', {
@@ -340,7 +341,9 @@ void yargs
           );
         }
 
-        if (!(await ensurePermissions([makeRequirement('customDev')]))) {
+        if (
+          !(await ensurePermissions([makeRequirement('customDev')]))
+        ) {
           process.exit(1);
         }
 
