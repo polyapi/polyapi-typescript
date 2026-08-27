@@ -33,6 +33,7 @@ export const addOrUpdateCustomFunction = async (
   generateContexts: string | undefined,
   executionApiKey: string | null | undefined,
   cachePolyLibrary: boolean | undefined,
+  image: string | undefined,
   visibility: string | undefined,
   ignoreDependencies: boolean | undefined,
   skipGenerate: boolean | undefined,
@@ -127,6 +128,7 @@ export const addOrUpdateCustomFunction = async (
       if (logsEnabled !== undefined) other.logsEnabled = logsEnabled;
       if (cachePolyLibrary !== undefined)
         other.cachePolyLibrary = cachePolyLibrary;
+      if (image) other.image = image;
       customFunction = await createOrUpdateServerFunction(
         context,
         name,

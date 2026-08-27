@@ -272,6 +272,10 @@ void yargs
               'Server function only - cache the poly library to improve function performance',
             type: 'boolean',
           })
+          .option('image', {
+            describe: 'Server function only - Docker image to run the function in',
+            type: 'string',
+          })
           .option('visibility', {
             describe:
               'Specifies the visibility of a function. Options: PUBLIC, TENANT, ENVIRONMENT. Case insensitive',
@@ -295,6 +299,7 @@ void yargs
         skipGenerate,
         executionApiKey,
         cachePolyLibrary,
+        image,
         visibility,
         ignoreDependencies,
       }) => {
@@ -319,6 +324,8 @@ void yargs
           ? 'Invalid value for `execution-api-key`. Must be a valid PolyAPI Key.'
           : cachePolyLibrary && !server
           ? 'Option `cache-poly-library` is only for server functions (--server).'
+          : image && !server
+          ? 'Option `image` is only for server functions (--server).'
           : !['PUBLIC', 'TENANT', 'ENVIRONMENT'].includes(visibility)
           ? 'Option `visibility` must be either PUBLIC, TENANT, or ENVIRONMENT. Case insensitive.'
           : '';
@@ -355,6 +362,7 @@ void yargs
           generateContexts,
           executionApiKey,
           cachePolyLibrary,
+          image,
           visibility,
           ignoreDependencies,
           skipGenerate,
