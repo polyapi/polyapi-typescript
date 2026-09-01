@@ -41,8 +41,37 @@ axios.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+const MAX_THROTTLE_RETRIES = 5;
+const DEFAULT_RETRY_AFTER_MS = 1000;
+const MAX_RETRY_AFTER_MS = 60_000;
+
+const parseRetryAfterMs = (value) => {
+  if (value == null || value === '') return DEFAULT_RETRY_AFTER_MS;
+  const asSeconds = Number(value);
+  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+    return Math.min(asSeconds * 1000, MAX_RETRY_AFTER_MS);
+  }
+  const asDate = Date.parse(String(value));
+  if (!Number.isNaN(asDate)) {
+    return Math.min(Math.max(asDate - Date.now(), 0), MAX_RETRY_AFTER_MS);
+  }
+  return DEFAULT_RETRY_AFTER_MS;
+};
+
 axios.interceptors.response.use(null, async (error) => {
   const config = error.config;
+  if (!config) {
+    return Promise.reject(error);
+  }
+
+  if (error.response?.status === 429) {
+    config._throttleRetries = (config._throttleRetries || 0) + 1;
+    if (config._throttleRetries <= MAX_THROTTLE_RETRIES) {
+      const header = error.response.headers?.['retry-after'];
+      await new Promise((resolve) => setTimeout(resolve, parseRetryAfterMs(header)));
+      return axios(config);
+    }
+  }
 
   if (error.code === 'ECONNRESET' && !config._didRetry) {
     config._didRetry = true;
