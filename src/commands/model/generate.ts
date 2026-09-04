@@ -3,7 +3,7 @@ import { promisify } from 'util';
 import chalk from 'chalk';
 import shell from 'shelljs';
 import { escapeRegExp } from 'lodash';
-import Axios from 'axios';
+import { get } from '../../http';
 
 import {
   ApiFunctionDescriptionGenerationDto,
@@ -25,8 +25,6 @@ const readFile = promisify(fs.readFile);
 const readDir = promisify(fs.readdir);
 const access = promisify(fs.access);
 const write = promisify(fs.writeFile);
-
-const axiosClient = Axios.create();
 
 const isRemoteSpecPath = (specPath: string) => {
   try {
@@ -356,9 +354,12 @@ export const generateModel = async (
     if (isRemoteSpecPath(specPath)) {
       try {
         shell.echo('Fetching open api specs from provided url...');
-        const response = await axiosClient.get(specPath);
+        const response = await get(specPath);
 
-        contents = response.data;
+        contents =
+          typeof response.data === 'string'
+            ? response.data
+            : JSON.stringify(response.data);
       } catch (error) {
         throw new Error(`Failed to fetch contents from url "${specPath}"`);
       }

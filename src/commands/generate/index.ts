@@ -157,7 +157,7 @@ const generateJSFiles = async (
 
   await generateIndexJSFile(libPath);
   await generatePolyCustomJSFile(libPath);
-  await generateAxiosJSFile(libPath);
+  await generateHttpJSFile(libPath);
   await generateErrorHandlerFile(libPath);
   await tryAsync(
     generateApiFunctionJSFiles(libPath, apiFunctions),
@@ -219,8 +219,17 @@ const generatePolyCustomJSFile = async (libPath: string) => {
   );
 };
 
-const generateAxiosJSFile = async (libPath: string) => {
-  fs.copyFileSync(templateUrl('axios.js'), `${libPath}/axios.js`);
+const generateHttpJSFile = async (libPath: string) => {
+  const compiledHttpPath = `${__dirname}/../../http.js`;
+  if (!fs.existsSync(compiledHttpPath)) {
+    throw new Error(
+      `Compiled HTTP client not found at ${compiledHttpPath}. Build the package before generating.`,
+    );
+  }
+  const source = fs
+    .readFileSync(compiledHttpPath, 'utf8')
+    .replace(/\r?\n\/\/# sourceMappingURL=.*\s*$/, '\n');
+  fs.writeFileSync(`${libPath}/http.js`, source);
 };
 
 const generateErrorHandlerFile = async (libPath: string) => {

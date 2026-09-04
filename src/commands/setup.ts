@@ -3,8 +3,8 @@ import { input, rawlist, confirm } from '@inquirer/prompts';
 import fs from 'fs';
 import { loadConfig, saveConfig } from '../config';
 import chalk from 'chalk';
-import axios from 'axios';
 import path from 'path';
+import { get } from '../http';
 import AdmZip from 'adm-zip';
 import {
   checkNodeVersion,
@@ -14,7 +14,7 @@ import {
   getPackageManager,
 } from '../dependencies';
 import { getAuthData, getProjectTemplatesConfig } from '../api';
-import { handleAxiosError, validateBaseUrl, URL_REGEX } from '../utils';
+import { handleHttpError, validateBaseUrl, URL_REGEX } from '../utils';
 
 const setup = async (
   polyPath: string,
@@ -108,7 +108,7 @@ const setup = async (
 
     shell.echo(chalk.green('Poly setup complete.'));
   } catch (error) {
-    const errorMessage = handleAxiosError(error, axios);
+    const errorMessage = handleHttpError(error);
     shell.echo(chalk.redBright('ERROR:'), errorMessage);
   }
 };
@@ -116,13 +116,13 @@ const setup = async (
 const initProjectStructure = async (fileUrl: string) => {
   try {
     shell.echo('-n', 'Downloading project template...');
-    const response = await axios.get(fileUrl, {
+    const response = await get<Buffer>(fileUrl, {
       responseType: 'arraybuffer',
     });
 
     const fileName = path.basename(fileUrl);
     const filePath = path.join(process.cwd(), fileName);
-    fs.writeFileSync(filePath, response.data);
+    fs.writeFileSync(filePath, response.data as unknown as Uint8Array);
     shell.echo(chalk.green('DONE'));
 
     shell.echo('-n', 'Extracting project template...');

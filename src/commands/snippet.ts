@@ -54,7 +54,7 @@ export const addSnippet = async (
       'Snippet successfully added.',
     );
 
-    shell.echo(`Snippet ID: ${response.data.id}`);
+    shell.echo(`Snippet ID: ${response.id}`);
   } catch (error) {
     // @ts-expect-error - it's fine
     const httpStatusCode = error.response?.status;

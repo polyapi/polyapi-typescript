@@ -1,4 +1,4 @@
-const { axios, scrubKeys } = require('../axios');
+const { http, scrubKeys } = require('../http');
 const set = require('lodash/set');
 const { functions } = require('./functions');
 
@@ -6,7 +6,7 @@ module.exports = (clientID, polyCustom) => functions.reduce(
   (acc, [path, id, ...argKeys]) => set(
     acc,
     path,
-    (...args) => axios.post(
+    (...args) => http.post(
       `/functions/server/${id}/execute?clientId=${clientID}`,
       argKeys.reduce((acc, key, index) => set(acc, key, args[index]), {}),
       {

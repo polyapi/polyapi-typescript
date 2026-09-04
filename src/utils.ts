@@ -159,7 +159,7 @@ export const validateBaseUrl = (url: any): string => {
   return sanitizedUrl;
 };
 
-export const handleAxiosError = (error: any, axios: any) => {
+export const handleHttpError = (error: any) => {
   let errorMessage = '';
 
   if (error instanceof AggregateError) {
@@ -167,14 +167,14 @@ export const handleAxiosError = (error: any, axios: any) => {
     error.errors.forEach((err, index) => {
       errorMessage += `Error #${index + 1}: ${err.message}\n`;
     });
-  } else if (axios.isAxiosError(error)) {
+  } else if (error?.isAxiosError || error?.response) {
     if (error.response) {
       errorMessage = `Request failed with status code ${error.response.status}\n`;
       errorMessage += `Status text: ${error.response.statusText}\n`;
     } else if (error.request) {
       errorMessage = 'No response received from the server.\n';
     } else {
-      errorMessage = `Axios error occurred: ${error.message}\n`;
+      errorMessage = `Request error occurred: ${error.message}\n`;
     }
   } else if (error.code === 'ECONNREFUSED') {
     errorMessage = `Connection refused. Is the server running?\nDetails: ${error.message}\n`;
