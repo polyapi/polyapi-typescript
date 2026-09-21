@@ -1,11 +1,10 @@
 import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
-import { toPascalCase } from '@guanghechen/helper-string';
+import { toPascalCase } from '../utils';
 import {
   CreateServerCustomFunctionResponseDto,
   FunctionDetailsDto,
-  Visibility,
 } from '../types';
 import {
   createOrUpdateClientFunction,

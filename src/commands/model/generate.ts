@@ -3,7 +3,7 @@ import { promisify } from 'util';
 import chalk from 'chalk';
 import shell from 'shelljs';
 import { escapeRegExp } from 'lodash';
-import Axios from 'axios';
+import { get } from '../../http';
 
 import {
   ApiFunctionDescriptionGenerationDto,
@@ -15,9 +15,8 @@ import {
   getApiFunctionDescription,
   getWebhookHandleDescription,
 } from '../../api';
-import { firstLetterToUppercase } from '../../utils';
+import { firstLetterToUppercase, slugify } from '../../utils';
 import path from 'path';
-import { default as slugifyString } from 'slugify';
 import { chunk } from 'lodash';
 
 export type RenameT = Array<[prevName: string, newName: string]>;
@@ -26,14 +25,6 @@ const readFile = promisify(fs.readFile);
 const readDir = promisify(fs.readdir);
 const access = promisify(fs.access);
 const write = promisify(fs.writeFile);
-
-const slugify = (content: string) =>
-  slugifyString(content, {
-    lower: true,
-    strict: true,
-  });
-
-const axiosClient = Axios.create();
 
 const isRemoteSpecPath = (specPath: string) => {
   try {
@@ -363,9 +354,12 @@ export const generateModel = async (
     if (isRemoteSpecPath(specPath)) {
       try {
         shell.echo('Fetching open api specs from provided url...');
-        const response = await axiosClient.get(specPath);
+        const response = await get(specPath);
 
-        contents = response.data;
+        contents =
+          typeof response.data === 'string'
+            ? response.data
+            : JSON.stringify(response.data);
       } catch (error) {
         throw new Error(`Failed to fetch contents from url "${specPath}"`);
       }
@@ -482,12 +476,14 @@ export const generateModel = async (
         'to check details.',
       );
     } catch (error) {
+      // @ts-expect-error - it's fine
       if (error.response?.data?.message) {
+        // @ts-expect-error - it's fine
         throw new Error(error.response.data.message);
       }
       throw error;
     }
   } catch (error) {
-    shell.echo(chalk.red('Error:'), error.message);
+    shell.echo(chalk.red('Error:'), error instanceof Error ? error.message : error);
   }
 };

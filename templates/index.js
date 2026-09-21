@@ -6,6 +6,7 @@ const webhooks = require('./webhooks');
 const subscriptions = require('./subscriptions');
 const authFunctions = require('./auth');
 const serverFunctions = require('./server');
+const aiFunctions = require('./ai');
 const vari = require('./vari');
 const tabi = require('./tabi');
 const polyCustom = require('./poly-custom');
@@ -67,6 +68,7 @@ merge(
   apiFunctions(CLIENT_ID, polyCustom),
   clientFunctions(poly, sendLocalErrorEvent),
   serverFunctions(CLIENT_ID, polyCustom),
+  aiFunctions(CLIENT_ID, polyCustom),
   authFunctions(CLIENT_ID, getSocket, getApiKey),
   webhooks(CLIENT_ID, getSocket, getApiKey),
   subscriptions(CLIENT_ID, getSocket, getApiKey),

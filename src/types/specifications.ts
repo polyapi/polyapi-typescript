@@ -15,7 +15,8 @@ export type SpecificationType =
   | 'snippet'
   | 'table'
   | 'graphqlSubscription'
-  | 'schema';
+  | 'schema'
+  | 'aiFunction';
 
 export interface ISpecification {
   id: string;
@@ -168,6 +169,16 @@ export interface TableSpecification extends ISpecification {
   unresolvedPolySchemaRefs?: SchemaRef[];
 }
 
+export interface AiFunctionSpecification extends ISpecification {
+  type: 'aiFunction';
+  function: FunctionSpecification;
+  provider: string;
+  model: string;
+  clientPromptEnabled: boolean;
+  clientPromptRequired: boolean;
+  clientPromptArgName: string | null;
+}
+
 export type Specification =
   | ApiFunctionSpecification
   | CustomFunctionSpecification
@@ -178,7 +189,8 @@ export type Specification =
   | SnippetSpecification
   | SchemaSpecification
   | GraphQLSubscriptionSpecification
-  | TableSpecification;
+  | TableSpecification
+  | AiFunctionSpecification;
 
 interface CreateWebhookHandleDtoForSpecificationInput
   extends CreateWebhookHandleDto {

@@ -4,7 +4,6 @@ import shell from 'shelljs';
 import ts from 'typescript';
 import path from 'path';
 import { createGenerator } from 'ts-json-schema-generator';
-import { toPascalCase } from '@guanghechen/helper-string';
 import {
   DeployableRecord,
   DeployableTsTypeToName,
@@ -14,7 +13,7 @@ import {
   getDeployableFileRevision,
   ParsedDeployableConfig,
 } from './deployables';
-import { getCachedSpecs, getPolyLibPath, writeCachedSpecs } from './utils';
+import { getCachedSpecs, getPolyLibPath, writeCachedSpecs, toPascalCase } from './utils';
 import { DEFAULT_POLY_PATH } from './constants';
 import { Specification } from './types';
 import { getSpecs } from './api';
@@ -101,8 +100,8 @@ export const getDependencies = async (
   [
     external: undefined | Record<string, string>,
     internal:
-      | undefined
-      | Record<string, InternalDependencyReference[] | string[]>,
+    | undefined
+    | Record<string, InternalDependencyReference[] | string[]>,
   ]
 > => {
   const importedLibraries = new Set<string>();
@@ -891,14 +890,14 @@ const parseDeployableFunction = async (
   const referencedSchemas =
     internalDependencies && 'schema' in internalDependencies
       ? Object.fromEntries(
-          internalDependencies.schema.map((schema) => [
-            `schemas.${schema.path
-              .split('.')
-              .map((s) => toPascalCase(s))
-              .join('.')}`,
-            { 'x-poly-ref': { path: schema.path } },
-          ]),
-        )
+        internalDependencies.schema.map((schema) => [
+          `schemas.${schema.path
+            .split('.')
+            .map((s) => toPascalCase(s))
+            .join('.')}`,
+          { 'x-poly-ref': { path: schema.path } },
+        ]),
+      )
       : null;
   const typeSchemas = generateTypeSchemas(
     sourceFile.fileName,
@@ -983,15 +982,15 @@ export const parseDeployable = async (
   } catch (e) {
     shell.echo(
       chalk.redBright(
-        `Prepared ${polyConfig.type.replaceAll('-', ' ')} ${
-          polyConfig.context
+        `Prepared ${polyConfig.type.replaceAll('-', ' ')} ${polyConfig.context
         }.${polyConfig.name}: ERROR`,
       ),
     );
     shell.echo(
       chalk.red(
+        // @ts-expect-error - it's fine
         (e instanceof Error ? e.message : e.response?.data?.message) ||
-          'Unexpected error.',
+        'Unexpected error.',
       ),
     );
   }
@@ -1145,8 +1144,8 @@ const dereferenceRoot = (schema: any): any => {
           const actualDefName = definitions[encodedDefName]
             ? encodedDefName
             : definitions[decodedDefName]
-            ? decodedDefName
-            : null;
+              ? decodedDefName
+              : null;
 
           if (actualDefName && !visited.has(actualDefName)) {
             visited.add(actualDefName);

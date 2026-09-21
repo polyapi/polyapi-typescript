@@ -1,10 +1,11 @@
 import fs, { PathOrFileDescriptor } from 'fs';
+import crypto from 'crypto';
 import handlebars from 'handlebars';
 import chalk from 'chalk';
 import shell from 'shelljs';
-import { v4 as uuidv4 } from 'uuid';
 
 import {
+  AiFunctionSpecification,
   ApiFunctionSpecification,
   AuthFunctionSpecification,
   CustomFunctionSpecification,
@@ -65,6 +66,7 @@ const prepareDir = async (polyPath: string, temp = false) => {
   fs.mkdirSync(`${libPath}/webhooks`);
   fs.mkdirSync(`${libPath}/subscriptions`);
   fs.mkdirSync(`${libPath}/server`);
+  fs.mkdirSync(`${libPath}/ai`);
   fs.mkdirSync(`${libPath}/vari`);
   fs.mkdirSync(`${libPath}/tabi`);
   fs.mkdirSync(`${libPath}/schemas`);
@@ -75,7 +77,7 @@ const prepareDir = async (polyPath: string, temp = false) => {
     } catch (err) {
       shell.echo(
         chalk.red(
-          `Could not generate redirect index files: ${err.message}, continuing...`,
+          `Could not generate redirect index files: ${err instanceof Error ? err.message : 'unexpected error'}, continuing...`,
         ),
       );
     }
@@ -140,6 +142,9 @@ const generateJSFiles = async (
   const serverFunctions = specs.filter(
     (spec) => spec.type === 'serverFunction',
   ) as ServerFunctionSpecification[];
+  const aiFunctions = specs.filter(
+    (spec) => spec.type === 'aiFunction',
+  ) as AiFunctionSpecification[];
   const serverVariables = specs.filter(
     (spec) => spec.type === 'serverVariable',
   ) as ServerVariableSpecification[];
@@ -152,7 +157,7 @@ const generateJSFiles = async (
 
   await generateIndexJSFile(libPath);
   await generatePolyCustomJSFile(libPath);
-  await generateAxiosJSFile(libPath);
+  await generateHttpJSFile(libPath);
   await generateErrorHandlerFile(libPath);
   await tryAsync(
     generateApiFunctionJSFiles(libPath, apiFunctions),
@@ -176,6 +181,10 @@ const generateJSFiles = async (
     'server functions',
   );
   await tryAsync(
+    generateAiFunctionJSFiles(libPath, aiFunctions),
+    'ai functions',
+  );
+  await tryAsync(
     generateServerVariableJSFiles(libPath, serverVariables),
     'variables',
   );
@@ -189,7 +198,7 @@ const generateIndexJSFile = async (libPath: string) => {
   fs.writeFileSync(
     `${libPath}/constants.js`,
     indexJSTemplate({
-      clientID: uuidv4(),
+      clientID: crypto.randomUUID(),
       apiBaseUrl: getApiBaseUrl(),
       apiKey: getApiKey(),
     }),
@@ -210,8 +219,17 @@ const generatePolyCustomJSFile = async (libPath: string) => {
   );
 };
 
-const generateAxiosJSFile = async (libPath: string) => {
-  fs.copyFileSync(templateUrl('axios.js'), `${libPath}/axios.js`);
+const generateHttpJSFile = async (libPath: string) => {
+  const compiledHttpPath = `${__dirname}/../../http.js`;
+  if (!fs.existsSync(compiledHttpPath)) {
+    throw new Error(
+      `Compiled HTTP client not found at ${compiledHttpPath}. Build the package before generating.`,
+    );
+  }
+  const source = fs
+    .readFileSync(compiledHttpPath, 'utf8')
+    .replace(/\r?\n\/\/# sourceMappingURL=.*\s*$/, '\n');
+  fs.writeFileSync(`${libPath}/http.js`, source);
 };
 
 const generateErrorHandlerFile = async (libPath: string) => {
@@ -330,6 +348,22 @@ const generateServerFunctionJSFiles = async (
     }),
   );
   fs.copyFileSync(templateUrl('server-index.js'), `${libPath}/server/index.js`);
+};
+
+const generateAiFunctionJSFiles = async (
+  libPath: string,
+  specifications: AiFunctionSpecification[],
+) => {
+  const aiFunctionsTemplate = handlebars.compile(
+    loadTemplate('ai-functions.js.hbs'),
+  );
+  fs.writeFileSync(
+    `${libPath}/ai/functions.js`,
+    aiFunctionsTemplate({
+      specifications,
+    }),
+  );
+  fs.copyFileSync(templateUrl('ai-index.js'), `${libPath}/ai/index.js`);
 };
 
 const generateServerVariableJSFiles = async (
@@ -483,8 +517,12 @@ const generateSingleCustomFunction = async (
   } catch (error) {
     shell.echo(chalk.red('ERROR'));
     shell.echo('Error while fetching local context data.');
-    shell.echo(chalk.red(error.message));
-    shell.echo(chalk.red(error.stack));
+    if (error instanceof Error) {
+      shell.echo(chalk.red(error.message));
+      shell.echo(chalk.red(error.stack));
+    } else {
+      shell.echo(chalk.red(error));
+    }
     return;
   }
 

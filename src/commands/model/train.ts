@@ -191,12 +191,10 @@ const executeTraining = async <T extends BaseResource, V extends BaseResult>({
     const lastResourceNumberInChunk = chunkSize * (chunkIterations + 1);
 
     shell.echo(
-      `Training from ${resourceName} number ${
-        chunkSize * chunkIterations + 1
-      } to ${resourceName} number ${
-        lastResourceNumberInChunk <= resources.length
-          ? lastResourceNumberInChunk
-          : resources.length
+      `Training from ${resourceName} number ${chunkSize * chunkIterations + 1
+      } to ${resourceName} number ${lastResourceNumberInChunk <= resources.length
+        ? lastResourceNumberInChunk
+        : resources.length
       } out of ${resources.length}`,
     );
 
@@ -341,9 +339,12 @@ export const train = async (polyPath: string, path: string) => {
       await generateClientCode(polyPath);
     }
   } catch (error) {
+    // @ts-expect-error - it's fine
     if (error.response?.status === 400) {
+      // @ts-expect-error - it's fine
       shell.echo(chalk.red('Error:'), error.response.data?.message);
     } else {
+      // @ts-expect-error - it's fine
       shell.echo(chalk.red('Error:'), error.message);
     }
   }

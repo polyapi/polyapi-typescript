@@ -1,7 +1,6 @@
 import fs from 'fs';
 import semver from 'semver';
 import { execSync } from 'child_process';
-import { parse, stringify } from 'comment-json';
 
 export const librariesToCheck = ['ts-node', 'typescript'];
 
@@ -71,7 +70,7 @@ export const checkTsConfig = async (steps: TsConfigSetupSteps) => {
     let tsConfig: any;
 
     try {
-      tsConfig = parse(currentConfig, undefined, false) as any;
+      tsConfig = JSON.parse(currentConfig) as any;
     } catch (error) {
       throw new Error(
         'tsconfig.json has invalid JSON syntax, please fix and try again',
@@ -94,7 +93,7 @@ export const checkTsConfig = async (steps: TsConfigSetupSteps) => {
       }
 
       try {
-        await steps.saveTsConfig(stringify(tsConfig, null, 2));
+        await steps.saveTsConfig(JSON.stringify(tsConfig, null, 2));
       } catch (error) {
         throw new Error('Failed to save tsconfig.json file.');
       }
@@ -170,7 +169,7 @@ export const checkNodeVersion = (opts: CheckNodeVersionOpts) => {
       encoding: 'utf-8',
     });
   } catch (err) {
-    if (err.stderr?.toString()?.includes('command not found')) {
+    if (typeof err === 'object' && 'stderr' in err && err.stderr?.toString()?.includes('command not found')) {
       const errMessage = `Node.js is not installed. Download and install Node.js version ${MIN_NODE_VERSION} or later from https://nodejs.org/en/download before trying to setup again.`;
       if (opts.onMissingNode) {
         return opts.onMissingNode(errMessage);

@@ -7,7 +7,7 @@ module.exports = (clientID, polyCustom) => functions.reduce(
     acc,
     path,
     (...args) => http.post(
-      `/functions/server/${id}/execute?clientId=${clientID}`,
+      `/functions/ai/${id}/execute?clientId=${clientID}`,
       argKeys.reduce((acc, key, index) => set(acc, key, args[index]), {}),
       {
         headers: {

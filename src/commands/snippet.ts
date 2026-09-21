@@ -54,22 +54,27 @@ export const addSnippet = async (
       'Snippet successfully added.',
     );
 
-    shell.echo(`Snippet ID: ${response.data.id}`);
+    shell.echo(`Snippet ID: ${response.id}`);
   } catch (error) {
+    // @ts-expect-error - it's fine
     const httpStatusCode = error.response?.status;
 
+    // @ts-expect-error - it's fine
     const errMessage = error.response?.data?.message;
 
     let finalMessage = '';
 
     if (httpStatusCode === 400) {
+      // @ts-expect-error - it's fine
       const messages = Array.isArray(error.response.data.message)
+        // @ts-expect-error - it's fine
         ? error.response.data.message
         : [`Failed with status code ${chalk.redBright(400)}`];
       finalMessage = messages[0];
     } else if (httpStatusCode) {
       finalMessage = errMessage;
     } else {
+      // @ts-expect-error - it's fine
       finalMessage = error.message;
     }
     shell.echo(`${chalk.redBright('Error:')}`, finalMessage);

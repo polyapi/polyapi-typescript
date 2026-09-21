@@ -3,11 +3,10 @@
 import yargs from 'yargs';
 import shell from 'shelljs';
 import chalk from 'chalk';
-import { validate as uuidValidate } from 'uuid';
 import { loadConfig } from './config';
 import { type RenameT } from './commands/model';
 import { DEFAULT_POLY_PATH } from './constants';
-import { isValidHttpUrl } from './utils';
+import { isValidHttpUrl, validateUUID } from './utils';
 import { ensurePermissions, makeRequirement } from './permissions';
 import { checkForClientVersionUpdate } from './version';
 
@@ -320,7 +319,7 @@ void yargs
           ? 'Option `logs` is only for server functions (--server).'
           : logs && logsEnabled === undefined
           ? 'Invalid value for `logs` option.'
-          : executionApiKey && !uuidValidate(executionApiKey)
+          : executionApiKey && !validateUUID(executionApiKey)
           ? 'Invalid value for `execution-api-key`. Must be a valid PolyAPI Key.'
           : cachePolyLibrary && !server
           ? 'Option `cache-poly-library` is only for server functions (--server).'
