@@ -47,16 +47,19 @@ export type LocalLinkStats = {
 
 export type LinkableSpec = Pick<Specification, 'id' | 'type' | 'context' | 'name'>;
 
-const SOURCE_EXTENSIONS = new Set([
+export const POLY_SOURCE_EXTENSIONS = 'POLY_SOURCE_EXTENSIONS';
+export const POLY_EXCLUDED_DIRECTORIES = 'POLY_EXCLUDED_DIRECTORIES';
+
+export const DEFAULT_SOURCE_EXTENSIONS = [
   '.ts',
   '.tsx',
   '.js',
   '.jsx',
   '.mjs',
   '.cjs',
-]);
+];
 
-const EXCLUDED_DIRECTORIES = new Set([
+export const DEFAULT_EXCLUDED_DIRECTORIES = [
   'node_modules',
   'dist',
   'build',
@@ -68,7 +71,52 @@ const EXCLUDED_DIRECTORIES = new Set([
   '.github',
   '.husky',
   '.yarn',
-]);
+];
+
+export type LocalSourceScan = {
+  sourceExtensions: Set<string>;
+  excludedDirectories: Set<string>;
+};
+
+const readConfigValue = (
+  config: Record<string, string> | undefined,
+  key: string,
+): string | undefined => {
+  if (config && Object.prototype.hasOwnProperty.call(config, key)) return config[key];
+  return process.env[key];
+};
+
+const parseCsv = (value: string | undefined): string[] | undefined => {
+  if (value === undefined || value.trim() === '') return undefined;
+  const items = value.split(',').map((item) => item.trim()).filter(Boolean);
+  return items.length ? items : undefined;
+};
+
+export const normalizeSourceExtension = (value: string): string => {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return '';
+  return trimmed.startsWith('.') ? trimmed : `.${trimmed}`;
+};
+
+// A custom exclude list replaces the defaults. node_modules is always kept
+// out so generate cannot index dependencies.
+export const localSourceScanFromConfig = (
+  config?: Record<string, string>,
+): LocalSourceScan => {
+  const extensions = parseCsv(readConfigValue(config, POLY_SOURCE_EXTENSIONS));
+  const directories = parseCsv(readConfigValue(config, POLY_EXCLUDED_DIRECTORIES));
+  return {
+    sourceExtensions: new Set(
+      extensions
+        ? extensions.map(normalizeSourceExtension).filter(Boolean)
+        : DEFAULT_SOURCE_EXTENSIONS,
+    ),
+    excludedDirectories: new Set([
+      ...(directories ?? DEFAULT_EXCLUDED_DIRECTORIES),
+      'node_modules',
+    ]),
+  };
+};
 
 const VLQ_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -506,7 +554,10 @@ export const parseLocalSourceFile = (
   return [...grouped.values()];
 };
 
-const listSourceFiles = async (repoRoot: string): Promise<string[]> => {
+const listSourceFiles = async (
+  repoRoot: string,
+  scan: LocalSourceScan,
+): Promise<string[]> => {
   const files: string[] = [];
   const walk = async (directory: string): Promise<void> => {
     let entries: Awaited<ReturnType<typeof readdir>>;
@@ -518,7 +569,7 @@ const listSourceFiles = async (repoRoot: string): Promise<string[]> => {
     for (const entry of entries) {
       const fullPath = path.join(directory, entry.name);
       if (entry.isDirectory()) {
-        if (EXCLUDED_DIRECTORIES.has(entry.name) || entry.name.startsWith('.')) {
+        if (scan.excludedDirectories.has(entry.name) || entry.name.startsWith('.')) {
           continue;
         }
         await walk(fullPath);
@@ -535,7 +586,7 @@ const listSourceFiles = async (repoRoot: string): Promise<string[]> => {
       if (
         !isFile
         || entry.name.endsWith('.d.ts')
-        || !SOURCE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())
+        || !scan.sourceExtensions.has(path.extname(entry.name).toLowerCase())
       ) {
         continue;
       }
@@ -548,6 +599,7 @@ const listSourceFiles = async (repoRoot: string): Promise<string[]> => {
 
 export const discoverLocalSources = async (
   repoRoot = resolveRepoRoot(),
+  scan: LocalSourceScan = localSourceScanFromConfig(),
 ): Promise<LocalSourceDiscovery> => {
   const root = path.resolve(repoRoot);
   const index: LocalSourceIndex = new Map();
@@ -555,7 +607,7 @@ export const discoverLocalSources = async (
 
   let files: string[] = [];
   try {
-    files = await listSourceFiles(root);
+    files = await listSourceFiles(root, scan);
   } catch {
     return { index, repoRoot: root };
   }

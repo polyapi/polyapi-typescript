@@ -6,6 +6,7 @@ import path from 'path';
 
 import {
   discoverLocalSources,
+  localSourceScanFromConfig,
   parseLocalSourceFile,
   planLocalSourceNavigation,
   selectLocalSource,
@@ -280,6 +281,46 @@ export async function returnArg(event: any) {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
+  test('config env lists replace extensions and excluded directories', async () => {
+    const previousExtensions = process.env.POLY_SOURCE_EXTENSIONS;
+    const previousExcluded = process.env.POLY_EXCLUDED_DIRECTORIES;
+    delete process.env.POLY_SOURCE_EXTENSIONS;
+    delete process.env.POLY_EXCLUDED_DIRECTORIES;
+    const root = tempRoot();
+    const kept = path.join(root, 'src', 'hello.mts');
+    const skippedExt = path.join(root, 'src', 'hello.ts');
+    const vendor = path.join(root, 'vendor', 'hello.mts');
+    const source = serverSource();
+    fs.mkdirSync(path.dirname(kept), { recursive: true });
+    fs.mkdirSync(path.dirname(vendor), { recursive: true });
+    fs.writeFileSync(kept, source);
+    fs.writeFileSync(skippedExt, source);
+    fs.writeFileSync(path.join(root, 'src', 'hello.js'), source);
+    fs.writeFileSync(vendor, source);
+
+    const scan = localSourceScanFromConfig({
+      POLY_SOURCE_EXTENSIONS: 'mts, ts',
+      POLY_EXCLUDED_DIRECTORIES: 'vendor',
+    });
+    expect([...scan.sourceExtensions].sort()).toEqual(['.mts', '.ts']);
+    expect(scan.excludedDirectories.has('vendor')).toBe(true);
+    expect(scan.excludedDirectories.has('node_modules')).toBe(true);
+    expect(scan.excludedDirectories.has('dist')).toBe(false);
+
+    const found = await discoverLocalSources(root, scan);
+    const paths = [...found.index.values()].flat().map((entry) => entry.relativePath).sort();
+    expect(paths).toEqual(['src/hello.mts', 'src/hello.ts']);
+
+    const defaults = localSourceScanFromConfig({});
+    expect(defaults.sourceExtensions.has('.js')).toBe(true);
+    expect(defaults.excludedDirectories.has('dist')).toBe(true);
+    fs.rmSync(root, { recursive: true, force: true });
+    if (previousExtensions === undefined) delete process.env.POLY_SOURCE_EXTENSIONS;
+    else process.env.POLY_SOURCE_EXTENSIONS = previousExtensions;
+    if (previousExcluded === undefined) delete process.env.POLY_EXCLUDED_DIRECTORIES;
+    else process.env.POLY_EXCLUDED_DIRECTORIES = previousExcluded;
+  });
+
   test('discover walks the repo and ignores node_modules', async () => {
     const root = tempRoot();
     const sourceDir = path.join(root, 'src');
@@ -359,7 +400,7 @@ describe('declaration maps', () => {
     expect(plan.dtsText).not.toContain(': number');
     expect(plan.dtsText.trimEnd().endsWith('//# sourceMappingURL=myContext.d.ts.map')).toBe(true);
     expect(plan.map).toBeDefined();
-    const map = JSON.parse(plan.map.text);
+    const map = JSON.parse(plan.map!.text);
     expect(map.sources).toEqual(['src/hello.ts']);
     expect(map.sourceRoot).toBe('../../../');
     expect(map.file).toBe('myContext.d.ts');
@@ -422,7 +463,7 @@ describe('declaration maps', () => {
       repoRoot: root,
     });
     fs.writeFileSync(dtsPath, plan.dtsText);
-    fs.writeFileSync(plan.map.path, plan.map.text);
+    fs.writeFileSync(plan.map!.path, plan.map!.text);
     fs.writeFileSync(path.join(libDir, 'index.d.ts'), `/// <reference path="./myContext.d.ts" />
 
 export const myContext: MyContext;
@@ -502,7 +543,7 @@ const pending = new Map<number, (message: any) => void>();
 const send = (proc: ChildProcess, command: string, args: Record<string, unknown>) => {
   requestSeq += 1;
   const seq = requestSeq;
-  proc.stdin.write(`${JSON.stringify({
+  proc.stdin!.write(`${JSON.stringify({
     seq,
     type: 'request',
     command,
@@ -519,8 +560,8 @@ const send = (proc: ChildProcess, command: string, args: Record<string, unknown>
 
 const attach = (proc: ChildProcess) => {
   let buffer = '';
-  proc.stdout.setEncoding('utf8');
-  proc.stdout.on('data', (chunk: string) => {
+  proc.stdout!.setEncoding('utf8');
+  proc.stdout!.on('data', (chunk: string) => {
     buffer += chunk;
     while (true) {
       const headerEnd = buffer.indexOf('\r\n\r\n');
@@ -540,7 +581,8 @@ const attach = (proc: ChildProcess) => {
         continue;
       }
       if (message.request_seq && pending.has(message.request_seq)) {
-        pending.get(message.request_seq)(message);
+        const fn = pending.get(message.request_seq)!;
+        fn(message);
         pending.delete(message.request_seq);
       }
     }
