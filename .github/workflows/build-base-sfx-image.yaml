@@ -101,7 +101,7 @@ jobs:
         if: steps.check-image.outputs.image_exists != 'true'
         run: |
           curl -fsSL -o /tmp/func \
-            https://github.com/knative/func/releases/download/knative-v1.15.0/func_linux_amd64
+            https://github.com/knative/func/releases/download/knative-v1.23.0/func_linux_amd64
           chmod +x /tmp/func
           sudo mv /tmp/func /usr/local/bin/func
           func version
