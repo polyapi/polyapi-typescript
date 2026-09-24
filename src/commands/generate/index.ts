@@ -38,6 +38,14 @@ import {
   getGenerationErrors,
   setGenerationErrors,
 } from './types';
+import {
+  countLinkableFunctions,
+  discoverLocalSources,
+  LocalLinkStats,
+  LocalSourceDiscovery,
+  LocalSourceScan,
+  localSourceScanFromConfig,
+} from './localSources';
 import { generateSchemaTSDeclarationFiles } from './schemaTypes';
 import { generateTableTSDeclarationFiles } from './table';
 
@@ -557,20 +565,17 @@ const generateSingleCustomFunction = async (
 
   setGenerationErrors(false);
 
-  await generateSpecs(tempPath, specs, noTypes);
+  const linkStats = await generateSpecs(
+    tempPath,
+    specs,
+    noTypes,
+    localSourceScanFromConfig(loadConfig(polyPath)),
+  );
   // Now remove old lib and rename temp directory to force a switchover in typescript
   fs.rmSync(libPath, { recursive: true, force: true });
   fs.renameSync(tempPath, libPath);
 
-  if (getGenerationErrors()) {
-    shell.echo(
-      chalk.yellow(
-        'Generate DONE with errors. Please investigate the errors and contact support@polyapi.io for assistance.',
-      ),
-    );
-  } else {
-    shell.echo(chalk.green('DONE'));
-  }
+  echoGenerateFinished(linkStats);
 };
 
 const updateLocalConfig = (
@@ -626,7 +631,7 @@ const generate = async ({
   shell.echo('-n', generateMsg);
 
   await prepareDir(polyPath, true);
-  loadConfig(polyPath);
+  const polyConfig = loadConfig(polyPath);
 
   const libPath = getPolyLibPath(polyPath);
   const tempPath = libPath.replace('/lib', '/temp');
@@ -641,20 +646,17 @@ const generate = async ({
   }
 
   setGenerationErrors(false);
-  await generateSpecs(tempPath, specs, noTypes);
+  const linkStats = await generateSpecs(
+    tempPath,
+    specs,
+    noTypes,
+    localSourceScanFromConfig(polyConfig),
+  );
   // Now remove old lib and rename temp directory to force a switchover in typescript
   fs.rmSync(libPath, { recursive: true, force: true });
   fs.renameSync(tempPath, libPath);
 
-  if (getGenerationErrors()) {
-    shell.echo(
-      chalk.yellow(
-        'Generate DONE with errors. Please investigate the errors and contact support@polyapi.io for assistance.',
-      ),
-    );
-  } else {
-    shell.echo(chalk.green('DONE'));
-  }
+  echoGenerateFinished(linkStats);
 };
 
 const tryAsync = async <R = unknown>(
@@ -672,11 +674,31 @@ const tryAsync = async <R = unknown>(
   }
 };
 
+const echoGenerateFinished = (linkStats?: LocalLinkStats) => {
+  if (getGenerationErrors()) {
+    shell.echo(
+      chalk.yellow(
+        'Generate DONE with errors. Please investigate the errors and contact support@polyapi.io for assistance.',
+      ),
+    );
+  } else {
+    shell.echo(chalk.green('DONE'));
+  }
+  if (!linkStats) return;
+  if (linkStats.indexError) {
+    shell.echo(
+      chalk.yellow(`Local source indexing failed: ${linkStats.indexError}`),
+    );
+  }
+};
+
 export const generateSpecs = async (
   libPath: string,
   specs: Specification[],
   noTypes: boolean,
-) => {
+  scan: LocalSourceScan = localSourceScanFromConfig(),
+): Promise<LocalLinkStats | undefined> => {
+  let linkStats: LocalLinkStats | undefined;
   try {
     let missingNames: Specification[] = [];
     [missingNames, specs] = specs.reduce(
@@ -697,10 +719,25 @@ export const generateSpecs = async (
     );
 
     if (!noTypes) {
-      await tryAsync(
-        generateFunctionsTSDeclarationFile(libPath, filteredSpecs),
+      const total = countLinkableFunctions(filteredSpecs);
+      let discovery: LocalSourceDiscovery | undefined;
+      let indexError: string | undefined;
+      if (total > 0) {
+        try {
+          discovery = await discoverLocalSources(undefined, scan);
+        } catch (error) {
+          indexError = error instanceof Error ? error.message : String(error);
+        }
+      }
+      const functionTypes = await tryAsync(
+        generateFunctionsTSDeclarationFile(libPath, filteredSpecs, discovery),
         'function types',
       );
+      linkStats = {
+        linked: functionTypes?.linked ?? 0,
+        total,
+        indexError,
+      };
       await tryAsync(
         generateVariablesTSDeclarationFile(libPath, filteredSpecs),
         'variable types',
@@ -736,6 +773,7 @@ export const generateSpecs = async (
   } catch (error) {
     showErrGeneratingFiles(error);
   }
+  return linkStats;
 };
 
 export { generate, generateSingleCustomFunction };
