@@ -1,0 +1,168 @@
+name: Build Base SFX Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      polyapi_version:
+        description: polyapi package version
+        required: true
+#   workflow_run:
+#     workflows:
+#       - Docker Image & NPM publish CI/CD
+#     types:
+#       - completed
+#     branches:
+#       - develop
+#       - main
+
+jobs:
+  build-and-push:
+    name: Build and push polyapi base image
+    runs-on: ubuntu-latest
+    concurrency:
+      group: build-base-sfx-${{ github.event.inputs.polyapi_version || github.event.workflow_run.head_sha || github.sha }}
+      cancel-in-progress: false
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve polyapi version
+        id: resolve-version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.polyapi_version }}"
+          else
+            VERSION="$(node -p "require('./package.json').version")"
+          fi
+
+          if [ -z "$VERSION" ]; then
+            echo "Could not resolve polyapi version" >&2
+            exit 1
+          fi
+
+          echo "polyapi_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Using polyapi version: $VERSION"
+
+      - name: Wait for polyapi release on npm
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
+          MAX_ATTEMPTS=30
+          SLEEP_SECONDS=20
+
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            if curl --silent --fail --head "https://registry.npmjs.org/polyapi/${VERSION}" >/dev/null; then
+              echo "polyapi@$VERSION is available on npm"
+              exit 0
+            fi
+
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "Timed out waiting for polyapi@$VERSION to appear on npm" >&2
+              exit 1
+            fi
+
+            echo "Attempt $attempt/$MAX_ATTEMPTS: polyapi@$VERSION not visible yet, retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Check if base image already exists
+        id: check-image
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
+          IMAGE="ghcr.io/polyapi/polyapi-ts-${VERSION}-base:latest"
+
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "base image already exists, skipping"
+            echo "image_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "base image does not exist, continuing build"
+            echo "image_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install kn func CLI
+        if: steps.check-image.outputs.image_exists != 'true'
+        run: |
+          curl -fsSL -o /tmp/func \
+            https://github.com/knative/func/releases/download/knative-v1.23.0/func_linux_amd64
+          chmod +x /tmp/func
+          sudo mv /tmp/func /usr/local/bin/func
+          func version
+
+      - name: Create Node function scaffold
+        if: steps.check-image.outputs.image_exists != 'true'
+        run: |
+          set -euo pipefail
+          POLYAPI_VERSION_SAFE="$(printf '%s' "${{ steps.resolve-version.outputs.polyapi_version }}" | tr '.' '-')"
+          FUNC_DIR="${RUNNER_TEMP}/polyapi-ts-${POLYAPI_VERSION_SAFE}-base"
+          rm -rf "$FUNC_DIR"
+          mkdir -p "$FUNC_DIR"
+          (
+            cd "$FUNC_DIR"
+            func create -l node
+          )
+          echo "FUNC_DIR=$FUNC_DIR" >> "$GITHUB_ENV"
+
+      - name: Install polyapi dependency
+        if: steps.check-image.outputs.image_exists != 'true'
+        run: |
+          set -euo pipefail
+          (
+            cd "$FUNC_DIR"
+            npm install "polyapi@${{ steps.resolve-version.outputs.polyapi_version }}"
+          )
+          echo "Final package.json:"
+          cat "${FUNC_DIR}/package.json"
+
+      - name: Normalize func.yaml build settings
+        if: steps.check-image.outputs.image_exists != 'true'
+        run: |
+          set -euo pipefail
+          CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > "${FUNC_DIR}/func.yaml" <<EOF
+          specVersion: 0.36.0
+          name: polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base
+          runtime: node
+          created: ${CREATED}
+          build:
+            builderImages:
+              pack: ghcr.io/knative/builder-jammy-base:latest
+            builder: pack
+            buildEnvs:
+              - name: BP_NODE_VERSION
+                value: "20.*"
+          EOF
+          echo "Final func.yaml:"
+          cat "${FUNC_DIR}/func.yaml"
+
+      - name: Build and push image with kn func
+        if: steps.check-image.outputs.image_exists != 'true'
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
+          func build --image "$IMAGE" --push=true -p "$FUNC_DIR" --verbose
+
+      - name: Verify pushed image
+        if: steps.check-image.outputs.image_exists != 'true'
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
+          docker pull "$IMAGE"
+          echo "Published image: $IMAGE"
