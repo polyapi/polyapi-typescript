@@ -1,9 +1,8 @@
 import fs from 'fs';
-import { memoize, set } from 'lodash';
-import { toPascalCase } from '@guanghechen/helper-string';
+import { set } from 'lodash';
 import { EOL } from 'node:os';
 import { SchemaRef, SchemaSpecification } from '../../types';
-import { echoGenerationError } from '../../utils';
+import { echoGenerationError, toPascalCase } from '../../utils';
 import { setGenerationErrors } from './types';
 import shell from 'shelljs';
 import chalk from 'chalk';

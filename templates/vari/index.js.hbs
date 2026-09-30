@@ -1,4 +1,4 @@
-const { axios, scrubKeys } = require('../axios');
+const { http, scrubKeys } = require('../http');
 const set = require('lodash/set');
 const get = require('lodash/get');
 const merge = require('lodash/merge');
@@ -47,13 +47,13 @@ const getVariableHandlers = (clientID, getSocket, getApiKey) => {
         if (secrecy === 'SECRET') {
           throw new Error('Cannot access secret variable from client. Use .inject() instead within Poly function.');
         } else {
-          return axios.get(
+          return http.get(
             `/variables/${id}/value`
           ).then(({data}) => data).catch(scrubKeys);
         }
       },
       update: (value) => {
-        return axios.patch(
+        return http.patch(
           `/variables/${id}`,
           { value }
         ).then(response => {
@@ -179,7 +179,7 @@ const getVariableHandlers = (clientID, getSocket, getApiKey) => {
 const getPathHandlers = () => {
   const pathHandlers = {
     get: () => {
-      return axios.get(
+      return http.get(
         `/variables/context/values`
       ).then(({data}) => data).catch(scrubKeys);
     }
@@ -187,7 +187,7 @@ const getPathHandlers = () => {
   contextPaths.forEach(path => {
     set(pathHandlers, path, {
       get: () => {
-        return axios.get(
+        return http.get(
           `/variables/context/${path}/values`
         ).then(({data}) => data).catch(scrubKeys);
       },

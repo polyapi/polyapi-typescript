@@ -1,4 +1,3 @@
-import axios from 'axios';
 import chalk from 'chalk';
 import shell from 'shelljs';
 
@@ -126,7 +125,7 @@ export const ensurePermissions = async (
       chalk.redBright('ERROR:'),
       `Unable to validate API key permissions via /auth${status ? ` (HTTP ${status})` : ''}. ${message}`,
     );
-    if (axios.isAxiosError?.(error) && !error.response) {
+    if (error?.isAxiosError && !error.response) {
       shell.echo(chalk.red('Network error:'), error.message);
     }
     return false;

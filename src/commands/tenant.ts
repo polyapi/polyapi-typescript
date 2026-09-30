@@ -74,10 +74,13 @@ export const create = async (
       tenantSignUp = response;
     } catch (error) {
       shell.echo(chalk.red('ERROR\n'));
+      // @ts-expect-error - it's fine
       if (error.response?.status === 409) {
+        // @ts-expect-error - it's fine
         if (error.response.data.code === 'TENANT_ALREADY_EXISTS') {
           shell.echo('Tenant already in use.\n');
           return signUp('tenant');
+          // @ts-expect-error - it's fine
         } else if (error.response.data.code === 'EMAIL_ALREADY_EXISTS') {
           shell.echo('Email already in use.\n');
           return signUp();
@@ -152,7 +155,9 @@ export const create = async (
       };
     } catch (error) {
       shell.echo(chalk.red('ERROR\n'));
+      // @ts-expect-error - it's fine
       if (error.response?.status === 409) {
+        // @ts-expect-error - it's fine
         if (error.response?.data?.code === 'INVALID_VERIFICATION_CODE') {
           shell.echo(
             "Wrong verification code. If you didn't receive your verification code, you can type",
@@ -161,11 +166,13 @@ export const create = async (
           );
         }
 
+        // @ts-expect-error - it's fine
         if (error.response?.data?.code === 'EXPIRED_VERIFICATION_CODE') {
           shell.echo('Verification code has expired.\n');
           return verifyTenant();
         }
 
+        // @ts-expect-error - it's fine
         if (error.response?.data?.code === 'TENANT_ALREADY_EXISTS') {
           shell.echo('Tenant already in use.\n');
           await signUp('tenant');

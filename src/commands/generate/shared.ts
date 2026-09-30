@@ -1,6 +1,6 @@
-import { toPascalCase } from '@guanghechen/helper-string';
 import { memoize } from 'lodash';
 import { EOL } from 'node:os';
+import { toPascalCase } from '../../utils';
 
 const unsafeCharacters = /(?:^\d)|[^0-9a-zA-Z_]/gi;
 const unescapedSingleQuote = /\b'\b/gi;

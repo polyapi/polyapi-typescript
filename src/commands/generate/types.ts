@@ -1,6 +1,5 @@
 import fs from 'fs';
 import handlebars from 'handlebars';
-import { toCamelCase, toPascalCase } from '@guanghechen/helper-string';
 import { compile } from 'json-schema-to-typescript';
 import * as ts from 'typescript';
 
@@ -27,8 +26,9 @@ import {
   isBinary,
   iterateRefs,
   toTypeDeclaration,
+  toPascalCase,
+  toCamelCase
 } from '../../utils';
-import { printSchemaAsType } from './schemaTypes';
 import { getVariableValueTypeDeclarations } from './variTypes';
 
 interface Context {
@@ -417,6 +417,7 @@ const getIDComment = (specification: Specification) => {
     case 'apiFunction':
     case 'serverFunction':
     case 'customFunction':
+    case 'aiFunction':
       return `* Function ID: ${specification.id}`;
     case 'authFunction':
       return `* Auth provider ID: ${specification.id}`;
@@ -522,6 +523,7 @@ const getSpecificationsTypeDeclarations = async (
       setGenerationErrors(true);
       errors.push({
         specification,
+        // @ts-expect-error - it's fine
         stack: error.stack,
       });
       return Promise.resolve('');
@@ -696,7 +698,8 @@ const generateTSContextDeclarationFile = async (
       arguments: specification.function.arguments.map(toArgumentDeclaration),
       returnType: wrapInResponseType(computedReturnType),
       synchronous:
-        specification.type === 'serverFunction'
+        specification.type === 'serverFunction' ||
+        specification.type === 'aiFunction'
           ? false
           : specification.function.synchronous === true,
     };
