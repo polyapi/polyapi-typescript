@@ -1,8 +1,11 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import eslint from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import prettier from 'eslint-config-prettier';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nodeGlobals = {
   process: 'readonly',
   console: 'readonly',
@@ -25,9 +28,8 @@ export default [
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: 'tsconfig.json',
-        tsconfigRootDir: '.',
-        sourceType: 'module',
+        projectService: true,
+        tsconfigRootDir: __dirname,
       },
       globals: {
         ...nodeGlobals,

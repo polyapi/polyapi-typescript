@@ -1,10 +1,10 @@
-const { axios, scrubKeys } = require('../axios');
+const { http, scrubKeys } = require('../http');
 const set = require('lodash/set');
 const { tables } = require('./tables');
 
 
 const executeQuery = (id, method, query, clientID, polyCustom) =>
-  axios.post(
+  http.post(
     `/tables/${id}/${method}?clientId=${clientID}`,
     query,
     {

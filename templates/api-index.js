@@ -1,15 +1,14 @@
-const { axios, scrub } = require('../axios');
+const { http, scrub, createDispatcher } = require('../http');
 const set = require('lodash/set');
-const https = require('https');
 const fs = require('fs');
 const { env, functions } = require('./functions');
 
 
-// Create MTLS agent if paths are provided
-let httpsAgent = undefined;
-const getHttpsAgent = () => {
-  if (httpsAgent) {
-    return httpsAgent;
+// Create MTLS dispatcher if paths are provided
+let mtlsDispatcher = undefined;
+const getMtlsDispatcher = () => {
+  if (mtlsDispatcher) {
+    return mtlsDispatcher;
   }
 
   const { mtls } = env;
@@ -17,14 +16,14 @@ const getHttpsAgent = () => {
     return undefined;
   }
 
-  httpsAgent = new https.Agent({
+  mtlsDispatcher = createDispatcher({
     cert: fs.readFileSync(mtls.certPath),
     key: fs.readFileSync(mtls.keyPath),
     ca: fs.readFileSync(mtls.caPath),
     rejectUnauthorized: mtls.rejectUnauthorized,
   });
 
-  return httpsAgent;
+  return mtlsDispatcher;
 };
 
 
@@ -63,7 +62,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
     let roundTripServerNetworkLatencyMs;
     let requestApiStartTime;
 
-    return axios.post(
+    return http.post(
       `/functions/api/${id}/direct-execute?clientId=${clientID}`,
       requestArgs,
       {
@@ -84,14 +83,14 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
       roundTripServerNetworkLatencyMs = Date.now() - requestServerStartTime - serverPreperationTimeMs;
 
       requestApiStartTime = Date.now();
-      const httpsAgent = getHttpsAgent();
+      const dispatcher = getMtlsDispatcher();
 
-      return axios({
+      return http({
         ...data,
         headers: {
           ...data.headers,
         },
-        httpsAgent,
+        dispatcher,
       })
     }).then(({ headers, data, status }) => {
       if (status && (status < 200 || status >= 300) && process.env.LOGS_ENABLED) {
@@ -115,7 +114,7 @@ const executeApiFunction = (id, clientID, polyCustom, requestArgs) => {
   }
 
   // default indirect execution
-  return axios.post(
+  return http.post(
     `/functions/api/${id}/execute?clientId=${clientID}`,
     requestArgs,
     {

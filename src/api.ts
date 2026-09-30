@@ -1,8 +1,5 @@
-import Axios, { AxiosResponse } from 'axios';
-import { HttpProxyAgent } from 'http-proxy-agent';
-import { HttpsProxyAgent } from 'https-proxy-agent';
-import https from 'https';
 import dotenv from 'dotenv';
+import * as http from './http';
 import {
   ApiFunctionDescriptionGenerationDto,
   ApiFunctionDetailsDto,
@@ -36,14 +33,6 @@ import { POLY_API_VERSION_HEADER } from './constants';
 
 dotenv.config();
 
-const httpProxy =
-  process.env.HTTP_PROXY ||
-  process.env.http_proxy ||
-  process.env.npm_config_proxy;
-const httpsProxy =
-  process.env.HTTPS_PROXY ||
-  process.env.https_proxy ||
-  process.env.npm_config_https_proxy;
 const nodeEnv = process.env.NODE_ENV;
 const isDevEnv = nodeEnv === 'development';
 
@@ -61,18 +50,6 @@ const getApiHeaders = () => ({
   [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
 });
 
-const axios = Axios.create({
-  httpAgent: httpProxy ? new HttpProxyAgent(httpProxy) : undefined,
-  httpsAgent: httpsProxy
-    ? new HttpsProxyAgent(httpsProxy, {
-        rejectUnauthorized: !isDevEnv,
-      })
-    : isDevEnv
-    ? new https.Agent({ rejectUnauthorized: false })
-    : undefined,
-  proxy: false,
-});
-
 export const getSpecs = async (
   contexts?: string[],
   names?: string[],
@@ -80,7 +57,7 @@ export const getSpecs = async (
   noTypes?: boolean,
 ) => {
   return (
-    await axios.get<Specification[]>(`${getApiBaseURL()}/specs`, {
+    await http.get<Specification[]>(`${getApiBaseURL()}/specs`, {
       headers: getApiHeaders(),
       params: {
         contexts,
@@ -108,7 +85,7 @@ export const createOrUpdateServerFunction = async (
   executionApiKey?: string,
 ) => {
   return (
-    await axios.post<any, AxiosResponse<CreateServerCustomFunctionResponseDto>>(
+    await http.post<CreateServerCustomFunctionResponseDto>(
       `${getApiBaseURL()}/functions/server`,
       {
         context,
@@ -138,7 +115,7 @@ export const createOrUpdateServerFunction = async (
 
 export const getServerFunctionById = async (id: string) => {
   return (
-    await axios.get<any, AxiosResponse<FunctionDetailsDto>>(
+    await http.get<FunctionDetailsDto>(
       `${getApiBaseURL()}/functions/server/${id}`,
       {
         headers: {
@@ -156,7 +133,7 @@ export const getServerFunctionByName = async (
   detail = false,
 ) => {
   const basic = (
-    await axios.get<any, AxiosResponse<{ results: FunctionBasicDto[] }>>(
+    await http.get<{ results: FunctionBasicDto[] }>(
       `${getApiBaseURL()}/functions/server?search=${encodeURIComponent(
         `${context}${context && name ? '.' : ''}${name}`,
       )}`,
@@ -174,7 +151,7 @@ export const getServerFunctionByName = async (
 };
 
 export const deleteServerFunction = async (id: string) => {
-  return await axios.delete(`${getApiBaseURL()}/functions/server/${id}`, {
+  return await http.delete(`${getApiBaseURL()}/functions/server/${id}`, {
     headers: {
       'Content-Type': 'application/json',
       ...getApiHeaders(),
@@ -197,7 +174,7 @@ export const createOrUpdateClientFunction = async (
   other?: Record<string, any>,
 ) => {
   return (
-    await axios.post<any, AxiosResponse<FunctionDetailsDto>>(
+    await http.post<FunctionDetailsDto>(
       `${getApiBaseURL()}/functions/client`,
       {
         context,
@@ -222,7 +199,7 @@ export const createOrUpdateClientFunction = async (
 
 export const getClientFunctionById = async (id: string) => {
   return (
-    await axios.get<any, AxiosResponse<FunctionDetailsDto>>(
+    await http.get<FunctionDetailsDto>(
       `${getApiBaseURL()}/functions/client/${id}`,
       {
         headers: {
@@ -240,7 +217,7 @@ export const getClientFunctionByName = async (
   detail = false,
 ) => {
   const basic = (
-    await axios.get<any, AxiosResponse<{ results: FunctionBasicDto[] }>>(
+    await http.get<{ results: FunctionBasicDto[] }>(
       `${getApiBaseURL()}/functions/client?search=${encodeURIComponent(
         `${context}${context && name ? '.' : ''}${name}`,
       )}`,
@@ -258,7 +235,7 @@ export const getClientFunctionByName = async (
 };
 
 export const deleteClientFunction = async (id: string) => {
-  return await axios.delete(`${getApiBaseURL()}/functions/client/${id}`, {
+  return await http.delete(`${getApiBaseURL()}/functions/client/${id}`, {
     headers: {
       'Content-Type': 'application/json',
       ...getApiHeaders(),
@@ -272,7 +249,7 @@ export const createTenantSignUp = async (
   tenantName: string | null = null,
 ) => {
   return (
-    await axios.post<any, AxiosResponse<SignUpDto>>(
+    await http.post<SignUpDto>(
       `${getInstanceUrl(instance)}/tenants/sign-up`,
       {
         email,
@@ -294,7 +271,7 @@ export const verifyTenantSignUp = async (
   code: string,
 ) => {
   return (
-    await axios.post<any, AxiosResponse<SignUpVerificationResultDto>>(
+    await http.post<SignUpVerificationResultDto>(
       `${getInstanceUrl(instance)}/tenants/sign-up/verify`,
       {
         code,
@@ -311,7 +288,7 @@ export const verifyTenantSignUp = async (
 };
 
 export const resendVerificationCode = (instance: string, email: string) => {
-  return axios.post<any, AxiosResponse<SignUpDto>>(
+  return http.post<SignUpDto>(
     `${getInstanceUrl(instance)}/tenants/sign-up/resend-verification-code`,
     {
       email,
@@ -326,7 +303,7 @@ export const resendVerificationCode = (instance: string, email: string) => {
 
 export const getLastTos = async (instance: string) => {
   return (
-    await axios.get<any, AxiosResponse<TosDto>>(
+    await http.get<TosDto>(
       `${getInstanceUrl(instance)}/tos`,
       {
         headers: {
@@ -339,7 +316,7 @@ export const getLastTos = async (instance: string) => {
 
 export const upsertApiFunction = async (data: CreateApiFunctionDto) => {
   return (
-    await axios.put<any, AxiosResponse<ApiFunctionDetailsDto>>(
+    await http.put<ApiFunctionDetailsDto>(
       `${getApiBaseURL()}/functions/api`,
       data,
       {
@@ -351,7 +328,7 @@ export const upsertApiFunction = async (data: CreateApiFunctionDto) => {
 
 export const upsertWebhookHandle = async (data: CreateWebhookHandleDto) => {
   return (
-    await axios.put<any, AxiosResponse<WebhookHandleDto>>(
+    await http.put<WebhookHandleDto>(
       `${getApiBaseURL()}/webhooks`,
       data,
       {
@@ -363,7 +340,7 @@ export const upsertWebhookHandle = async (data: CreateWebhookHandleDto) => {
 
 export const upsertSchema = async (data: CreateSchemaDto) => {
   return (
-    await axios.put<any, AxiosResponse<SchemaDto>>(
+    await http.put<SchemaDto>(
       `${getApiBaseURL()}/schemas`,
       data,
       {
@@ -387,7 +364,7 @@ export const translateSpecification = async (
   const url = `${getApiBaseURL()}/specification-input/oas?${params.toString()}`;
 
   return (
-    await axios.post<any, AxiosResponse<SpecificationInputDto>>(url, contents, {
+    await http.post<SpecificationInputDto>(url, contents, {
       headers: {
         'Content-Type': 'text/plain',
         ...getApiHeaders(),
@@ -398,7 +375,7 @@ export const translateSpecification = async (
 
 export const validateApiFunctionDto = async (data: CreateApiFunctionDto) => {
   return (
-    await axios.post<any, AxiosResponse<void>>(
+    await http.post<void>(
       `${getApiBaseURL()}/specification-input/validation/api-function`,
       data,
       {
@@ -412,7 +389,7 @@ export const validateWebhookHandleDto = async (
   data: CreateWebhookHandleDto,
 ) => {
   return (
-    await axios.post<any, AxiosResponse<void>>(
+    await http.post<void>(
       `${getApiBaseURL()}/specification-input/validation/webhook-handle`,
       data,
       {
@@ -426,12 +403,13 @@ export const getServerFunctionDescription = async (
   data: ExecuteCustomFunctionDescriptionGenerationDto,
 ) => {
   return (
-    await axios.post<
-      any,
-      AxiosResponse<CustomFunctionDescriptionGenerationDto>
-    >(`${getApiBaseURL()}/functions/server/description-generation`, data, {
-      headers: getApiHeaders(),
-    })
+    await http.post<CustomFunctionDescriptionGenerationDto>(
+      `${getApiBaseURL()}/functions/server/description-generation`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
   ).data;
 };
 
@@ -439,12 +417,13 @@ export const getClientFunctionDescription = async (
   data: ExecuteCustomFunctionDescriptionGenerationDto,
 ) => {
   return (
-    await axios.post<
-      any,
-      AxiosResponse<CustomFunctionDescriptionGenerationDto>
-    >(`${getApiBaseURL()}/functions/client/description-generation`, data, {
-      headers: getApiHeaders(),
-    })
+    await http.post<CustomFunctionDescriptionGenerationDto>(
+      `${getApiBaseURL()}/functions/client/description-generation`,
+      data,
+      {
+        headers: getApiHeaders(),
+      },
+    )
   ).data;
 };
 
@@ -452,7 +431,7 @@ export const getApiFunctionDescription = async (
   data: ExecuteApiFunctionDescriptionGenerationDto,
 ) => {
   return (
-    await axios.post<any, AxiosResponse<ApiFunctionDescriptionGenerationDto>>(
+    await http.post<ApiFunctionDescriptionGenerationDto>(
       `${getApiBaseURL()}/functions/api/description-generation`,
       data,
       {
@@ -463,20 +442,18 @@ export const getApiFunctionDescription = async (
 };
 
 export const upsertSnippet = async (data: CreateSnippetDto) => {
-  return await axios.put<any, AxiosResponse<SnippetDetailsDto>>(
-    `${getApiBaseURL()}/snippets`,
-    data,
-    {
+  return (
+    await http.put<SnippetDetailsDto>(`${getApiBaseURL()}/snippets`, data, {
       headers: getApiHeaders(),
-    },
-  );
+    })
+  ).data;
 };
 
 export const getWebhookHandleDescription = async (
   data: ExecuteWebhookHandleDescriptionGenerationDto,
 ) => {
   return (
-    await axios.post<any, AxiosResponse<WebhookHandleDescriptionGenerationDto>>(
+    await http.post<WebhookHandleDescriptionGenerationDto>(
       `${getApiBaseURL()}/webhooks/description-generation`,
       data,
       {
@@ -491,7 +468,7 @@ export const getAuthData = async (
   apiKey: string,
 ): Promise<AuthData> => {
   return (
-    await axios.get<any, AxiosResponse<AuthData>>(`${baseUrl}/auth`, {
+    await http.get<AuthData>(`${baseUrl}/auth`, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
@@ -507,7 +484,7 @@ export const getProjectTemplatesConfig = async (
   environmentId: string,
 ): Promise<ProjectTemplatesConfig> => {
   return (
-    await axios.get<any, AxiosResponse<ProjectTemplatesConfigVariable>>(
+    await http.get<ProjectTemplatesConfigVariable>(
       `${baseUrl}/tenants/${tenantId}/environments/${environmentId}/config-variables/ProjectTemplates`,
       {
         headers: {
@@ -526,7 +503,7 @@ export const createOrUpdateWebhook = async (
   config?: Record<string, any>,
 ) => {
   return (
-    await axios.put<any, AxiosResponse<CreateServerCustomFunctionResponseDto>>(
+    await http.put<CreateServerCustomFunctionResponseDto>(
       `${getApiBaseURL()}/webhooks`,
       {
         context,
@@ -546,7 +523,7 @@ export const createOrUpdateWebhook = async (
 
 export const getWebhookById = async (id: string) => {
   return (
-    await axios.get<any, AxiosResponse<WebhookHandleDto>>(
+    await http.get<WebhookHandleDto>(
       `${getApiBaseURL()}/webhooks/${id}`,
       {
         headers: {
@@ -564,7 +541,7 @@ export const getWebhookByName = async (
   detail = false,
 ) => {
   const basic = (
-    await axios.get<any, AxiosResponse<WebhookHandleBasicDto[]>>(
+    await http.get<WebhookHandleBasicDto[]>(
       `${getApiBaseURL()}/webhooks`,
       {
         headers: {
@@ -581,7 +558,7 @@ export const getWebhookByName = async (
 };
 
 export const deleteWebhook = async (webhookId: string) => {
-  return await axios.delete<any, AxiosResponse>(
+  return await http.delete(
     `${getApiBaseURL()}/webhooks/${webhookId}`,
     {
       headers: {
