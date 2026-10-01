@@ -123,10 +123,23 @@ jobs:
         if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
-          (
-            cd "$FUNC_DIR"
-            npm install "polyapi@${{ steps.resolve-version.outputs.polyapi_version }}"
-          )
+          VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
+          MAX_ATTEMPTS=10
+          SLEEP_SECONDS=15
+          cd "$FUNC_DIR"
+          # The registry packument can lag behind the per-version endpoint checked earlier
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            if npm install --prefer-online "polyapi@${VERSION}"; then
+              break
+            fi
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "Failed to install polyapi@$VERSION after $MAX_ATTEMPTS attempts" >&2
+              exit 1
+            fi
+            echo "Attempt $attempt/$MAX_ATTEMPTS: install failed, retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+          cd - >/dev/null
           echo "Final package.json:"
           cat "${FUNC_DIR}/package.json"
 
