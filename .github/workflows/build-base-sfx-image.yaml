@@ -6,14 +6,13 @@ on:
       polyapi_version:
         description: polyapi package version
         required: true
-#   workflow_run:
-#     workflows:
-#       - Docker Image & NPM publish CI/CD
-#     types:
-#       - completed
-#     branches:
-#       - develop
-#       - main
+  workflow_run:
+    workflows:
+      - Docker Image & NPM publish CI/CD
+    types:
+      - completed
+    branches:
+      - develop
 
 jobs:
   build-and-push:
@@ -157,7 +156,20 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
-          func build --image "$IMAGE" --push=true -p "$FUNC_DIR" --verbose
+          func build --image "$IMAGE" --push=false -p "$FUNC_DIR" --verbose
+
+      - name: Fix node_modules ownership and push image
+        if: steps.check-image.outputs.image_exists != 'true'
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
+          docker build -t "$IMAGE" - <<EOF
+          FROM ${IMAGE}
+          USER root
+          RUN if [ -d /layers/paketo-buildpacks_npm-install/launch-modules/node_modules ]; then chown -R 1001:1001 /layers/paketo-buildpacks_npm-install/launch-modules/node_modules; fi
+          USER 1001
+          EOF
+          docker push "$IMAGE"
 
       - name: Verify pushed image
         if: steps.check-image.outputs.image_exists != 'true'
