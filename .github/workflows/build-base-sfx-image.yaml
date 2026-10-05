@@ -16,10 +16,14 @@ on:
 
 jobs:
   build-and-push:
-    name: Build and push polyapi base image
+    name: Build and push polyapi ${{ matrix.flavor }} image
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [base, perch]
     concurrency:
-      group: build-base-sfx-${{ github.event.inputs.polyapi_version || github.event.workflow_run.head_sha || github.sha }}
+      group: build-${{ matrix.flavor }}-sfx-${{ github.event.inputs.polyapi_version || github.event.workflow_run.head_sha || github.sha }}
       cancel-in-progress: false
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -27,6 +31,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      FLAVOR: ${{ matrix.flavor }}
 
     steps:
       - name: Checkout
@@ -53,6 +59,7 @@ jobs:
           echo "Using polyapi version: $VERSION"
 
       - name: Wait for polyapi release on npm
+        if: matrix.flavor == 'base'
         run: |
           set -euo pipefail
           VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
@@ -81,18 +88,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Check if base image already exists
+      - name: Check if image already exists
         id: check-image
         run: |
           set -euo pipefail
           VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
-          IMAGE="ghcr.io/polyapi/polyapi-ts-${VERSION}-base:latest"
+          IMAGE="ghcr.io/polyapi/polyapi-ts-${VERSION}-${FLAVOR}:latest"
 
           if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
-            echo "base image already exists, skipping"
+            echo "$FLAVOR image already exists, skipping"
             echo "image_exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "base image does not exist, continuing build"
+            echo "$FLAVOR image does not exist, continuing build"
             echo "image_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -109,8 +116,9 @@ jobs:
         if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
-          POLYAPI_VERSION_SAFE="$(printf '%s' "${{ steps.resolve-version.outputs.polyapi_version }}" | tr '.' '-')"
-          FUNC_DIR="${RUNNER_TEMP}/polyapi-ts-${POLYAPI_VERSION_SAFE}-base"
+          VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
+          VERSION_SAFE="$(printf '%s' "$VERSION" | tr '.' '-')"
+          FUNC_DIR="${RUNNER_TEMP}/polyapi-ts-${VERSION_SAFE}-${FLAVOR}"
           rm -rf "$FUNC_DIR"
           mkdir -p "$FUNC_DIR"
           (
@@ -119,21 +127,26 @@ jobs:
           )
           echo "FUNC_DIR=$FUNC_DIR" >> "$GITHUB_ENV"
 
-      - name: Install polyapi dependency
+      - name: Install runtime dependency
         if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
           VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
+          if [ "$FLAVOR" = "perch" ]; then
+            DEPENDENCY="polyapi@npm:perch-ts@latest"
+          else
+            DEPENDENCY="polyapi@${VERSION}"
+          fi
+
           MAX_ATTEMPTS=10
           SLEEP_SECONDS=15
           cd "$FUNC_DIR"
-          # The registry packument can lag behind the per-version endpoint checked earlier
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-            if npm install --prefer-online "polyapi@${VERSION}"; then
+            if npm install --prefer-online "$DEPENDENCY"; then
               break
             fi
             if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "Failed to install polyapi@$VERSION after $MAX_ATTEMPTS attempts" >&2
+              echo "Failed to install $DEPENDENCY after $MAX_ATTEMPTS attempts" >&2
               exit 1
             fi
             echo "Attempt $attempt/$MAX_ATTEMPTS: install failed, retrying in ${SLEEP_SECONDS}s..."
@@ -148,9 +161,10 @@ jobs:
         run: |
           set -euo pipefail
           CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
           cat > "${FUNC_DIR}/func.yaml" <<EOF
           specVersion: 0.36.0
-          name: polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base
+          name: polyapi-ts-${VERSION}-${FLAVOR}
           runtime: node
           created: ${CREATED}
           build:
@@ -168,14 +182,14 @@ jobs:
         if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
-          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
+          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-${FLAVOR}:latest"
           func build --image "$IMAGE" --push=false -p "$FUNC_DIR" --verbose
 
       - name: Fix node_modules ownership and push image
         if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
-          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
+          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-${FLAVOR}:latest"
           docker build -t "$IMAGE" - <<EOF
           FROM ${IMAGE}
           USER root
@@ -188,6 +202,6 @@ jobs:
         if: steps.check-image.outputs.image_exists != 'true'
         run: |
           set -euo pipefail
-          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
+          IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-${FLAVOR}:latest"
           docker pull "$IMAGE"
           echo "Published image: $IMAGE"
