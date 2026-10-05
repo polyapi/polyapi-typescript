@@ -133,7 +133,7 @@ jobs:
           set -euo pipefail
           VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
           if [ "$FLAVOR" = "perch" ]; then
-            DEPENDENCY="polyapi@npm:perch-ts@latest"
+            DEPENDENCY="perch-ts@latest"
           else
             DEPENDENCY="polyapi@${VERSION}"
           fi
