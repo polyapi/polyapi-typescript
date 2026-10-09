@@ -69,6 +69,7 @@ export const clearPermissionsCache = (): void => {
 export const PERMISSION_ACTIONS: Record<string, string> = {
   libraryGenerate: 'generate Poly library',
   customDev: 'add Client or Server functions',
+  manageApplications: 'create or update applications',
   manageApiFunctions: 'add API functions',
   manageSchemas: 'add schemas',
   manageWebhooks: 'add webhooks',

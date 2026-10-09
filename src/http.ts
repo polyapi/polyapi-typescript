@@ -47,6 +47,8 @@ export type HttpRequestConfig = {
   timeout?: number;
   throttleRetries?: number;
   didRetry?: boolean;
+  skipGeneratedAuth?: boolean;
+  transformRequest?: Array<(data: unknown) => unknown>;
 };
 
 export type HttpResponse<T = unknown> = {
@@ -212,6 +214,7 @@ export const encodeBody = (
   headers: Record<string, string>,
 ): Dispatcher.DispatchOptions['body'] | undefined => {
   if (body === undefined || body === null) return undefined;
+  if (Buffer.isBuffer(body)) return body;
   if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
     if (!getHeader(headers, 'content-type')) {
       setHeader(
@@ -466,8 +469,13 @@ const send = async <T = unknown>(
 ): Promise<HttpResponse<T>> => {
   const method = (config.method || 'GET').toUpperCase();
   const headers = normalizeHeaders(config.headers);
-  applyGeneratedAuth(headers);
-  const payload = config.body !== undefined ? config.body : config.data;
+  if (!config.skipGeneratedAuth) applyGeneratedAuth(headers);
+  let payload = config.body !== undefined ? config.body : config.data;
+  if (payload !== undefined && config.transformRequest?.length) {
+    for (const transform of config.transformRequest) {
+      payload = transform(payload);
+    }
+  }
   const body = ['GET', 'HEAD'].includes(method)
     ? undefined
     : encodeBody(payload, headers);

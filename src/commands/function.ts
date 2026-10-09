@@ -19,6 +19,55 @@ import {
   getTSBaseUrl,
 } from '../transpiler';
 import { DeployableTypeEntries } from '../deployables';
+import { publishComponents } from '../component/publish';
+
+export const addOrUpdateComponentFunction = async (
+  polyPath: string,
+  context: string,
+  name: string,
+  file: string,
+  isRoot: boolean,
+  visibility?: string,
+) => {
+  loadConfig(polyPath);
+
+  try {
+    shell.echo('-n', 'Publishing component function...');
+    const published = await publishComponents({
+      context,
+      name,
+      file,
+      isRoot,
+      visibility,
+    });
+    shell.echo(chalk.green('DONE'));
+    for (const result of published.components) {
+      const polyPathName = result.context
+        ? `${result.context}.${result.name}`
+        : result.name;
+      shell.echo(`Component ${polyPathName} (${result.kind}) ID: ${result.id}`);
+    }
+    for (const application of published.applications) {
+      const config = application.config;
+      const subpath =
+        config && typeof config === 'object' && 'subpath' in config
+          ? String((config as { subpath?: string }).subpath || '')
+          : application.subpath || '';
+      shell.echo(
+        `Re-uploaded application ${application.name}${subpath ? ` (${subpath})` : ''}.`,
+      );
+    }
+  } catch (e) {
+    shell.echo(chalk.redBright('ERROR\n'));
+    const err = e as any;
+    const details = err?.response?.data?.message
+      ? `:\n    ${chalk.red.italic(err.response.data.message)}`
+      : '';
+    shell.echo(
+      `${chalk.redBright.bold(err?.message ?? 'Unexpected error.')}${details}`,
+    );
+  }
+};
 
 export const addOrUpdateCustomFunction = async (
   polyPath: string,

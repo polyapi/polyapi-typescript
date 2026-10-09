@@ -233,3 +233,27 @@ export interface ExecuteCustomFunctionDescriptionGenerationDto {
   arguments?: FunctionArgumentDto[];
   code: string;
 }
+
+export type ComponentKind = 'root' | 'leaf';
+
+export interface CreateComponentFunctionDto {
+  name: string;
+  context: string;
+  kind: ComponentKind;
+  sourceCode: string;
+  code: string;
+  imports: string[];
+  visibility?: Visibility;
+  vendorCode?: string | null;
+  vendorHash?: string | null;
+  externalDependencies?: Record<string, string>;
+}
+
+export interface ComponentFunctionDetailsDto extends FunctionDetailsDto {
+  kind?: ComponentKind;
+  sourceCode?: string;
+  vendorCode?: string | null;
+  vendorHash?: string | null;
+  imports?: string[];
+  externalDependencies?: Record<string, string>;
+}
