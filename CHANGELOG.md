@@ -2,6 +2,9 @@
 * Updating brace-expansion to 5.0.12 to fix denial-of-service vulnerabilities.
 * Removing the unused tsc-alias build step and its vulnerable braces dependency; the project does not configure TypeScript path aliases.
 
+### 0.27.6
+* Misc fixes
+
 ### 0.27.5
 * Bumping some transitive dependencies to close open CVEs.
 * Adding code to generate method to create local references when possible to enable "Go to Definition" command in VS Code to actually go to the function code instead of the SDK typedefs.
