@@ -18,7 +18,7 @@
     "poly": "build/cli.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
     "prebuild": "rimraf build && rm -rf ./tsconfig.build.tsbuildinfo",
     "postbuild": "npm run copy-templates",
     "copy-templates": "copyfiles \"templates/**/*\" build",
@@ -46,8 +46,7 @@
     "jest": "^30.5.2",
     "jest-summary-reporter": "0.0.2",
     "rimraf": "4.4.1",
-    "ts-jest": "^29.4.15",
-    "tsc-alias": "^1.0.11"
+    "ts-jest": "^29.4.15"
   },
   "dependencies": {
     "@inquirer/prompts": "8.6.0",
@@ -71,7 +70,7 @@
     "axios": {
       "form-data": "^4.0.4"
     },
-    "brace-expansion": "5.0.9",
+    "brace-expansion": "5.0.12",
     "json-schema-to-typescript": {
       "js-yaml": "4.3.2"
     },
