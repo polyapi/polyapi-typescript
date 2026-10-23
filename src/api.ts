@@ -79,7 +79,7 @@ export const createOrUpdateServerFunction = async (
   externalDependencies: Record<string, string> | null,
   internalDependencies: Record<
     string,
-    Array<{ path: string; id: string }> | string[]
+    Array<{ path: string; id?: string }> | string[]
   > | null,
   other?: Record<string, any>,
   executionApiKey?: string,
@@ -169,7 +169,7 @@ export const createOrUpdateClientFunction = async (
   externalDependencies: Record<string, string> | null,
   internalDependencies: Record<
     string,
-    Array<{ path: string; id: string }> | string[]
+    Array<{ path: string; id?: string }> | string[]
   > | null,
   other?: Record<string, any>,
 ) => {

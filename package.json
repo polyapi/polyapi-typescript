@@ -1,6 +1,6 @@
 {
   "name": "polyapi",
-  "version": "0.27.7",
+  "version": "0.27.8",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
@@ -31,6 +31,7 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "devDependencies": {
+    "@polyapi/qnats": "0.1.11",
     "@types/adm-zip": "0.5.5",
     "@types/jest": "30.0.0",
     "@types/lodash": "4.17.9",

@@ -1,7 +1,6 @@
 import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
-import { toPascalCase } from '../utils';
 import {
   CreateServerCustomFunctionResponseDto,
   FunctionDetailsDto,
@@ -81,24 +80,11 @@ export const addOrUpdateCustomFunction = async (
       }
     }
 
-    const [externalDependencies, internalDependencies] = await getDependencies(
-      code,
-      file,
-      tsConfigBaseUrl,
-      ignoreDependencies,
-    );
-    const referencedSchemas =
-      internalDependencies && 'schema' in internalDependencies
-        ? Object.fromEntries(
-            internalDependencies.schema.map((schema) => [
-              `schemas.${schema.path
-                .split('.')
-                .map((s) => toPascalCase(s))
-                .join('.')}`,
-              { 'x-poly-ref': { path: schema.path } },
-            ]),
-          )
-        : null;
+    const [externalDependencies, internalDependencies, schemaRefs] =
+      await getDependencies(code, file, tsConfigBaseUrl, ignoreDependencies);
+    const referencedSchemas = Object.keys(schemaRefs).length
+      ? schemaRefs
+      : null;
     const typeSchemas = generateTypeSchemas(
       file,
       DeployableTypeEntries.map((d) => d[0]),

@@ -9,6 +9,8 @@ const serverFunctions = require('./server');
 const aiFunctions = require('./ai');
 const vari = require('./vari');
 const tabi = require('./tabi');
+const loxi = require('./loxi');
+const que = require('./que');
 const polyCustom = require('./poly-custom');
 const { createErrorHandler, sendLocalErrorEvent } = require('./error-handler');
 const { CLIENT_ID, API_KEY, API_BASE_URL } = require('./constants');
@@ -78,5 +80,7 @@ module.exports = {
   errorHandler: createErrorHandler(getApiKey, getSocket),
   vari: vari(CLIENT_ID, getSocket, getApiKey),
   tabi: tabi(CLIENT_ID, polyCustom),
+  loxi: loxi(CLIENT_ID, polyCustom),
+  que: que(CLIENT_ID, polyCustom),
   polyCustom,
 };
