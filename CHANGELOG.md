@@ -1,3 +1,10 @@
+### 0.28.0
+* Adding support for queues and locks
+* Fixing internal dependency tracking to capture dynamic paths using a wildcard
+* Picking up any schema reference used as a function argument or return type
+* Moving function transpilation to be client-side
+* Removing 'axios' from the excluded dependencies list now that it's no longer included by default
+
 ### 0.27.7
 * Updating brace-expansion to 5.0.12 to fix denial-of-service vulnerabilities.
 * Removing the unused tsc-alias build step and its vulnerable braces dependency; the project does not configure TypeScript path aliases.
