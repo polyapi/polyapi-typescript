@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { randomBytes } from 'crypto';
 import chalk from 'chalk';
 import shell from 'shelljs';
 import ts from 'typescript';
@@ -1319,19 +1320,11 @@ const parseDeployableFunction = async (
     polyConfig.description = functionDetails.types.description || '';
   }
 
-  const [externalDependencies, internalDependencies, schemaRefs] =
-    await getDependencies(
-      sourceFile.getFullText(),
-      sourceFile.fileName,
-      baseUrl,
-      false,
-    );
-  const referencedSchemas = Object.keys(schemaRefs).length ? schemaRefs : null;
-  const typeSchemas = generateTypeSchemas(
+  const [externalDependencies, internalDependencies] = await getDependencies(
+    sourceFile.getFullText(),
     sourceFile.fileName,
-    DeployableTypeEntries.map((d) => d[0]),
-    polyConfig.name,
-    referencedSchemas,
+    baseUrl,
+    false,
   );
   return {
     ...polyConfig,
@@ -1340,7 +1333,6 @@ const parseDeployableFunction = async (
     deploymentCommentRanges,
     externalDependencies,
     internalDependencies: internalDependencies ?? null,
-    typeSchemas,
     fileRevision,
     gitRevision,
     file: sourceFile.fileName,
@@ -1408,7 +1400,8 @@ export const parseDeployable = async (
   } catch (e) {
     shell.echo(
       chalk.redBright(
-        `Prepared ${polyConfig.type.replaceAll('-', ' ')} ${polyConfig.context
+        `Prepared ${polyConfig.type.replaceAll('-', ' ')} ${
+          polyConfig.context
         }.${polyConfig.name}: ERROR`,
       ),
     );
@@ -1416,7 +1409,7 @@ export const parseDeployable = async (
       chalk.red(
         // @ts-expect-error - it's fine
         (e instanceof Error ? e.message : e.response?.data?.message) ||
-        'Unexpected error.',
+          'Unexpected error.',
       ),
     );
   }
@@ -1774,4 +1767,886 @@ export const generateTypeSchemas = (
   }
 
   return output;
+};
+
+type CallableDeclaration =
+  | ts.FunctionDeclaration
+  | ts.MethodDeclaration
+  | ts.FunctionExpression
+  | ts.ArrowFunction;
+
+export interface ParsedFunctionReturnType {
+  /** Type annotation text, for example `string | number`. */
+  returnType: string | null;
+  /** JSON Schema for that type, produced by ts-json-schema-generator. */
+  returnTypeSchema?: Record<string, any>;
+}
+
+const isCallableDeclaration = (node: ts.Node): node is CallableDeclaration =>
+  ts.isFunctionDeclaration(node) ||
+  ts.isMethodDeclaration(node) ||
+  ts.isFunctionExpression(node) ||
+  ts.isArrowFunction(node);
+
+/** Name the callable is bound to: `function foo`, `const foo = () =>`, or `{ foo() {} }`. */
+const callableName = (
+  node: CallableDeclaration,
+  sourceFile: ts.SourceFile,
+): string | undefined => {
+  const parent = node.parent;
+  if (
+    parent &&
+    ts.isVariableDeclaration(parent) &&
+    ts.isIdentifier(parent.name) &&
+    parent.initializer === node
+  ) {
+    return parent.name.text;
+  }
+  if (
+    parent &&
+    ts.isPropertyAssignment(parent) &&
+    parent.initializer === node
+  ) {
+    return parent.name.getText(sourceFile);
+  }
+  if (
+    (ts.isFunctionDeclaration(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isFunctionExpression(node)) &&
+    node.name
+  ) {
+    return node.name.getText(sourceFile);
+  }
+  return undefined;
+};
+
+const isFunctionLike = (node: ts.Node): boolean =>
+  ts.isFunctionDeclaration(node) ||
+  ts.isFunctionExpression(node) ||
+  ts.isArrowFunction(node) ||
+  ts.isMethodDeclaration(node) ||
+  ts.isConstructorDeclaration(node) ||
+  ts.isGetAccessorDeclaration(node) ||
+  ts.isSetAccessorDeclaration(node);
+
+/** Prefer an exported top-level declaration over a nested helper with the same name. */
+const callableRank = (node: CallableDeclaration): number => {
+  let depth = 0;
+  let current = node.parent;
+  while (current) {
+    if (isFunctionLike(current)) depth += 1;
+    current = current.parent;
+  }
+
+  let statement: ts.Node = node;
+  while (statement.parent && !ts.isSourceFile(statement.parent)) {
+    statement = statement.parent;
+  }
+  const exported =
+    ts.canHaveModifiers(statement) &&
+    ts
+      .getModifiers(statement)
+      ?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+  return (
+    (exported ? 10 : 0) + (ts.isFunctionDeclaration(node) ? 1 : 0) - depth * 100
+  );
+};
+
+const findCallable = (
+  sourceFile: ts.SourceFile,
+  functionName: string,
+): CallableDeclaration | undefined => {
+  const found: CallableDeclaration[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      isCallableDeclaration(node) &&
+      callableName(node, sourceFile) === functionName
+    ) {
+      found.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  found.sort((a, b) => callableRank(b) - callableRank(a));
+  return found[0];
+};
+
+const returnTypeOfCallable = (
+  node: CallableDeclaration,
+  sourceFile: ts.SourceFile,
+  checker: ts.TypeChecker,
+): string | undefined => {
+  if (node.type) {
+    const returnType = node.type.getText(sourceFile).trim();
+    if (returnType) return returnType;
+  }
+
+  const signature = checker.getSignatureFromDeclaration(node);
+  if (!signature) return undefined;
+  const returnType = checker
+    .typeToString(
+      checker.getReturnTypeOfSignature(signature),
+      node,
+      ts.TypeFormatFlags.NoTruncation,
+    )
+    .trim();
+  return returnType || undefined;
+};
+
+const compilerOptionsFor = (filePath: string): ts.CompilerOptions => {
+  const defaults: ts.CompilerOptions = {
+    target: ts.ScriptTarget.ESNext,
+    module: ts.ModuleKind.CommonJS,
+    strictNullChecks: false,
+    skipLibCheck: true,
+    esModuleInterop: true,
+    noEmit: true,
+  };
+  const configPath = ts.findConfigFile(
+    path.dirname(path.resolve(filePath)),
+    ts.sys.fileExists,
+    'tsconfig.json',
+  );
+  if (!configPath) return defaults;
+  const read = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (read.error || !read.config) return defaults;
+  const parsed = ts.parseJsonConfigFileContent(
+    read.config,
+    ts.sys,
+    path.dirname(configPath),
+  );
+  return { ...parsed.options, noEmit: true };
+};
+
+const sourceFileInProgram = (
+  program: ts.Program,
+  filePath: string,
+): ts.SourceFile | undefined => {
+  const resolved = path.resolve(filePath);
+  return program
+    .getSourceFiles()
+    .find((sourceFile) => path.resolve(sourceFile.fileName) === resolved);
+};
+
+/**
+ * Generate schemas for type expressions in the context of `filePath`.
+ * Each expression is appended as a type alias so ts-json-schema-generator can
+ * resolve names declared in that file. The alias file is removed afterwards.
+ * Types that fail to generate are omitted.
+ */
+const schemasForTypeTexts = (
+  filePath: string,
+  typeTexts: string[],
+  referencedSchemas: Record<string, any> | null,
+): Map<string, Record<string, any>> => {
+  const unique = [
+    ...new Set(typeTexts.map((typeText) => typeText.trim())),
+  ].filter(Boolean);
+  const schemas = new Map<string, Record<string, any>>();
+  if (!unique.length) return schemas;
+
+  const resolved = path.resolve(filePath);
+  const prefix = `__PolyType${randomBytes(4).toString('hex')}`;
+  const aliases = unique.map((typeText, index) => ({
+    typeText,
+    alias: `${prefix}_${index}`,
+  }));
+  const tempPath = path.join(
+    path.dirname(resolved),
+    `.poly-types-${randomBytes(8).toString('hex')}${path.extname(resolved) || '.ts'}`,
+  );
+  fs.writeFileSync(
+    tempPath,
+    `${fs.readFileSync(resolved, 'utf8')}\n${aliases
+      .map(({ alias, typeText }) => `export type ${alias} = ${typeText};`)
+      .join('\n')}\n`,
+  );
+  try {
+    const generator = createGenerator({
+      path: tempPath,
+      tsconfig: path.resolve('tsconfig.json'),
+      expose: 'all',
+      topRef: true,
+      skipTypeCheck: true,
+      jsDoc: 'none',
+    });
+    for (const { alias, typeText } of aliases) {
+      try {
+        const schema = generator.createSchema(alias);
+        const withPolyRefs = referencedSchemas
+          ? applyPolySchemaRefs(schema, referencedSchemas)
+          : schema;
+        schemas.set(typeText, dereferenceRoot(withPolyRefs));
+      } catch (err: any) {
+        console.warn(
+          `⚠️ Error generating schema for "${typeText}":`,
+          err?.message ?? err,
+        );
+      }
+    }
+    return schemas;
+  } finally {
+    fs.rmSync(tempPath, { force: true });
+  }
+};
+
+const schemaForReturnType = (
+  filePath: string,
+  returnType: string,
+  referencedSchemas: Record<string, any> | null,
+): Record<string, any> => {
+  const schema = schemasForTypeTexts(
+    filePath,
+    [returnType],
+    referencedSchemas,
+  ).get(returnType.trim());
+  if (!schema) {
+    throw new Error(`No schema generated for "${returnType}"`);
+  }
+  return schema;
+};
+
+/**
+ * Read the function's return type text and build its JSON Schema.
+ * `returnType` is the annotation as written (`string | number`). When the
+ * annotation is missing, it is the type TypeScript infers.
+ * `ts-json-schema-generator` unwraps `Promise<T>` in the schema.
+ */
+export const parseFunctionReturnType = (
+  filePath: string,
+  functionName: string,
+  referencedSchemas: Record<string, any> | null = null,
+): ParsedFunctionReturnType => {
+  let program: ts.Program;
+  try {
+    const options = compilerOptionsFor(filePath);
+    // TypeScript 6 does not set node.parent unless the host is asked to.
+    program = ts.createProgram(
+      [path.resolve(filePath)],
+      options,
+      ts.createCompilerHost(options, true),
+    );
+  } catch (err: any) {
+    console.warn(
+      `⚠️ Error parsing return type for "${functionName}":`,
+      err?.message ?? err,
+    );
+    return { returnType: null };
+  }
+
+  const sourceFile = sourceFileInProgram(program, filePath);
+  if (!sourceFile) {
+    console.warn(
+      `⚠️ Could not load "${filePath}" when parsing return type for "${functionName}".`,
+    );
+    return { returnType: null };
+  }
+
+  const callable = findCallable(sourceFile, functionName);
+  if (!callable) {
+    console.warn(
+      `⚠️ Could not find function "${functionName}" in "${filePath}" when parsing return type.`,
+    );
+    return { returnType: null };
+  }
+
+  const returnType = returnTypeOfCallable(
+    callable,
+    sourceFile,
+    program.getTypeChecker(),
+  );
+  if (!returnType) return { returnType: null };
+
+  // The annotation is already a poly schema. Generating it would inline the
+  // ambient declaration instead of keeping the ref the server expects.
+  if (referencedSchemas?.[returnType]) {
+    return {
+      returnType,
+      returnTypeSchema: referencedSchemas[returnType],
+    };
+  }
+
+  try {
+    return {
+      returnType,
+      returnTypeSchema: schemaForReturnType(
+        filePath,
+        returnType,
+        referencedSchemas,
+      ),
+    };
+  } catch (err: any) {
+    console.warn(
+      `⚠️ Error generating return type schema for "${functionName}":`,
+      err?.message ?? err,
+    );
+    return { returnType };
+  }
+};
+
+export interface ParsedFunctionArgument {
+  key: string;
+  name: string;
+  type: string;
+  required: boolean;
+  typeSchema?: Record<string, any>;
+}
+
+export interface TranspiledFunction {
+  /**
+   * True when `code` is compiled JavaScript and `arguments` plus `returnType`
+   * are complete enough for the server to skip `transpileCode`.
+   */
+  transpiled: boolean;
+  /** Compiled JavaScript when `transpiled` is true, otherwise the original source. */
+  code: string;
+  /** Original TypeScript source. */
+  sourceCode: string;
+  arguments: ParsedFunctionArgument[];
+  returnType: string | null;
+  returnTypeSchema?: Record<string, any>;
+  /** False when the function is `async` or its return type is `Promise<...>`. */
+  synchronous: boolean;
+  /** Property path of a nested callable, such as `users.greet`. Empty at the top level. */
+  context: string;
+  /**
+   * Why `transpiled` is false. Deploy throws this and does not post.
+   */
+  failure?: string;
+}
+
+const SCHEMA_VERSION = 'http://json-schema.org/draft-07/schema#';
+
+const isPromiseTypeText = (typeText: string): boolean =>
+  /^Promise\s*</.test(typeText.trim());
+
+const isFunctionTypeText = (typeText: string): boolean => {
+  const text = typeText.trim();
+  if (!text.includes('=>') && !text.startsWith('new ')) return false;
+  if (
+    text.startsWith('{') ||
+    text.startsWith('[') ||
+    text.includes('|') ||
+    text.includes('&')
+  ) {
+    return false;
+  }
+  return true;
+};
+
+/** `any`, fallback words, and function types have no useful generated schema. */
+const shouldGenerateSchema = (typeText: string): boolean => {
+  const text = typeText.trim();
+  if (
+    !text ||
+    text === 'any' ||
+    text === 'unknown' ||
+    text === 'error' ||
+    text === 'object' ||
+    text === 'array' ||
+    text === 'function'
+  ) {
+    return false;
+  }
+  return !isFunctionTypeText(text);
+};
+
+const isAsyncCallable = (node: CallableDeclaration): boolean =>
+  ts.canHaveModifiers(node) &&
+  (ts.getModifiers(node) ?? []).some(
+    (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
+  );
+
+const contextChainOf = (node: ts.Node, sourceFile: ts.SourceFile): string[] => {
+  const chain: string[] = [];
+  let current = node.parent;
+  while (current && !ts.isSourceFile(current)) {
+    if (ts.isPropertyAssignment(current)) {
+      chain.unshift(current.name.getText(sourceFile));
+    }
+    current = current.parent;
+  }
+  return chain;
+};
+
+const bindingTitle = (
+  element: ts.BindingElement,
+  sourceFile: ts.SourceFile,
+): string => {
+  if (element.propertyName) return element.propertyName.getText(sourceFile);
+  if (ts.isIdentifier(element.name)) return element.name.text;
+  return element.name.getText(sourceFile);
+};
+
+const bindingSchemas = {
+  array(
+    param: ts.ArrayBindingPattern,
+    name: string,
+    sourceFile: ts.SourceFile,
+    nested = false,
+  ): Record<string, any> {
+    let restIndex = -1;
+    const items = param.elements.map((element, index) => {
+      if (ts.isOmittedExpression(element)) return { title: `_${index}` };
+      if (element.dotDotDotToken) restIndex = index;
+      const title = bindingTitle(element, sourceFile);
+      if (ts.isObjectBindingPattern(element.name)) {
+        return bindingSchemas.object(element.name, title, sourceFile, true);
+      }
+      if (ts.isArrayBindingPattern(element.name)) {
+        return bindingSchemas.array(element.name, title, sourceFile, true);
+      }
+      return { title };
+    });
+    const additionalItems =
+      restIndex > -1 && items.length > 1
+        ? items.splice(restIndex, 1)[0]
+        : false;
+    const schema: Record<string, any> = {
+      title: name,
+      type: 'array',
+      items: items.length === 1 ? items[0] : items,
+      additionalItems,
+    };
+    if (!nested) schema.$schema = SCHEMA_VERSION;
+    return schema;
+  },
+
+  object(
+    param: ts.ObjectBindingPattern,
+    name: string,
+    sourceFile: ts.SourceFile,
+    nested = false,
+  ): Record<string, any> {
+    const properties = Object.fromEntries(
+      param.elements.map((element) => {
+        const title = bindingTitle(element, sourceFile);
+        if (ts.isObjectBindingPattern(element.name)) {
+          return [
+            title,
+            bindingSchemas.object(element.name, title, sourceFile, true),
+          ];
+        }
+        if (ts.isArrayBindingPattern(element.name)) {
+          return [
+            title,
+            bindingSchemas.array(element.name, title, sourceFile, true),
+          ];
+        }
+        return [title, { title }];
+      }),
+    );
+    const schema: Record<string, any> = {
+      title: name,
+      type: 'object',
+      properties,
+      required: Object.keys(properties),
+      additionalProperties: false,
+    };
+    if (!nested) schema.$schema = SCHEMA_VERSION;
+    return schema;
+  },
+};
+
+const inferredTypeText = (
+  checker: ts.TypeChecker,
+  node: ts.Node,
+): string | undefined => {
+  const type = checker.getTypeAtLocation(node);
+  if (
+    type.flags & ts.TypeFlags.Any ||
+    type.flags & ts.TypeFlags.Unknown ||
+    type.flags & ts.TypeFlags.Never
+  ) {
+    return undefined;
+  }
+  const text = checker
+    .typeToString(type, node, ts.TypeFormatFlags.NoTruncation)
+    .trim();
+  if (!text || text === 'any' || text === 'unknown' || text === 'error') {
+    return undefined;
+  }
+  return text;
+};
+
+interface CollectedArgument extends ParsedFunctionArgument {
+  generate: boolean;
+}
+
+const argumentFromParameter = (
+  param: ts.ParameterDeclaration,
+  index: number,
+  sourceFile: ts.SourceFile,
+  checker: ts.TypeChecker,
+  referencedSchemas: Record<string, any> | null,
+): CollectedArgument => {
+  const required = !(param.questionToken || param.initializer);
+  let name = '';
+  let fallback = 'any';
+  let shape: Record<string, any> | undefined;
+  if (ts.isObjectBindingPattern(param.name)) {
+    name = `arg${index}`;
+    fallback = 'object';
+    shape = bindingSchemas.object(param.name, name, sourceFile);
+  } else if (ts.isArrayBindingPattern(param.name)) {
+    name = `arg${index}`;
+    fallback = 'array';
+    shape = bindingSchemas.array(param.name, name, sourceFile);
+  } else {
+    name = param.name.getText(sourceFile);
+  }
+
+  // Untyped bindings keep `shape`. The checker types them as `{ prop: any }`.
+  let type = fallback;
+  let generate = false;
+  if (param.type) {
+    type = param.type.getText(sourceFile).trim() || fallback;
+    generate =
+      !ts.isFunctionTypeNode(param.type) &&
+      !ts.isConstructorTypeNode(param.type) &&
+      shouldGenerateSchema(type);
+  } else if (
+    !shape &&
+    param.initializer &&
+    (ts.isArrowFunction(param.initializer) ||
+      ts.isFunctionExpression(param.initializer))
+  ) {
+    type = inferredTypeText(checker, param.initializer) || 'function';
+  } else if (!shape) {
+    const inferred = inferredTypeText(checker, param);
+    if (inferred && shouldGenerateSchema(inferred)) {
+      type = inferred;
+      generate = true;
+    } else if (inferred) {
+      type = inferred;
+    }
+  }
+
+  if (referencedSchemas?.[type]) {
+    return {
+      key: name,
+      name,
+      type,
+      required,
+      typeSchema: referencedSchemas[type],
+      generate: false,
+    };
+  }
+
+  return {
+    key: name,
+    name,
+    type,
+    required,
+    ...(generate ? {} : shape ? { typeSchema: shape } : {}),
+    generate,
+  };
+};
+
+const modifiersWithoutExport = (
+  modifiers: readonly ts.ModifierLike[],
+): ts.ModifierLike[] =>
+  modifiers.filter(
+    (modifier) =>
+      modifier.kind !== ts.SyntaxKind.ExportKeyword &&
+      modifier.kind !== ts.SyntaxKind.DefaultKeyword,
+  );
+
+const statementBindsCallable = (
+  node: ts.VariableStatement,
+  functionName: string,
+): boolean =>
+  node.declarationList.declarations.some((declaration) => {
+    if (
+      !ts.isIdentifier(declaration.name) ||
+      declaration.name.text !== functionName
+    ) {
+      return false;
+    }
+    const initializer = declaration.initializer;
+    return (
+      !!initializer &&
+      (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))
+    );
+  });
+
+/**
+ * Compile with the same options the server transpiler uses.
+ * TypeScript 6 ignores `noImplicitUseStrict`, so the prologue is removed to
+ * match the JavaScript the server stores today.
+ */
+const compileFunction = (source: string, functionName: string): string => {
+  const result = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.CommonJS,
+      esModuleInterop: true,
+      noImplicitUseStrict: true,
+    },
+    fileName: 'customFunction.ts',
+    transformers: {
+      before: [
+        (context) => (sourceFile) => {
+          const visitor = (node: ts.Node): ts.Node | undefined => {
+            // `export default greet;` is not a callable binding the runtime can call.
+            if (ts.isExportAssignment(node)) return undefined;
+
+            if (
+              ts.isFunctionDeclaration(node) &&
+              node.name?.getText(sourceFile) === functionName
+            ) {
+              const modifiers =
+                (ts.canHaveModifiers(node) && ts.getModifiers(node)) || [];
+              if (
+                modifiers.some(
+                  (modifier) =>
+                    modifier.kind === ts.SyntaxKind.ExportKeyword ||
+                    modifier.kind === ts.SyntaxKind.DefaultKeyword,
+                )
+              ) {
+                return ts.factory.updateFunctionDeclaration(
+                  node,
+                  modifiersWithoutExport(modifiers),
+                  node.asteriskToken,
+                  node.name,
+                  node.typeParameters,
+                  node.parameters,
+                  node.type,
+                  node.body,
+                );
+              }
+            }
+
+            if (
+              ts.isVariableStatement(node) &&
+              statementBindsCallable(node, functionName)
+            ) {
+              const modifiers =
+                (ts.canHaveModifiers(node) && ts.getModifiers(node)) || [];
+              if (
+                modifiers.some(
+                  (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+                )
+              ) {
+                return ts.factory.updateVariableStatement(
+                  node,
+                  modifiersWithoutExport(modifiers),
+                  node.declarationList,
+                );
+              }
+            }
+
+            return ts.visitEachChild(node, visitor, context);
+          };
+          return ts.visitEachChild(sourceFile, visitor, context);
+        },
+      ],
+    },
+  });
+  return result.outputText.replace(/^"use strict";\r?\n/, '');
+};
+
+const emptyTranspile = (
+  sourceCode = '',
+  failure = 'Could not transpile the function.',
+): TranspiledFunction => ({
+  transpiled: false,
+  code: sourceCode,
+  sourceCode,
+  arguments: [],
+  returnType: null,
+  synchronous: true,
+  context: '',
+  failure,
+});
+
+/**
+ * Compile a function and collect the metadata `poly function add` sends so
+ * the server can skip `transpileCode`: compiled JavaScript, the original
+ * source, arguments, return type, and whether the call is synchronous.
+ */
+export const transpileFunction = (
+  filePath: string,
+  functionName: string,
+  referencedSchemas: Record<string, any> | null = null,
+): TranspiledFunction => {
+  let sourceText = '';
+  try {
+    sourceText = fs.readFileSync(filePath, 'utf8');
+  } catch (err: any) {
+    const detail = err?.message ?? err;
+    console.warn(
+      `⚠️ Error reading "${filePath}" while transpiling "${functionName}":`,
+      detail,
+    );
+    return emptyTranspile(
+      '',
+      `Could not read "${filePath}" while transpiling "${functionName}": ${detail}`,
+    );
+  }
+
+  let program: ts.Program;
+  try {
+    const options = compilerOptionsFor(filePath);
+    program = ts.createProgram(
+      [path.resolve(filePath)],
+      options,
+      ts.createCompilerHost(options, true),
+    );
+  } catch (err: any) {
+    const detail = err?.message ?? err;
+    console.warn(`⚠️ Error transpiling "${functionName}":`, detail);
+    return emptyTranspile(
+      sourceText,
+      `Could not transpile "${functionName}": ${detail}`,
+    );
+  }
+
+  const sourceFile = sourceFileInProgram(program, filePath);
+  if (!sourceFile) {
+    const failure = `Could not load "${filePath}" while transpiling "${functionName}".`;
+    console.warn(`⚠️ ${failure}`);
+    return emptyTranspile(sourceText, failure);
+  }
+
+  const callable = findCallable(sourceFile, functionName);
+  if (!callable) {
+    const failure = `Could not find function "${functionName}" in "${filePath}".`;
+    console.warn(`⚠️ ${failure}`);
+    return emptyTranspile(sourceText, failure);
+  }
+
+  const checker = program.getTypeChecker();
+  const collected = callable.parameters.map((param, index) =>
+    argumentFromParameter(param, index, sourceFile, checker, referencedSchemas),
+  );
+  const returnType =
+    returnTypeOfCallable(callable, sourceFile, checker) ?? null;
+  const context = contextChainOf(callable, sourceFile).join('.');
+  const synchronous = !(
+    isAsyncCallable(callable) ||
+    (!!returnType && isPromiseTypeText(returnType))
+  );
+
+  const typeTexts = collected
+    .filter((argument) => argument.generate)
+    .map((argument) => argument.type);
+  if (
+    returnType &&
+    !referencedSchemas?.[returnType] &&
+    shouldGenerateSchema(returnType)
+  ) {
+    typeTexts.push(returnType);
+  }
+
+  let generated = new Map<string, Record<string, any>>();
+  if (typeTexts.length) {
+    try {
+      generated = schemasForTypeTexts(filePath, typeTexts, referencedSchemas);
+    } catch (err: any) {
+      console.warn(
+        `⚠️ Error generating schemas for "${functionName}":`,
+        err?.message ?? err,
+      );
+    }
+  }
+
+  const args: ParsedFunctionArgument[] = collected.map(
+    ({ generate, ...argument }) => {
+      if (!generate || argument.typeSchema) return argument;
+      const typeSchema = generated.get(argument.type.trim());
+      return typeSchema ? { ...argument, typeSchema } : argument;
+    },
+  );
+
+  let returnTypeSchema: Record<string, any> | undefined;
+  if (returnType && referencedSchemas?.[returnType]) {
+    returnTypeSchema = referencedSchemas[returnType];
+  } else if (returnType) {
+    returnTypeSchema = generated.get(returnType.trim());
+  }
+
+  let code = sourceText;
+  try {
+    code = compileFunction(sourceText, functionName);
+  } catch (err: any) {
+    const detail = err?.message ?? err;
+    console.warn(`⚠️ Error compiling "${functionName}":`, detail);
+    return {
+      transpiled: false,
+      code: sourceText,
+      sourceCode: sourceText,
+      arguments: args,
+      returnType,
+      ...(returnTypeSchema ? { returnTypeSchema } : {}),
+      synchronous,
+      context,
+      failure: `Could not compile "${functionName}": ${detail}`,
+    };
+  }
+
+  // The server skips its transpiler only when both fields are present.
+  // Without a return type there is nothing complete to send.
+  if (!returnType) {
+    const failure = `Could not determine the return type of "${functionName}" in "${filePath}".`;
+    console.warn(`⚠️ ${failure}`);
+    return {
+      transpiled: false,
+      code: sourceText,
+      sourceCode: sourceText,
+      arguments: args,
+      returnType: null,
+      synchronous,
+      context,
+      failure,
+    };
+  }
+
+  return {
+    transpiled: true,
+    code,
+    sourceCode: sourceText,
+    arguments: args,
+    returnType,
+    ...(returnTypeSchema ? { returnTypeSchema } : {}),
+    synchronous,
+    context,
+  };
+};
+
+export interface FunctionDeployFields {
+  /** Compiled JavaScript. */
+  code: string;
+  /** CLI or poly config context, or the nested property path when that context is empty. */
+  context: string | null;
+  /** Fields merged into the create-function body: source, arguments, return type, synchronous. */
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Shape both `poly function add` and `poly sync` send for a custom function.
+ * Throws when the function was not found or could not be fully transpiled,
+ * so nothing is posted for the server to infer.
+ */
+export const functionDeployFields = (
+  transpiled: TranspiledFunction,
+  context: string | null,
+): FunctionDeployFields => {
+  if (!transpiled.transpiled || !transpiled.returnType) {
+    throw new Error(transpiled.failure ?? 'Could not transpile the function.');
+  }
+  const payload: Record<string, unknown> = {
+    sourceCode: transpiled.sourceCode,
+    arguments: transpiled.arguments,
+    synchronous: transpiled.synchronous,
+    returnType: transpiled.returnType,
+  };
+  if (transpiled.returnTypeSchema) {
+    payload.returnTypeSchema = transpiled.returnTypeSchema;
+  }
+  return {
+    code: transpiled.code,
+    context: context || transpiled.context || context,
+    payload,
+  };
 };
