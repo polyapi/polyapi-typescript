@@ -13,7 +13,7 @@ import {
   upsertWebhookHandle,
 } from '../../api';
 import { firstLetterToUppercase } from '../../utils';
-import { ensurePermissions, buildModelTrainingRequirements } from '../../permissions';
+import { ensurePermissions, buildModelRequirements } from '../../permissions';
 
 const readFile = promisify(fs.readFile);
 const exec = promisify(execChildProcess);
@@ -301,7 +301,7 @@ export const train = async (polyPath: string, path: string) => {
       contents,
     ) as SpecificationInputDto;
 
-    const trainingRequirements = buildModelTrainingRequirements(
+    const trainingRequirements = buildModelRequirements(
         specificationInput
       );
 
