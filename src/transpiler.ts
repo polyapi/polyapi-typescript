@@ -54,9 +54,6 @@ const EXCLUDED_REQUIREMENTS = [
 
   // PolyAPI
   'polyapi',
-
-  // 3rd Party
-  'axios',
 ];
 
 export const getTSConfig = () => {

@@ -1,3 +1,6 @@
+### 0.27.8
+* Fix for bug preventing axios use
+
 ### 0.27.7
 * Updating brace-expansion to 5.0.12 to fix denial-of-service vulnerabilities.
 * Removing the unused tsc-alias build step and its vulnerable braces dependency; the project does not configure TypeScript path aliases.
