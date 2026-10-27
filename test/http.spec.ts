@@ -1,5 +1,6 @@
 /// <reference types="jest" />
 import { request as undiciRequest } from 'undici';
+import { createOrUpdateClientFunction, createOrUpdateServerFunction } from '../src/api';
 import {
   AxiosError,
   get,
@@ -204,6 +205,42 @@ describe('http client', () => {
   });
 
   describe('errors', () => {
+    test.each([createOrUpdateClientFunction, createOrUpdateServerFunction])('source API retains the full HTTP response and does not retry uploads', async (upload) => {
+      const previousBase = process.env.POLY_API_BASE_URL;
+      process.env.POLY_API_BASE_URL = 'https://example.com';
+      try {
+        const body = { id: 'synthetic-id', warnings: ['synthetic warning'], traceId: 'trace-1' };
+        undiciRequestMock.mockResolvedValue(jsonResponse(body, { statusCode: 201,
+          headers: { 'x-request-id': 'request-1' } }) as unknown as Awaited<ReturnType<typeof undiciRequest>>);
+        const call = () => upload('example', 'canary', null, 'return 1', 'ENVIRONMENT', {}, null, null);
+        expect(await call()).toMatchObject({ status: 201, data: body, headers: { 'x-request-id': 'request-1' } });
+        undiciRequestMock.mockClear();
+        undiciRequestMock.mockResolvedValue(jsonResponse({ message: 'throttled' }, { statusCode: 429,
+          headers: { 'retry-after': '0' } }) as unknown as Awaited<ReturnType<typeof undiciRequest>>);
+        await expect(call()).rejects.toMatchObject({ response: { status: 429, data: { message: 'throttled' } } });
+        expect(undiciRequestMock).toHaveBeenCalledTimes(1);
+      } finally {
+        if (previousBase === undefined) delete process.env.POLY_API_BASE_URL;
+        else process.env.POLY_API_BASE_URL = previousBase;
+      }
+    });
+
+    test('does not resend an explicitly bounded write after throttling', async () => {
+      undiciRequestMock.mockResolvedValue(jsonResponse({ warning: 'unchanged' }, {
+        statusCode: 429, headers: { 'retry-after': '0' },
+      }) as unknown as Awaited<ReturnType<typeof undiciRequest>>);
+      await expect(post('https://example.com/deploy', { code: 'return 1' }, { retry: false }))
+        .rejects.toMatchObject({ response: { status: 429, data: { warning: 'unchanged' } } });
+      expect(undiciRequestMock).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not resend an explicitly bounded write after an uncertain socket reset', async () => {
+      undiciRequestMock.mockRejectedValue(Object.assign(new Error('reset'), { code: 'ECONNRESET' }));
+      await expect(post('https://example.com/deploy', { code: 'return 1' }, { retry: false }))
+        .rejects.toMatchObject({ code: 'ECONNRESET' });
+      expect(undiciRequestMock).toHaveBeenCalledTimes(1);
+    });
+
     test('throws AxiosError on 4xx with response data', async () => {
       undiciRequestMock.mockResolvedValue(
         jsonResponse(

@@ -84,33 +84,32 @@ export const createOrUpdateServerFunction = async (
   other?: Record<string, any>,
   executionApiKey?: string,
 ) => {
-  return (
-    await http.post<CreateServerCustomFunctionResponseDto>(
-      `${getApiBaseURL()}/functions/server`,
-      {
-        context,
-        name,
-        description,
-        code,
-        visibility,
-        typeSchemas,
-        // Keeping backwards compatability on requirements
-        requirements: externalDependencies
-          ? Object.keys(externalDependencies)
-          : null,
-        externalDependencies,
-        internalDependencies,
-        executionApiKey,
-        ...other,
+  return http.post<CreateServerCustomFunctionResponseDto>(
+    `${getApiBaseURL()}/functions/server`,
+    {
+      context,
+      name,
+      description,
+      code,
+      visibility,
+      typeSchemas,
+      // Keeping backwards compatability on requirements
+      requirements: externalDependencies
+        ? Object.keys(externalDependencies)
+        : null,
+      externalDependencies,
+      internalDependencies,
+      executionApiKey,
+      ...other,
+    },
+    {
+      retry: false,
+      headers: {
+        'Content-Type': 'application/json',
+        ...getApiHeaders(),
       },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getApiHeaders(),
-        },
-      },
-    )
-  ).data;
+    },
+  );
 };
 
 export const getServerFunctionById = async (id: string) => {
@@ -173,28 +172,27 @@ export const createOrUpdateClientFunction = async (
   > | null,
   other?: Record<string, any>,
 ) => {
-  return (
-    await http.post<FunctionDetailsDto>(
-      `${getApiBaseURL()}/functions/client`,
-      {
-        context,
-        name,
-        description,
-        code,
-        visibility,
-        typeSchemas,
-        externalDependencies,
-        internalDependencies,
-        ...other,
+  return http.post<FunctionDetailsDto>(
+    `${getApiBaseURL()}/functions/client`,
+    {
+      context,
+      name,
+      description,
+      code,
+      visibility,
+      typeSchemas,
+      externalDependencies,
+      internalDependencies,
+      ...other,
+    },
+    {
+      retry: false,
+      headers: {
+        'Content-Type': 'application/json',
+        ...getApiHeaders(),
       },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getApiHeaders(),
-        },
-      },
-    )
-  ).data;
+    },
+  );
 };
 
 export const getClientFunctionById = async (id: string) => {

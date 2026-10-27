@@ -262,6 +262,10 @@ void yargs
               'Skip running generate after function add command, especially useful if you are deploying a bunch of functions at once. Run generate manually at the end!',
             type: 'boolean',
           })
+          .option('result-file', {
+            describe: 'Write a typed deployment receipt to a new private file; does not verify runtime health',
+            type: 'string',
+          })
           .option('execution-api-key', {
             describe: 'Optional API key for server functions',
             type: 'string',
@@ -296,6 +300,7 @@ void yargs
         logs,
         generateContexts,
         skipGenerate,
+        resultFile,
         executionApiKey,
         cachePolyLibrary,
         image,
@@ -331,10 +336,12 @@ void yargs
         if (err) {
           shell.echo(chalk.redBright('ERROR:'), err);
           yargs.showHelp();
+          process.exitCode = 1;
           return;
         }
 
         if (!checkPolyConfig(DEFAULT_POLY_PATH)) {
+          process.exitCode = 1;
           return shell.echo(
             'Poly is not configured. Please run `poly setup` to configure it.',
           );
@@ -349,7 +356,7 @@ void yargs
         const { addOrUpdateCustomFunction } = await import(
           './commands/function'
         );
-        await addOrUpdateCustomFunction(
+        const result = await addOrUpdateCustomFunction(
           DEFAULT_POLY_PATH,
           context,
           name,
@@ -365,7 +372,9 @@ void yargs
           visibility,
           ignoreDependencies,
           skipGenerate,
+          resultFile,
         );
+        if (result.failure) process.exitCode = 1;
       },
     );
   })

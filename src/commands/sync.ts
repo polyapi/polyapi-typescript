@@ -104,7 +104,7 @@ const syncDeployableAndGetId = async (deployable, code, apiKey) => {
         deployable.config,
         apiKey
       )
-    ).id;
+    ).data.id;
   } else if (deployable.type === 'client-function') {
     return (
       await createOrUpdateClientFunction(
@@ -118,7 +118,7 @@ const syncDeployableAndGetId = async (deployable, code, apiKey) => {
         deployable.internalDependencies,
         deployable.config,
       )
-    ).id;
+    ).data.id;
   }
   throw new Error(`Unsupported deployable type: '${deployable.type}'`);
 };

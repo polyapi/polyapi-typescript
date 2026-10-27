@@ -226,6 +226,34 @@ export interface ExecuteApiFunctionDescriptionGenerationDto {
 export interface CreateServerCustomFunctionResponseDto
   extends FunctionDetailsDto {
   traceId?: string;
+  executionId?: string;
+}
+
+/** A source-upload receipt; runtime health still requires independent verification. */
+export interface FunctionDeploymentResult {
+  schema_version: 'poly.function-deployment.v1';
+  operation: {
+    kind: 'server' | 'client';
+    context: string | null;
+    name: string;
+    source_sha256: string | null;
+  };
+  upload: 'not_sent' | 'accepted' | 'unknown';
+  function_id: string | null;
+  http_status: number | null;
+  request_id: string | null;
+  trace_id: string | null;
+  deployment_execution_id: string | null;
+  warnings: { present: boolean; codes: string[]; details_omitted: boolean };
+  response: { body_omitted: true; body_sha256: null };
+  generation: 'not_started' | 'skipped' | 'completed' | 'failed' | 'blocked';
+  verification: 'not_checked';
+  failure?: {
+    stage: 'receipt' | 'source' | 'prepare' | 'upload' | 'generate';
+    code: string;
+    http_status?: number;
+    request_id?: string | null;
+  };
 }
 
 export interface ExecuteCustomFunctionDescriptionGenerationDto {

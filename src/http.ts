@@ -45,6 +45,8 @@ export type HttpRequestConfig = {
   baseURL?: string;
   dispatcher?: Dispatcher;
   timeout?: number;
+  /** Disable retransmission when an operation needs explicit attempt authority. */
+  retry?: boolean;
   throttleRetries?: number;
   didRetry?: boolean;
 };
@@ -545,6 +547,7 @@ export const request = async <T = unknown>(
     return await send<T>(nextConfig);
   } catch (error) {
     if (!isAxiosError(error)) throw error;
+    if (nextConfig.retry === false) throw error;
 
     if (error.response && error.response.status === 429) {
       nextConfig.throttleRetries = (nextConfig.throttleRetries || 0) + 1;

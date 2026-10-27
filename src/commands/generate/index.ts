@@ -531,7 +531,7 @@ const generateSingleCustomFunction = async (
     } else {
       shell.echo(chalk.red(error));
     }
-    return;
+    throw error;
   }
 
   let specs: Specification[] = [];
@@ -540,10 +540,13 @@ const generateSingleCustomFunction = async (
     specs = await getSpecs([], [], [functionId], noTypes);
   } catch (error) {
     showErrGettingSpecs(error);
-    return;
+    throw error;
   }
 
   const [customFunction] = specs;
+  if (!customFunction || customFunction.id !== functionId) {
+    throw new Error('Generated function identity is missing or changed');
+  }
 
   if (prevSpecs.some((prevSpec) => prevSpec.id === customFunction.id)) {
     specs = prevSpecs.map((prevSpec) => {
@@ -571,6 +574,7 @@ const generateSingleCustomFunction = async (
     noTypes,
     localSourceScanFromConfig(loadConfig(polyPath)),
   );
+  if (getGenerationErrors()) throw new Error('Function SDK generation failed');
   // Now remove old lib and rename temp directory to force a switchover in typescript
   fs.rmSync(libPath, { recursive: true, force: true });
   fs.renameSync(tempPath, libPath);

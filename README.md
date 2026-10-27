@@ -76,3 +76,24 @@ unregister();
 ```
 
 Happy hacking!
+
+### Deployment receipts for automation
+
+`poly function add <name> <file> --server` (or `--client`) accepts
+`--result-file <new-path>`. It reserves a new file with mode `0600` before
+provider requests and writes a `poly.function-deployment.v1` JSON receipt.
+An existing file is never replaced. Bind the receipt to the requested function
+kind, context, name and source SHA-256; inspect it together with the process exit
+code instead of parsing console output.
+
+The receipt preserves upload acceptance, HTTP status, function/deployment-job
+identifiers, warning presence and generation outcome. Provider bodies and warning
+text are omitted; the underlying create API returns its complete `HttpResponse`
+to its caller. A generation failure retains the earlier upload facts and returns
+a nonzero exit code. HTTP 202 remains pending, including its job identifier.
+Uploads do not automatically retry throttling or socket failures. Missing or
+empty receipts and uncertain uploads need recovery/readback before another send.
+
+`verification: "not_checked"` is explicit: upload acceptance and local SDK
+generation do not prove compiled artifacts, current revision health or a business
+outcome. Verify those independently before running dependent operations.
