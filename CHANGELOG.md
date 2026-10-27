@@ -3,7 +3,9 @@
 * Fixing internal dependency tracking to capture dynamic paths using a wildcard
 * Picking up any schema reference used as a function argument or return type
 * Moving function transpilation to be client-side
-* Removing 'axios' from the excluded dependencies list now that it's no longer included by default
+
+### 0.27.8
+* Fix for bug preventing axios use
 
 ### 0.27.7
 * Updating brace-expansion to 5.0.12 to fix denial-of-service vulnerabilities.
