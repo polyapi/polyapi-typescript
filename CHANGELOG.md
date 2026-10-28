@@ -1,3 +1,9 @@
+### 0.28.0
+* Adding support for queues and locks
+* Fixing internal dependency tracking to capture dynamic paths using a wildcard
+* Picking up any schema reference used as a function argument or return type
+* Moving function transpilation to be client-side
+
 ### 0.27.8
 * Fix for bug preventing axios use
 

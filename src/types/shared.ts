@@ -11,3 +11,8 @@ export enum LifecycleState {
   Deprecated = 'DEPRECATED',
   Disabled = 'DISABLED',
 }
+
+export enum QueueDurability {
+  STANDARD = 'STANDARD',
+  HIGH = 'HIGH',
+}

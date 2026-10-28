@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -23,6 +24,13 @@ jest.mock('child_process', () => ({
 
 jest.mock('shelljs', () => ({
   echo: jest.fn(),
+}));
+
+jest.mock('../src/permissions', () => ({
+  ensurePermissions: jest.fn(async () => true),
+  buildModelTrainingRequirements: jest.fn(() => [
+    { permission: 'manageSchemas', action: 'add schemas' },
+  ]),
 }));
 
 describe('train schema ordering', () => {
