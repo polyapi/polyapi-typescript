@@ -159,7 +159,7 @@ jobs:
           created: ${CREATED}
           build:
             builderImages:
-              pack: docker.io/paketobuildpacks/builder-jammy-base:latest
+              pack: ghcr.io/knative/builder-jammy-base:0.4.669
             builder: pack
             buildEnvs:
               - name: BP_NODE_VERSION
