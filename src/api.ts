@@ -69,7 +69,7 @@ export const getSpecs = async (
   ).data;
 };
 
-export const createOrUpdateServerFunction = async (
+export const createOrUpdateServerFunctionWithResponse = async (
   context: string | null,
   name: string,
   description: string | null,
@@ -111,6 +111,11 @@ export const createOrUpdateServerFunction = async (
     },
   );
 };
+
+// Keep existing API callers on the DTO contract; deployment receipts need the response.
+export const createOrUpdateServerFunction = async (
+  ...args: Parameters<typeof createOrUpdateServerFunctionWithResponse>
+) => (await createOrUpdateServerFunctionWithResponse(...args)).data;
 
 export const getServerFunctionById = async (id: string) => {
   return (
@@ -158,7 +163,7 @@ export const deleteServerFunction = async (id: string) => {
   });
 };
 
-export const createOrUpdateClientFunction = async (
+export const createOrUpdateClientFunctionWithResponse = async (
   context: string | null,
   name: string,
   description: string | null,
@@ -194,6 +199,11 @@ export const createOrUpdateClientFunction = async (
     },
   );
 };
+
+// Keep existing API callers on the DTO contract; deployment receipts need the response.
+export const createOrUpdateClientFunction = async (
+  ...args: Parameters<typeof createOrUpdateClientFunctionWithResponse>
+) => (await createOrUpdateClientFunctionWithResponse(...args)).data;
 
 export const getClientFunctionById = async (id: string) => {
   return (

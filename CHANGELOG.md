@@ -1,4 +1,5 @@
 ### 0.27.9
+* Keep existing source API helpers returning function DTOs; expose full HTTP responses through explicit helpers used by deployment receipts.
 * Preserve actual deployment HTTP receipts for protected SDK and Flow callers, including generation failures and pending jobs.
 * Disable automatic source-upload retries; uncertain uploads require readback before another send.
 

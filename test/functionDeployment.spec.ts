@@ -5,8 +5,8 @@ import path from 'path';
 import { createHash } from 'crypto';
 import { addOrUpdateCustomFunction } from '../src/commands/function';
 import {
-  createOrUpdateClientFunction,
-  createOrUpdateServerFunction,
+  createOrUpdateClientFunctionWithResponse,
+  createOrUpdateServerFunctionWithResponse,
   getSpecs,
 } from '../src/api';
 import { generateSingleCustomFunction } from '../src/commands/generate';
@@ -19,8 +19,8 @@ import {
 
 jest.mock('../src/config', () => ({ loadConfig: jest.fn() }));
 jest.mock('../src/api', () => ({
-  createOrUpdateClientFunction: jest.fn(),
-  createOrUpdateServerFunction: jest.fn(),
+  createOrUpdateClientFunctionWithResponse: jest.fn(),
+  createOrUpdateServerFunctionWithResponse: jest.fn(),
   getSpecs: jest.fn(),
 }));
 jest.mock('../src/commands/generate', () => ({
@@ -33,8 +33,8 @@ jest.mock('../src/transpiler', () => ({
 }));
 jest.mock('shelljs', () => ({ echo: jest.fn() }));
 
-const server = jest.mocked(createOrUpdateServerFunction);
-const client = jest.mocked(createOrUpdateClientFunction);
+const server = jest.mocked(createOrUpdateServerFunctionWithResponse);
+const client = jest.mocked(createOrUpdateClientFunctionWithResponse);
 const generate = jest.mocked(generateSingleCustomFunction);
 const id = '00000000-0000-4000-8000-000000000001';
 const functionBody: CreateServerCustomFunctionResponseDto = {

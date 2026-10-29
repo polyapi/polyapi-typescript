@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 import { request as undiciRequest } from 'undici';
-import { createOrUpdateClientFunction, createOrUpdateServerFunction } from '../src/api';
+import { createOrUpdateClientFunction, createOrUpdateServerFunction, createOrUpdateClientFunctionWithResponse, createOrUpdateServerFunctionWithResponse } from '../src/api';
 import {
   AxiosError,
   get,
@@ -205,7 +205,7 @@ describe('http client', () => {
   });
 
   describe('errors', () => {
-    test.each([createOrUpdateClientFunction, createOrUpdateServerFunction])('source API retains the full HTTP response and does not retry uploads', async (upload) => {
+    test.each([createOrUpdateClientFunctionWithResponse, createOrUpdateServerFunctionWithResponse])('source API retains the full HTTP response and does not retry uploads', async (upload) => {
       const previousBase = process.env.POLY_API_BASE_URL;
       process.env.POLY_API_BASE_URL = 'https://example.com';
       try {
@@ -218,6 +218,27 @@ describe('http client', () => {
         undiciRequestMock.mockResolvedValue(jsonResponse({ message: 'throttled' }, { statusCode: 429,
           headers: { 'retry-after': '0' } }) as unknown as Awaited<ReturnType<typeof undiciRequest>>);
         await expect(call()).rejects.toMatchObject({ response: { status: 429, data: { message: 'throttled' } } });
+        expect(undiciRequestMock).toHaveBeenCalledTimes(1);
+      } finally {
+        if (previousBase === undefined) delete process.env.POLY_API_BASE_URL;
+        else process.env.POLY_API_BASE_URL = previousBase;
+      }
+    });
+
+    test.each([createOrUpdateClientFunction, createOrUpdateServerFunction])('existing source API callers still receive the DTO without upload retries', async (upload) => {
+      const previousBase = process.env.POLY_API_BASE_URL;
+      process.env.POLY_API_BASE_URL = 'https://example.com';
+      try {
+        const body = { id: 'synthetic-id', warnings: ['synthetic warning'], traceId: 'trace-1' };
+        undiciRequestMock.mockResolvedValue(jsonResponse(body, { statusCode: 201 }) as unknown as Awaited<ReturnType<typeof undiciRequest>>);
+        const call = () => upload('example', 'canary', null, 'return 1', 'ENVIRONMENT', {}, null, null);
+        const result = await call();
+        expect(result.id).toBe(body.id);
+        expect(result).toEqual(body);
+        undiciRequestMock.mockClear();
+        undiciRequestMock.mockResolvedValue(jsonResponse({ message: 'throttled' }, { statusCode: 429,
+          headers: { 'retry-after': '0' } }) as unknown as Awaited<ReturnType<typeof undiciRequest>>);
+        await expect(call()).rejects.toMatchObject({ response: { status: 429 } });
         expect(undiciRequestMock).toHaveBeenCalledTimes(1);
       } finally {
         if (previousBase === undefined) delete process.env.POLY_API_BASE_URL;

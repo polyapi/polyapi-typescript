@@ -8,8 +8,8 @@ import {
   FunctionDeploymentResult,
 } from '../types';
 import {
-  createOrUpdateClientFunction,
-  createOrUpdateServerFunction,
+  createOrUpdateClientFunctionWithResponse,
+  createOrUpdateServerFunctionWithResponse,
   getSpecs,
 } from '../api';
 import { loadConfig } from '../config';
@@ -162,7 +162,7 @@ export const addOrUpdateCustomFunction = async (
         other.cachePolyLibrary = cachePolyLibrary;
       if (image) other.image = image;
       result.upload = 'unknown';
-      response = await createOrUpdateServerFunction(
+      response = await createOrUpdateServerFunctionWithResponse(
         context,
         name,
         description,
@@ -184,7 +184,7 @@ export const addOrUpdateCustomFunction = async (
         } Client Function to PolyAPI Catalog...`,
       );
       result.upload = 'unknown';
-      response = await createOrUpdateClientFunction(
+      response = await createOrUpdateClientFunctionWithResponse(
         context,
         name,
         description,
