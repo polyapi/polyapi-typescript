@@ -159,7 +159,7 @@ jobs:
             builder: pack
             buildEnvs:
               - name: BP_NODE_VERSION
-                value: "20.*"
+                value: "26.*"
           EOF
           echo "Final func.yaml:"
           cat "${FUNC_DIR}/func.yaml"
