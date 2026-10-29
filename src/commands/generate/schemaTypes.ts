@@ -829,7 +829,7 @@ const printSchemaSpecs = (specs: SchemaSpec[]): Record<string, string> => {
   );
   fileMap['index.d.ts'] = Object.keys(fileMap)
     .map((file) => `/// <reference path="./${file}" />`)
-    .join(EOL);
+    .join(EOL) || 'declare namespace schemas {}';
   return fileMap;
 };
 

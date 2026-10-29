@@ -67,7 +67,8 @@ export const tabi: tabi.Tabi;
 /**
  * This type contain all schemas saved into poly.
  */
-export type schemas = schemas.Schemas
+import PolySchemas = schemas;
+export { PolySchemas as schemas };
 
 interface AuthData {
   apiKeyId: string;

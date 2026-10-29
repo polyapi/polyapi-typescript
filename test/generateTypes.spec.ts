@@ -1,9 +1,15 @@
 import { EOL } from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
+import handlebars from 'handlebars';
+import ts from 'typescript';
+import { describe, expect, test } from '@jest/globals';
 import { JsonSchema, SchemaSpec, printSchemaAsType, __test } from '../src/commands/generate/schemaTypes';
+import { __test as sharedTest } from '../src/commands/generate/shared';
+import { Visibility } from '../src/types/shared';
 
+const { formatName, printComment } = sharedTest;
 const {
-  formatName,
-  printComment,
   buildSchemaTree,
   printSchemaSpecs
 } = __test;
@@ -1603,6 +1609,88 @@ describe('Generate types from specs', () => {
   });
 
   describe('printSpecs', () => {
+
+    describe('public schema declarations', () => {
+      const spec: SchemaSpec = {
+        id: 'synthetic-schema',
+        type: 'schema',
+        name: 'User',
+        context: 'example',
+        contextName: 'example.User',
+        definition: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+          additionalProperties: false,
+        },
+        visibilityMetadata: { visibility: Visibility.Environment },
+      };
+
+      const checkDeclarations = (specs: SchemaSpec[], consumer: string) => {
+        const generated = printSchemaSpecs(structuredClone(specs));
+        const template = handlebars.compile(fs.readFileSync(
+          path.join(__dirname, '../templates/index.d.ts.hbs'), 'utf8',
+        ))({ contexts: [] });
+        const source = ts.createSourceFile('index.d.ts', template, ts.ScriptTarget.Latest, true);
+        // Isolate the public schema export from unrelated Vari and Tabi declarations.
+        const schemaExports = source.statements.filter((statement) =>
+          ts.isImportEqualsDeclaration(statement)
+            || ts.isTypeAliasDeclaration(statement) && statement.name.text === 'schemas'
+            || ts.isExportDeclaration(statement) && statement.exportClause
+              && ts.isNamedExports(statement.exportClause)
+              && statement.exportClause.elements.some((element) => element.name.text === 'schemas'),
+        ).map((statement) => statement.getText(source)).join(EOL);
+        const files = new Map(Object.entries(generated).map(([name, contents]) =>
+          [`/generated/schemas/${name}`, contents],
+        ));
+        files.set('/generated/index.d.ts', `/// <reference path="./schemas/index.d.ts" />${EOL}${schemaExports}`);
+        files.set('/generated/use.ts', consumer);
+        const options: ts.CompilerOptions = {
+          strict: true, skipLibCheck: false, noEmit: true, types: [],
+          target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.Node16,
+          moduleResolution: ts.ModuleResolutionKind.Node16,
+        };
+        const host = ts.createCompilerHost(options);
+        const getSourceFile = host.getSourceFile.bind(host);
+        const readFile = host.readFile.bind(host);
+        const fileExists = host.fileExists.bind(host);
+        host.getSourceFile = (filename, languageVersion, onError, shouldCreateNewSourceFile) =>
+          files.has(filename) ? ts.createSourceFile(filename, files.get(filename), languageVersion, true)
+            : getSourceFile(filename, languageVersion, onError, shouldCreateNewSourceFile);
+        host.readFile = (filename) => files.get(filename) ?? readFile(filename);
+        host.fileExists = (filename) => files.has(filename) || fileExists(filename);
+        host.resolveModuleNames = (names) => names.map((name) => name === './index'
+          ? { resolvedFileName: '/generated/index.d.ts', extension: ts.Extension.Dts } : undefined);
+        return ts.getPreEmitDiagnostics(ts.createProgram(['/generated/use.ts'], options, host));
+      };
+
+      test('empty generation preserves an empty importable schema namespace', () => {
+        expect(printSchemaSpecs([])).toEqual({ 'index.d.ts': 'declare namespace schemas {}' });
+        expect(checkDeclarations([], "import type { schemas } from './index';")).toEqual([]);
+      });
+
+      test('populated schemas retain their named and global namespace types', () => {
+        expect(checkDeclarations([spec], multiline(
+          "import type { schemas as imported } from './index';",
+          "const user: imported.Example.User = { id: 'synthetic' };",
+          'const original: schemas.Example.User = user;',
+        ))).toEqual([]);
+      });
+
+      test.each([
+        ['wrong field type', "const user: schemas.Example.User = { id: 3 };", 2322],
+        ['missing required field', 'const user: schemas.Example.User = {};', 2741],
+        ['missing schema', 'type Missing = schemas.Example.Absent;', 2694],
+      ])('populated schemas reject %s', (_name, consumer, code) => {
+        const diagnostics = checkDeclarations([spec], `import type { schemas } from './index';${EOL}${consumer}`);
+        expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([code]);
+      });
+
+      test('empty namespace does not invent schema types', () => {
+        const diagnostics = checkDeclarations([], "import type { schemas } from './index'; type Missing = schemas.Absent;");
+        expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([2694]);
+      });
+    });
 
     test('single spec', () => {
       const specs: SchemaSpec[] = [
