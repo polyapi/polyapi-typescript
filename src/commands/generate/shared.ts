@@ -74,7 +74,7 @@ export const buildTree = <S extends ISpecification>(specs: S[], interfaceName: s
   const schemas: Record<string, ResourceRoot<S>> = {
     default: {
       path: 'default',
-      interfaceName: interfaceName,
+      interfaceName,
       interfaces: {},
       namespaces: {},
       hasTypes: false,
