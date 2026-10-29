@@ -153,7 +153,7 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v2
       with:
-        node-version: '18'
+        node-version: '22'
         registry-url: 'https://registry.npmjs.org'
 
     - name: Publish package
@@ -171,10 +171,7 @@ jobs:
           echo "Local NPM version is the same as remote"
         else
           if [[ "$VERSION" != "$VERSIONREMOTEDEVELOP" ]]; then
-            yarn install
-            npx prisma@4.11.0 generate --generator js
-            cd packages/client 
-            npm install --include=dev
+            npm ci --include=dev
             npm publish --tag na1
           else
             npm dist-tag add polyapi@$VERSION na1

@@ -1,3 +1,7 @@
+### 0.27.9
+* Preserve actual deployment HTTP receipts for protected SDK and Flow callers, including generation failures and pending jobs.
+* Disable automatic source-upload retries; uncertain uploads require readback before another send.
+
 ### 0.27.8
 * Fix for bug preventing axios use
 
