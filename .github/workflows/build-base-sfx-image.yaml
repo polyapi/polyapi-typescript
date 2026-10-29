@@ -101,7 +101,7 @@ jobs:
           fi
 
       - name: Install kn func CLI
-        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build != 'false'
+        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build == 'true'
         run: |
           curl -fsSL -o /tmp/func \
             https://github.com/knative/func/releases/download/knative-v1.23.0/func_linux_amd64
@@ -110,7 +110,7 @@ jobs:
           func version
 
       - name: Create Node function scaffold
-        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build != 'false'
+        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build == 'true'
         run: |
           set -euo pipefail
           POLYAPI_VERSION_SAFE="$(printf '%s' "${{ steps.resolve-version.outputs.polyapi_version }}" | tr '.' '-')"
@@ -124,7 +124,7 @@ jobs:
           echo "FUNC_DIR=$FUNC_DIR" >> "$GITHUB_ENV"
 
       - name: Install polyapi dependency
-        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build != 'false'
+        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build == 'true'
         run: |
           set -euo pipefail
           VERSION="${{ steps.resolve-version.outputs.polyapi_version }}"
@@ -148,7 +148,7 @@ jobs:
           cat "${FUNC_DIR}/package.json"
 
       - name: Normalize func.yaml build settings
-        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build != 'false'
+        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build == 'true'
         run: |
           set -euo pipefail
           CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -169,14 +169,14 @@ jobs:
           cat "${FUNC_DIR}/func.yaml"
 
       - name: Build and push image with kn func
-        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build != 'false'
+        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build == 'true'
         run: |
           set -euo pipefail
           IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
           func build --image "$IMAGE" --push=false -p "$FUNC_DIR" --verbose
 
       - name: Fix node_modules ownership and push image
-        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build != 'false'
+        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build == 'true'
         run: |
           set -euo pipefail
           IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
@@ -189,7 +189,7 @@ jobs:
           docker push "$IMAGE"
 
       - name: Verify pushed image
-        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build != 'false'
+        if: steps.check-image.outputs.image_exists != 'true' || github.event.inputs.force_build == 'true'
         run: |
           set -euo pipefail
           IMAGE="ghcr.io/polyapi/polyapi-ts-${{ steps.resolve-version.outputs.polyapi_version }}-base:latest"
