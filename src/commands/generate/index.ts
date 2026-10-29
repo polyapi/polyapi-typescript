@@ -375,7 +375,7 @@ const generateServerFunctionJSFiles = async (
       `  functions: [`,
 
       specifications
-        .map(s => `    ['${s.contextName}', '${s.id}', '${s.function.arguments.map(a => `'${a.name}'`).join(', ')}']`)
+        .map(s => `    ['${s.contextName}', '${s.id}', ${s.function.arguments.map(a => `'${a.name}'`).join(', ')}]`)
         .join(`,${EOL}`),
 
       `  ]`,
@@ -395,7 +395,7 @@ const generateAiFunctionJSFiles = async (
       `  functions: [`,
 
       specifications
-        .map(s => `    ['${s.contextName}', '${s.id}', '${s.function.arguments.map(a => `'${a.name}'`).join(', ')}']`)
+        .map(s => `    ['${s.contextName}', '${s.id}', ${s.function.arguments.map(a => `'${a.name}'`).join(', ')}]`)
         .join(`,${EOL}`),
 
       `  ]`,

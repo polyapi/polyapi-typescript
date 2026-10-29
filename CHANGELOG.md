@@ -1,3 +1,6 @@
+### 0.28.1
+* Fixing bug generating SDK for functions with arguments
+
 ### 0.28.0
 * Adding support for queues and locks
 * Fixing internal dependency tracking to capture dynamic paths using a wildcard
