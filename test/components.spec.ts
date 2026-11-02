@@ -798,33 +798,37 @@ export const App = () => <div>{_.toUpper('hello')}</div>;
       if (href.includes('/functions/vendor') && method === 'GET') {
         return jsonResponse(INSTANCE_VENDOR) as any;
       }
+      if (href.endsWith('/auth') && method === 'GET') {
+        return jsonResponse({
+          tenant: { id: 'tenant-1' },
+          environment: { id: 'env-1', subdomain: 'dev' },
+        }) as any;
+      }
       if (href.endsWith('/applications') && method === 'GET') {
         return jsonResponse([
           {
             id: 'app-welcome',
-            name: 'demo',
-            runtime: 'canopy-v2',
+            name: 'Welcome display',
+            version: 2,
+            subdomain: 'demo',
             rootComponent: 'myapp.App',
             authenticatedRoot: null,
-            subpath: 'welcome',
-            config: { subpath: 'welcome' },
           },
           {
             id: 'app-other',
-            name: 'other',
-            runtime: 'canopy-v2',
+            name: 'demo',
+            version: 2,
+            subdomain: 'other',
             rootComponent: 'other.App',
-            subpath: 'other',
-            config: { subpath: 'other' },
           },
         ]) as any;
       }
       if (href.includes('/applications/app-welcome') && method === 'PATCH') {
         return jsonResponse({
           id: 'app-welcome',
-          name: 'demo',
-          runtime: 'canopy-v2',
-          config: { subpath: 'welcome' },
+          name: 'Welcome display',
+          version: 2,
+          subdomain: 'demo',
         }) as any;
       }
       const posted = parseBody(init);
@@ -874,11 +878,12 @@ export const Button = ({ label }: { label: string }) => <button>{label}</button>
     );
     expect(patches[0].headers.Authorization).toBe('Bearer test-token');
     expect(patches[0].body).toEqual({
-      name: 'demo',
-      runtime: 'canopy-v2',
+      name: 'Welcome display',
+      version: 2,
+      subdomain: 'demo',
       rootComponent: 'myapp.App',
-      config: { subpath: 'welcome' },
     });
+    expect(patches[0].body.runtime).toBeUndefined();
     expect(patches[0].body.vendorHash).toBeUndefined();
     expect(patches[0].body.vendorCode).toBeUndefined();
   });

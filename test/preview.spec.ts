@@ -152,7 +152,7 @@ export const Button = ({ label }: { label: string }) => <button>{label}</button>
     };
 
     const server = await startApplicationPreview({
-      subpath: 'welcome',
+      app: 'myapp-dev',
       port: 0,
       projectRoot: tmp,
       npmResolveDir,
@@ -161,20 +161,22 @@ export const Button = ({ label }: { label: string }) => <button>{label}</button>
     });
 
     try {
+      const origin = server.url.split('?')[0];
+      expect(server.url).toContain('?app=myapp-dev');
       const index = await getText(server.url);
       expect(index.status).toBe(200);
       expect(index.body).toContain('/__poly/myapp.App.js');
       expect(index.body).toContain('/__poly/myapp.Button.js');
       expect(index.body).toContain('/__remote/poly-vendor.js');
 
-      const app = await getText(`${server.url}__poly/myapp.App.js`);
+      const app = await getText(`${origin}__poly/myapp.App.js`);
       expect(app.status).toBe(200);
       expect(app.body).toContain('poly:myapp.Button');
       expect(app.body).toContain('poly:vendor');
       expect(app.body).toContain('local-preview');
 
       const meta = await getText(
-        `${server.url}functions/component/myapp.App?usePathId=true`,
+        `${origin}functions/component/myapp.App?usePathId=true`,
       );
       expect(meta.status).toBe(200);
       expect(JSON.parse(meta.body)).toMatchObject({
@@ -183,7 +185,9 @@ export const Button = ({ label }: { label: string }) => <button>{label}</button>
         imports: ['myapp.Button'],
       });
 
-      const manifestRes = await getText(`${server.url}canopy/v2/manifest`);
+      const manifestRes = await getText(
+        `${origin}applications/myapp-dev/spec`,
+      );
       expect(manifestRes.status).toBe(200);
       expect(JSON.parse(manifestRes.body).imports['poly:myapp.App']).toBe(
         '/__poly/myapp.App.js',
@@ -214,14 +218,14 @@ export const Button = ({ label }: { label: string }) => <button>{label}</button>
     };
     undiciRequestMock.mockImplementation(async (url) => {
       const href = String(url);
-      const text = href.includes('/canopy/v2/manifest')
+      const text = href.includes('/applications/myapp-dev/spec')
         ? JSON.stringify(manifest)
         : '<!DOCTYPE html><html><body><script>window.__POLY_API_BASE__ = "https://poly.example.test";</script></body></html>';
       const bytes = new TextEncoder().encode(text);
       return {
         statusCode: 200,
         headers: {
-          'content-type': href.includes('/canopy/v2/manifest')
+          'content-type': href.includes('/applications/myapp-dev/spec')
             ? 'application/json'
             : 'text/html',
         },
@@ -234,22 +238,29 @@ export const Button = ({ label }: { label: string }) => <button>{label}</button>
     });
 
     try {
-      const deployed = await fetchDeployedApp({ subpath: 'welcome' });
+      const deployed = await fetchDeployedApp({ app: 'myapp-dev' });
       expect(deployed.manifest.unauthenticatedRoot).toBe('myapp.App2');
       const urls = undiciRequestMock.mock.calls.map(([url]) => String(url));
       expect(urls).toContain(
-        'https://poly.example.test/canopy/v2/manifest?subpath=welcome',
+        'https://poly.example.test/applications/myapp-dev/spec',
       );
       expect(urls).toContain('https://poly.example.test/canopy/v2/');
-      expect(urls.some((url) => url.includes('/canopy/v2/welcome/'))).toBe(
+      expect(urls.some((url) => url.includes('/canopy/v2/manifest'))).toBe(
         false,
       );
+      const specCall = undiciRequestMock.mock.calls.find(([url]) =>
+        String(url).includes('/applications/myapp-dev/spec'),
+      );
+      expect(
+        (specCall?.[1]?.headers as Record<string, string> | undefined)
+          ?.Authorization,
+      ).toBeUndefined();
 
       undiciRequestMock.mockClear();
-      await fetchDeployedApp({ app: 'demo', env: 'develop' });
-      expect(String(undiciRequestMock.mock.calls[0][0])).toBe(
-        'https://poly.example.test/canopy/v2/manifest?app=demo&env=develop',
+      await expect(fetchDeployedApp({ app: 'welcome' })).rejects.toThrow(
+        /joined subdomain/,
       );
+      expect(undiciRequestMock).not.toHaveBeenCalled();
 
       const rewritten = rewritePreviewHtml(deployed.indexHtml, deployed.manifest, [
         'myapp.App2',

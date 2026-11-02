@@ -1,70 +1,69 @@
-import {
-  createApplication,
-  listApplications,
-  updateApplication,
-} from '../api';
+import { getAuthData, createApplication, listApplications, updateApplication } from '../api';
 import {
   ApplicationDto,
-  CANOPY_V2_RUNTIME,
+  APPLICATION_SUBDOMAIN_PATTERN,
+  CANOPY_V2_VERSION,
   CreateCanopyV2ApplicationDto,
+  JOINED_SUBDOMAIN_PATTERN,
 } from '../types';
 import { ComponentManifest } from './types';
 
-const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-
-export const assertHostnameSafeApplicationName = (name: string) => {
-  if (!HOSTNAME_LABEL.test(name)) {
+export const assertApplicationSubdomain = (subdomain: string) => {
+  if (!APPLICATION_SUBDOMAIN_PATTERN.test(subdomain)) {
     throw new Error(
-      `Application name "${name}" must be a hostname label (lowercase letters, digits, and interior hyphens). Origin is {name}-{environment.subdomain}.`,
+      `Application subdomain "${subdomain}" must be 1–32 characters: lowercase letters, digits, and interior hyphens.`,
     );
   }
 };
 
-export const normalizeApplicationSubpath = (subpath: string) =>
-  subpath.trim().replace(/^\/+|\/+$/g, '');
-
-const readSubpath = (application: ApplicationDto) => {
-  const config = application.config;
-  if (config && typeof config === 'object' && typeof config.subpath === 'string') {
-    return config.subpath;
-  }
-  if (typeof config === 'string') {
-    try {
-      const parsed = JSON.parse(config) as { subpath?: string };
-      if (typeof parsed?.subpath === 'string') return parsed.subpath;
-    } catch {
-      // config is stored as JSON on the server and returned parsed
-    }
-  }
-  return application.subpath || '';
-};
-
-export const buildCanopyV2ApplicationBody = (
-  input: {
-    name: string;
-    rootComponent: string;
-    authenticatedRoot?: string | null;
-    subpath: string;
-  },
-  options: { validateName?: boolean } = {},
-): CreateCanopyV2ApplicationDto => {
-  if (options.validateName !== false) {
-    assertHostnameSafeApplicationName(input.name);
-  }
-  const subpath = normalizeApplicationSubpath(input.subpath);
-  if (!subpath || subpath.includes('/')) {
+export const assertJoinedOriginLabel = (
+  applicationSubdomain: string,
+  environmentSubdomain: string,
+) => {
+  const joined = `${applicationSubdomain}-${environmentSubdomain}`;
+  if (!JOINED_SUBDOMAIN_PATTERN.test(joined)) {
     throw new Error(
-      'config.subpath is required and must be a single path segment.',
+      `'${joined}' is not a valid DNS label. Origin is {subdomain}-{environment.subdomain} and must be 1–63 characters, not starting or ending with a hyphen.`,
     );
   }
+};
+
+export const getCurrentEnvironmentSubdomain = async () => {
+  const baseUrl = process.env.POLY_API_BASE_URL || '';
+  const apiKey = process.env.POLY_API_KEY || '';
+  if (!baseUrl || !apiKey) {
+    throw new Error(
+      'Poly is not configured. Run `poly setup` so the environment subdomain can be read from GET /auth.',
+    );
+  }
+  const auth = await getAuthData(baseUrl, apiKey);
+  const subdomain = auth?.environment?.subdomain?.trim();
+  if (!subdomain) {
+    throw new Error(
+      'GET /auth did not include environment.subdomain. Cannot build the canopy-v2 origin.',
+    );
+  }
+  return subdomain;
+};
+
+export const buildCanopyV2ApplicationBody = (input: {
+  name: string;
+  subdomain: string;
+  rootComponent: string;
+  authenticatedRoot?: string | null;
+  environmentSubdomain: string;
+}): CreateCanopyV2ApplicationDto => {
+  const subdomain = input.subdomain.trim();
+  assertApplicationSubdomain(subdomain);
+  assertJoinedOriginLabel(subdomain, input.environmentSubdomain.trim());
   if (!input.rootComponent) {
-    throw new Error('rootComponent is required when runtime is canopy-v2.');
+    throw new Error('rootComponent is required when version is 2.');
   }
   const body: CreateCanopyV2ApplicationDto = {
     name: input.name,
-    runtime: CANOPY_V2_RUNTIME,
+    version: CANOPY_V2_VERSION,
+    subdomain,
     rootComponent: input.rootComponent,
-    config: { subpath },
   };
   if (input.authenticatedRoot) {
     body.authenticatedRoot = input.authenticatedRoot;
@@ -76,63 +75,66 @@ export const buildCanopyV2ApplicationBody = (
 
 export type CanopyV2ApplicationInput = {
   name: string;
+  subdomain?: string;
   rootComponent: string;
-  authenticatedRoot?: string;
-  subpath: string;
-};
-
-export const createCanopyV2Application = async (
-  input: CanopyV2ApplicationInput,
-) => createApplication(buildCanopyV2ApplicationBody(input));
-
-const findApplication = (applications: ApplicationDto[], nameOrId: string) => {
-  const needle = nameOrId.trim();
-  const needleLower = needle.toLowerCase();
-  return applications.filter((application) => {
-    if (application.runtime && application.runtime !== CANOPY_V2_RUNTIME) {
-      return false;
-    }
-    return (
-      application.id === needle ||
-      application.name?.toLowerCase() === needleLower
-    );
-  });
-};
-
-export type UpdateCanopyV2ApplicationInput = {
-  nameOrId: string;
-  name?: string;
-  rootComponent?: string;
   authenticatedRoot?: string | null;
-  subpath?: string;
 };
 
-export const updateCanopyV2Application = async (
-  input: UpdateCanopyV2ApplicationInput,
+export type CanopyV2WriteResult = {
+  application: ApplicationDto;
+  subdomain: string;
+  environmentSubdomain: string;
+  updating: boolean;
+};
+
+const findApplicationBySubdomain = (
+  applications: ApplicationDto[],
+  subdomain: string,
 ) => {
-  const applications = await listApplications();
-  const matches = findApplication(applications, input.nameOrId);
-  if (matches.length !== 1) {
+  const needle = subdomain.trim().toLowerCase();
+  return applications.filter(
+    (application) =>
+      application.version === CANOPY_V2_VERSION &&
+      application.subdomain?.toLowerCase() === needle,
+  );
+};
+
+export const addCanopyV2Application = async (
+  input: CanopyV2ApplicationInput,
+  report?: (updating: boolean) => void,
+): Promise<CanopyV2WriteResult> => {
+  const subdomain = (input.subdomain ?? input.name).trim();
+  assertApplicationSubdomain(subdomain);
+  const environmentSubdomain = await getCurrentEnvironmentSubdomain();
+  const matches = findApplicationBySubdomain(await listApplications(), subdomain);
+  if (matches.length > 1) {
     throw new Error(
-      matches.length
-        ? `More than one canopy-v2 application matches "${input.nameOrId}".`
-        : `No canopy-v2 application named "${input.nameOrId}".`,
+      `More than one canopy-v2 application matches subdomain "${subdomain}".`,
     );
   }
   const existing = matches[0];
   const authenticatedRoot =
     input.authenticatedRoot === undefined
-      ? existing.authenticatedRoot
+      ? existing?.authenticatedRoot
       : input.authenticatedRoot;
-  return updateApplication(
-    existing.id,
-    buildCanopyV2ApplicationBody({
-      name: input.name ?? existing.name,
-      rootComponent: input.rootComponent ?? existing.rootComponent ?? '',
-      authenticatedRoot,
-      subpath: input.subpath ?? readSubpath(existing),
-    }),
-  );
+  const body = buildCanopyV2ApplicationBody({
+    name: input.name,
+    subdomain,
+    rootComponent: input.rootComponent,
+    authenticatedRoot,
+    environmentSubdomain,
+  });
+  const updating = Boolean(existing);
+  report?.(updating);
+  const application = existing
+    ? await updateApplication(existing.id, body)
+    : await createApplication(body);
+  return {
+    application,
+    subdomain,
+    environmentSubdomain,
+    updating,
+  };
 };
 
 const graphIncludesPublished = (
@@ -169,35 +171,36 @@ export const refreshCanopyV2Applications = async (
       `Components were published, but listing applications failed: ${err?.message || error}`,
     );
   }
-  const refreshed = [];
-  for (const application of applications) {
-    if (application.runtime !== CANOPY_V2_RUNTIME) continue;
+  const matches = applications.filter((application) => {
+    if (application.version !== CANOPY_V2_VERSION) return false;
     const roots = [application.rootComponent, application.authenticatedRoot].filter(
       (path): path is string => Boolean(path),
     );
-    if (!roots.some((root) => graphIncludesPublished(root, published, manifest))) {
-      continue;
-    }
-    const subpath = readSubpath(application);
-    if (!application.rootComponent || !subpath) continue;
+    return roots.some((root) => graphIncludesPublished(root, published, manifest));
+  });
+  if (!matches.length) return [];
+
+  const environmentSubdomain = await getCurrentEnvironmentSubdomain();
+  const refreshed = [];
+  for (const application of matches) {
+    const subdomain = application.subdomain?.trim() || '';
+    if (!application.rootComponent || !subdomain) continue;
     let saved;
     try {
       saved = await updateApplication(
         application.id,
-        buildCanopyV2ApplicationBody(
-          {
-            name: application.name,
-            rootComponent: application.rootComponent,
-            authenticatedRoot: application.authenticatedRoot || undefined,
-            subpath,
-          },
-          { validateName: false },
-        ),
+        buildCanopyV2ApplicationBody({
+          name: application.name,
+          subdomain,
+          rootComponent: application.rootComponent,
+          authenticatedRoot: application.authenticatedRoot || undefined,
+          environmentSubdomain,
+        }),
       );
     } catch (error) {
       const err = error as { message?: string };
       throw new Error(
-        `Components were published, but re-uploading application ${application.name} failed: ${err?.message || error}`,
+        `Components were published, but re-uploading application ${application.subdomain || application.name} failed: ${err?.message || error}`,
       );
     }
     refreshed.push(saved);

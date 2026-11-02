@@ -32,35 +32,26 @@ export type DeployedAppAssets = {
   indexHtml: string;
 };
 
-const normalizeSubpath = (subpath: string) =>
-  subpath.replace(/^\/+|\/+$/g, '');
-
 const instanceBaseUrl = () =>
   (process.env.POLY_API_BASE_URL || '').replace(/\/+$/, '');
 
 export type DeployedAppQuery = {
-  subpath?: string;
   app?: string;
-  env?: string;
 };
 
-export const canopyV2ManifestUrl = (
-  baseUrl: string,
-  query: DeployedAppQuery,
-) => {
+export const joinedApplicationSpecPath = (joined: string) => {
+  const app = joined.trim();
+  if (!app.includes('-') || app.startsWith('-') || app.endsWith('-')) {
+    throw new Error(
+      'Provide the joined subdomain {application.subdomain}-{environment.subdomain} (`poly application preview myapp-dev`).',
+    );
+  }
+  return `/applications/${encodeURIComponent(app)}/spec`;
+};
+
+export const canopyV2SpecUrl = (baseUrl: string, query: DeployedAppQuery) => {
   const base = baseUrl.replace(/\/+$/, '');
-  const subpath = query.subpath ? normalizeSubpath(query.subpath) : '';
-  if (subpath) {
-    return `${base}/canopy/v2/manifest?subpath=${encodeURIComponent(subpath)}`;
-  }
-  const app = query.app?.trim();
-  const env = query.env?.trim();
-  if (app && env) {
-    return `${base}/canopy/v2/manifest?app=${encodeURIComponent(app)}&env=${encodeURIComponent(env)}`;
-  }
-  throw new Error(
-    'Provide a hosted subpath or both app and env for /canopy/v2/manifest.',
-  );
+  return `${base}${joinedApplicationSpecPath(query.app || '')}`;
 };
 
 const LOCAL_COMPONENT_PREFIX = '/__poly/';
@@ -111,11 +102,12 @@ export const fetchDeployedApp = async (
       'POLY_API_BASE_URL is not set. Run `poly setup` or export POLY_API_BASE_URL.',
     );
   }
-  const manifestUrl = canopyV2ManifestUrl(baseUrl, query);
+  const manifestUrl = canopyV2SpecUrl(baseUrl, query);
   const indexUrl = `${baseUrl}/canopy/v2/`;
   try {
     const manifestRes = await httpClient.get<unknown>(manifestUrl, {
       responseType: 'json',
+      skipGeneratedAuth: true,
     });
     const htmlRes = await httpClient.get<string>(indexUrl, {
       responseType: 'text',
@@ -128,7 +120,7 @@ export const fetchDeployedApp = async (
     const err = error as { response?: { status?: number }; message?: string };
     if (err?.response?.status === 404) {
       throw new Error(
-        `No canopy-v2 application for ${manifestUrl}. Create it with \`poly application create\` first.`,
+        `No canopy-v2 application for ${manifestUrl}. Add it with \`poly application add\` first.`,
       );
     }
     throw new Error(
@@ -397,9 +389,7 @@ export type PreviewServer = {
 };
 
 export const startApplicationPreview = async (options: {
-  subpath?: string;
-  app?: string;
-  env?: string;
+  app: string;
   port?: number;
   projectRoot?: string;
   npmResolveDir?: string;
@@ -413,9 +403,7 @@ export const startApplicationPreview = async (options: {
   const deployed =
     options.assets ||
     (await fetchDeployedApp({
-      subpath: options.subpath,
       app: options.app,
-      env: options.env,
     }));
 
   try {
@@ -465,7 +453,13 @@ export const startApplicationPreview = async (options: {
         return;
       }
 
-      if (pathname === '/canopy/v2/manifest') {
+      let decodedPath = pathname;
+      try {
+        decodedPath = decodeURIComponent(pathname);
+      } catch {
+        // keep the raw pathname
+      }
+      if (decodedPath === `/applications/${options.app.trim()}/spec`) {
         send(
           res,
           200,
@@ -598,7 +592,7 @@ export const startApplicationPreview = async (options: {
     });
 
   return {
-    url: `http://127.0.0.1:${port}/`,
+    url: `http://127.0.0.1:${port}/?app=${encodeURIComponent(options.app.trim())}`,
     port,
     close,
   };

@@ -48,14 +48,7 @@ export const addOrUpdateComponentFunction = async (
       shell.echo(`Component ${polyPathName} (${result.kind}) ID: ${result.id}`);
     }
     for (const application of published.applications) {
-      const config = application.config;
-      const subpath =
-        config && typeof config === 'object' && 'subpath' in config
-          ? String((config as { subpath?: string }).subpath || '')
-          : application.subpath || '';
-      shell.echo(
-        `Re-uploaded application ${application.name}${subpath ? ` (${subpath})` : ''}.`,
-      );
+      shell.echo(`Re-uploaded application ${application.name}.`);
     }
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));

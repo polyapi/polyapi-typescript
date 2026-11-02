@@ -19,11 +19,13 @@ const readError = async (res: Response) => {
   return `Request failed (${res.status})`;
 };
 
+const sessionHeaders = { 'x-poly-session': '1' };
+
 export const createPolySession = async (apiKey: string): Promise<PolySession> => {
   const res = await fetch('/auth/session', {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders },
     body: JSON.stringify({ apiKey }),
   });
   if (!res.ok) {
@@ -35,7 +37,7 @@ export const createPolySession = async (apiKey: string): Promise<PolySession> =>
 };
 
 export const getPolySession = async (): Promise<PolySession | null> => {
-  const res = await fetch('/auth/session', { credentials: 'include' });
+  const res = await fetch('/auth/session', { credentials: 'include', headers: sessionHeaders });
   if (!res.ok) return null;
   return (await res.json()) as PolySession;
 };
@@ -44,6 +46,7 @@ export const deletePolySession = async () => {
   await fetch('/auth/session', {
     method: 'DELETE',
     credentials: 'include',
+    headers: sessionHeaders,
   });
   window.location.reload();
 };

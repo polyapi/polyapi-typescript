@@ -437,13 +437,18 @@ void yargs
   .command('application <command>', 'Manages canopy-v2 applications', (yargs) => {
     yargs
       .command(
-        'create <name>',
-        'Creates a canopy-v2 application (POST /applications)',
+        'add <name>',
+        'Adds or updates a canopy-v2 application',
         (yargs) =>
           yargs
             .positional('name', {
               describe:
-                'Hostname-safe name. Origin is {name}-{environment.subdomain}.',
+                'Display name. Defaults the application subdomain when --subdomain is omitted.',
+              type: 'string',
+            })
+            .option('subdomain', {
+              describe:
+                'Application subdomain (1–32). Origin is {subdomain}-{environment.subdomain}.{region}.polyapi.app. Defaults to <name>. Running add again with the same subdomain updates the application.',
               type: 'string',
             })
             .option('root', {
@@ -453,20 +458,15 @@ void yargs
               demandOption: true,
             })
             .option('authenticated-root', {
-              describe: 'Optional authenticated root component',
-              type: 'string',
-            })
-            .option('subpath', {
               describe:
-                'config.subpath. HTTP manifest is /canopy/v2/manifest?subpath=',
+                'Authenticated root component. Pass an empty string to clear it. Omitted on update keeps the current root.',
               type: 'string',
-              demandOption: true,
             }),
-        async ({ name, root, authenticatedRoot, subpath }) => {
-          if (!name || !root || !subpath) {
+        async ({ name, subdomain, root, authenticatedRoot }) => {
+          if (!name || !root) {
             shell.echo(
               chalk.redBright('ERROR:'),
-              'Usage: poly application create <name> --root <component> --subpath <subpath>',
+              'Usage: poly application add <name> --root <component>',
             );
             yargs.showHelp();
             return;
@@ -481,95 +481,28 @@ void yargs
           ) {
             process.exit(1);
           }
-          const { createApplicationCommand } = await import(
+          const { addApplicationCommand } = await import(
             './commands/application'
           );
-          await createApplicationCommand(DEFAULT_POLY_PATH, {
+          await addApplicationCommand(DEFAULT_POLY_PATH, {
             name,
+            subdomain: subdomain || undefined,
             rootComponent: root,
-            authenticatedRoot: authenticatedRoot || undefined,
-            subpath,
-          });
-        },
-      )
-      .command(
-        'update <name>',
-        'Updates a canopy-v2 application (PATCH /applications/:id)',
-        (yargs) =>
-          yargs
-            .positional('name', {
-              describe: 'Existing application name or id',
-              type: 'string',
-            })
-            .option('rename', {
-              describe:
-                'New hostname-safe name. Origin is {name}-{environment.subdomain}.',
-              type: 'string',
-            })
-            .option('root', {
-              describe: 'Unauthenticated PUBLIC root component',
-              type: 'string',
-            })
-            .option('authenticated-root', {
-              describe:
-                'Authenticated root component. Pass an empty string to clear it.',
-              type: 'string',
-            })
-            .option('subpath', {
-              describe: 'config.subpath for HTTP manifest lookup',
-              type: 'string',
-            }),
-        async ({ name, rename, root, authenticatedRoot, subpath }) => {
-          if (!name) {
-            shell.echo(
-              chalk.redBright('ERROR:'),
-              'Usage: poly application update <name>',
-            );
-            yargs.showHelp();
-            return;
-          }
-          if (!checkPolyConfig(DEFAULT_POLY_PATH)) {
-            return shell.echo(
-              'Poly is not configured. Please run `poly setup` to configure it.',
-            );
-          }
-          if (
-            !(await ensurePermissions([makeRequirement('manageApplications')]))
-          ) {
-            process.exit(1);
-          }
-          const { updateApplicationCommand } = await import(
-            './commands/application'
-          );
-          await updateApplicationCommand(DEFAULT_POLY_PATH, {
-            nameOrId: name,
-            name: rename || undefined,
-            rootComponent: root || undefined,
             authenticatedRoot:
               authenticatedRoot === ''
                 ? null
                 : authenticatedRoot || undefined,
-            subpath: subpath || undefined,
           });
         },
       )
       .command(
-      'preview [subpath]',
+      'preview <app>',
       'Serve the shared canopy-v2 bootstrap with locally compiled components',
       (yargs) =>
         yargs
-          .positional('subpath', {
+          .positional('app', {
             describe:
-              'Loads {POLY_URL}/canopy/v2/manifest?subpath={subpath}',
-            type: 'string',
-          })
-          .option('app', {
-            describe:
-              'Application name for {POLY_URL}/canopy/v2/manifest?app=&env=',
-            type: 'string',
-          })
-          .option('env', {
-            describe: 'Environment subdomain for the manifest query',
+              'Joined subdomain {application.subdomain}-{environment.subdomain}. Loads GET /applications/{app}/spec. The page URL is /canopy/v2/?app={app}.',
             type: 'string',
           })
           .option('port', {
@@ -577,24 +510,19 @@ void yargs
             type: 'number',
             default: 4173,
           }),
-      async ({ subpath, app, env, port }) => {
-        const resolvedSubpath =
-          typeof subpath === 'string' ? subpath : undefined;
+      async ({ app, port }) => {
         const resolvedApp = typeof app === 'string' ? app : undefined;
-        const resolvedEnv = typeof env === 'string' ? env : undefined;
-        if (!resolvedSubpath && !(resolvedApp && resolvedEnv)) {
+        if (!resolvedApp) {
           shell.echo(
             chalk.redBright('ERROR:'),
-            'Provide a subpath (`poly application preview welcome`) or both --app and --env.',
+            'Provide the joined subdomain (`poly application preview myapp-dev`).',
           );
           yargs.showHelp();
           return;
         }
         const { previewApplication } = await import('./commands/preview');
         await previewApplication(DEFAULT_POLY_PATH, {
-          subpath: resolvedSubpath,
           app: resolvedApp,
-          env: resolvedEnv,
           port,
         });
       },

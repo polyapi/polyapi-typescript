@@ -6,9 +6,7 @@ import { startApplicationPreview } from '../component/preview';
 export const previewApplication = async (
   polyPath: string,
   options: {
-    subpath?: string;
-    app?: string;
-    env?: string;
+    app: string;
     port?: number;
     projectRoot?: string;
   },
@@ -24,9 +22,7 @@ export const previewApplication = async (
   shell.echo('-n', 'Starting local application preview...');
   try {
     const server = await startApplicationPreview({
-      subpath: options.subpath,
       app: options.app,
-      env: options.env,
       port: options.port,
       projectRoot: options.projectRoot,
     });
