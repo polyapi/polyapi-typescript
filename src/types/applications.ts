@@ -26,16 +26,3 @@ export type ApplicationDto = {
   authenticatedRoot?: string | null;
   vendorHash?: string | null;
 };
-
-export type CanopyV2UploadRequest = {
-  hash: string;
-  contentType: 'application/javascript';
-};
-
-export type CanopyV2UploadDto = {
-  url: string;
-  key: string;
-  method: 'PUT';
-  headers?: Record<string, string>;
-  expiresAt?: string;
-};

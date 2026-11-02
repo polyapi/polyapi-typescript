@@ -2,22 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import semver from 'semver';
 import { readPackageVersion } from './compile';
-import { isReactFamilySpecifier, packageRoot } from './types';
+import { isReactFamilySpecifier } from './types';
 
 export const extraVendorSpecifiers = (specifiers: string[]): string[] =>
   specifiers.filter((spec) => !isReactFamilySpecifier(spec));
-
-export const instanceVendorPackageRoots = (
-  packages: Record<string, string>,
-): Set<string> => {
-  const roots = new Set<string>();
-  for (const key of Object.keys(packages)) {
-    roots.add(packageRoot(key));
-  }
-  roots.add('react');
-  roots.add('react-dom');
-  return roots;
-};
 
 export const readDeclaredDependencyVersions = (
   projectDir: string,

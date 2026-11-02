@@ -5,8 +5,6 @@ import {
   ApiFunctionDescriptionGenerationDto,
   ApiFunctionDetailsDto,
   ApplicationDto,
-  CanopyV2UploadDto,
-  CanopyV2UploadRequest,
   CreateApiFunctionDto,
   CreateCanopyV2ApplicationDto,
   CreateComponentFunctionDto,
@@ -378,39 +376,6 @@ export const updateApplication = async (
       },
     )
   ).data;
-};
-
-export const createCanopyV2Upload = async (data: CanopyV2UploadRequest) => {
-  return (
-    await http.post<CanopyV2UploadDto>(
-      `${getApiBaseURL()}/canopy/v2/uploads`,
-      data,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getApiHeaders(),
-        },
-      },
-    )
-  ).data;
-};
-
-export const putCanopyV2Upload = async (
-  upload: Pick<CanopyV2UploadDto, 'url' | 'headers'>,
-  bundled: string,
-) => {
-  const bytes = Buffer.from(bundled, 'utf8');
-  const headers: Record<string, string> = {};
-  for (const [key, value] of Object.entries(upload.headers || {})) {
-    if (key.toLowerCase() === 'content-type') continue;
-    headers[key] = value;
-  }
-  headers['Content-Type'] = 'application/octet-stream';
-  return http.put(upload.url, bytes, {
-    headers,
-    skipGeneratedAuth: true,
-    transformRequest: [(data) => data],
-  });
 };
 
 export const deleteClientFunction = async (id: string) => {

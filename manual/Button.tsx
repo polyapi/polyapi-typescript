@@ -1,6 +1,4 @@
 import React from 'react';
-import _ from 'lodash';
-import * as chalk from 'chalk';
 
 export const Button = ({
   label,

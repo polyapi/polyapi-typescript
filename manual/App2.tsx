@@ -1,16 +1,12 @@
 import React from 'react';
-import Confetti from 'react-confetti';
 import { Button } from './Button';
 import { createPolySession } from './polySession';
-import _ from 'lodash';
 
 export const App2 = () => {
-  const [celebrate, setCelebrate] = React.useState(false);
   const [size, setSize] = React.useState({ width: 0, height: 0 });
   const [apiKey, setApiKey] = React.useState('');
   const [signingIn, setSigningIn] = React.useState(false);
   const [error, setError] = React.useState('');
-  const label = React.useMemo(() => _.toUpper('launch confetti'), []);
 
   React.useEffect(() => {
     const update = () =>
@@ -49,17 +45,6 @@ export const App2 = () => {
           'radial-gradient(1200px 700px at 18% -10%, rgba(232, 196, 92, 0.28), transparent 55%), radial-gradient(900px 600px at 110% 10%, rgba(86, 196, 154, 0.22), transparent 50%), linear-gradient(165deg, #10231c 0%, #163528 42%, #0b1814 100%)',
       }}
     >
-      {celebrate && (
-        <Confetti
-          width={size.width}
-          height={size.height}
-          recycle={false}
-          numberOfPieces={420}
-          gravity={0.18}
-          colors={['#e8c45c', '#7ee0b0', '#f4efe4', '#3aa87a', '#ff8a5b']}
-          onConfettiComplete={() => setCelebrate(false)}
-        />
-      )}
 
       <main
         style={{
@@ -135,7 +120,6 @@ export const App2 = () => {
             marginBottom: 36,
           }}
         >
-          <Button label={label} onClick={() => setCelebrate(true)} />
         </div>
 
         <form onSubmit={signIn} style={formStyle}>

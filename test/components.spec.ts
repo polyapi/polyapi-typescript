@@ -202,13 +202,12 @@ describe('component function add', () => {
     else process.env.POLY_API_KEY = prevApiKey;
   });
 
-  test('root with local child + react + lodash posts leaves then root', async () => {
+  test('root with local child and react posts leaves then root', async () => {
     const appSource = `import React from 'react';
-import _ from 'lodash';
 import { Button } from './Button';
 
 export const App = () => {
-  const label = React.useMemo(() => _.toUpper('hello'), []);
+  const label = React.useMemo(() => 'hello', []);
   return <Button label={label} />;
 };
 `;
@@ -271,18 +270,10 @@ export const Button = ({ label }: { label: string }) => {
     expect(root.body.sourceCode).toContain("from './Button'");
     expect(root.body.code).toContain('poly:myapp.Button');
     expect(root.body.code).toContain('poly:vendor');
-    expect(root.body.code).toContain('poly:app-vendor');
-    expect(root.body.code).toMatch(
-      /lodash as __poly_lodash[^;]*from "poly:app-vendor"/,
-    );
-    expect(root.body.code).not.toMatch(
-      /lodash as __poly_lodash[^;]*from "poly:vendor"/,
-    );
-    expect(root.body.vendorCode).toBeUndefined();
-    expect(root.body.vendorHash).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
-    expect(root.body.externalDependencies).toEqual({
-      lodash: expect.any(String),
-    });
+    expect(root.body.code).not.toContain('poly:app-vendor');
+    expect(root.body.vendorCode).toBeNull();
+    expect(root.body.vendorHash).toBeUndefined();
+    expect(root.body.externalDependencies).toBeUndefined();
     expect(root.body.bundleHash).toBeUndefined();
     expect(vendorPosts()).toHaveLength(0);
     expect(vendorGets().length).toBeGreaterThan(0);
@@ -292,9 +283,6 @@ export const Button = ({ label }: { label: string }) => {
 
     for (const post of posts) {
       expect(post.body.code).not.toMatch(npmImportPattern('react'));
-      expect(post.body.code).not.toMatch(npmImportPattern('react-dom'));
-      expect(post.body.code).not.toMatch(npmImportPattern('react/jsx-runtime'));
-      expect(post.body.code).not.toMatch(npmImportPattern('lodash'));
       expect(findBareNpmSpecifiersInCode(post.body.code)).toEqual([]);
     }
 
@@ -312,11 +300,10 @@ export const Button = ({ label }: { label: string }) => {
   test('leaf update posts once without vendorCode and leaves the root unchanged', async () => {
     writeComponents({
       'src/App.tsx': `import React from 'react';
-import _ from 'lodash';
 import { Button } from './Button';
 
 export const App = () => {
-  const label = React.useMemo(() => _.toUpper('hello'), []);
+  const label = React.useMemo(() => 'hello', []);
   return <Button label={label} />;
 };
 `,
@@ -379,9 +366,7 @@ export const Button = ({ label }: { label: string }) => {
       file: 'src/App.tsx',
       kind: 'root',
     });
-    expect(manifest['myapp.App'].externalDependencies).toEqual(
-      rootBody.externalDependencies,
-    );
+    expect(manifest['myapp.App'].externalDependencies).toBeUndefined();
   });
 
   test('leaf with a new npm package fails and does not grow vendor', async () => {
@@ -430,7 +415,7 @@ export const Button = ({ label }: { label: string }) => {
         file: 'src/Button.tsx',
       }),
     ).rejects.toThrow(
-      'new vendor import lodash; re-publish the root `myapp.App`.',
+      'Unsupported package lodash. Only poly vendor libraries can be imported.',
     );
     expect(componentPosts()).toHaveLength(0);
   });
@@ -482,7 +467,7 @@ export const Button = ({ label }: { label: string }) => {
         file: 'src/Button.tsx',
       }),
     ).rejects.toThrow(
-      'new vendor import lodash; re-publish the root `myapp.App`.',
+      'Unsupported packages chalk, lodash. Only poly vendor libraries can be imported.',
     );
     expect(componentPosts()).toHaveLength(0);
   });
@@ -553,11 +538,10 @@ export const App = () => {
   });
 
   const publicAppSource = `import React from 'react';
-import _ from 'lodash';
 import { Button } from './Button';
 
 export const App = () => {
-  const label = React.useMemo(() => _.toUpper('hello'), []);
+  const label = React.useMemo(() => 'hello', []);
   return <Button label={label} />;
 };
 `;
@@ -596,8 +580,8 @@ export const Button = ({ label }: { label: string }) => {
     const root = posts.find((post) => post.body.kind === 'root')!;
     const leaf = posts.find((post) => post.body.kind === 'leaf')!;
     expect(root.body.code).toContain('poly:myapp.Button');
-    expect(root.body.vendorCode).toBeUndefined();
-    expect(root.body.vendorHash).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
+    expect(root.body.vendorCode).toBeNull();
+    expect(root.body.vendorHash).toBeUndefined();
     expect(leaf.body.vendorCode).toBeUndefined();
 
     const manifest = loadManifest(tmp);
@@ -727,8 +711,7 @@ export const App = () => <div>hello</div>;
     expect(vendorPosts()).toHaveLength(0);
   });
 
-  test('presigns extra npm then posts vendorHash without vendorCode', async () => {
-    const { createHash } = await import('crypto');
+  test('rejects a third-party package and does not upload', async () => {
     writeComponents({
       'src/App.tsx': `import React from 'react';
 import _ from 'lodash';
@@ -736,59 +719,26 @@ export const App = () => <div>{_.toUpper('hello')}</div>;
 `,
     });
 
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-
-    const calls = httpCalls();
-    const uploadPostIndex = calls.findIndex(
-      (call) =>
-        call.url.includes('/canopy/v2/uploads') && call.method === 'POST',
+    await expect(
+      publishComponents({
+        projectRoot: tmp,
+        npmResolveDir,
+        context: 'myapp',
+        name: 'App',
+        file: 'src/App.tsx',
+        isRoot: true,
+      }),
+    ).rejects.toThrow(
+      'Unsupported package lodash. Only poly vendor libraries can be imported.',
     );
-    const uploadPutIndex = calls.findIndex((call) => call.method === 'PUT');
-    const componentPostIndex = calls.findIndex(
-      (call) =>
-        call.url.includes('/functions/component') && call.method === 'POST',
-    );
-    expect(uploadPostIndex).toBeGreaterThanOrEqual(0);
-    expect(uploadPutIndex).toBeGreaterThan(uploadPostIndex);
-    expect(componentPostIndex).toBeGreaterThan(uploadPutIndex);
-
-    const uploadPost = calls[uploadPostIndex];
-    const uploadPut = calls[uploadPutIndex];
-    const componentPost = calls[componentPostIndex];
-    expect(Buffer.isBuffer(uploadPut.rawBody)).toBe(true);
-    const putBytes = uploadPut.rawBody as Buffer;
-    const hash = createHash('sha256')
-      .update(putBytes.toString('utf8'))
-      .digest('hex');
-
-    expect(uploadPost.body).toEqual({
-      hash,
-      contentType: 'application/javascript',
-    });
-    expect(uploadPost.headers.Authorization).toBe('Bearer test-token');
-    expect(uploadPut.url).toBe(
-      `https://uploads.example.test/canopy/v2/npm/${hash}/package.js`,
-    );
-    expect(uploadPut.headers['Content-Type']).toBe('application/octet-stream');
-    expect(uploadPut.headers.Authorization).toBeUndefined();
-    expect(putBytes.toString('hex')).toBe(
-      Buffer.from(putBytes.toString('utf8'), 'utf8').toString('hex'),
-    );
-    expect(putBytes.toString('utf8')).toMatch(/lodash/i);
-    expect(putBytes.toString('utf8')).not.toMatch(/reactDomClient/);
-    expect(putBytes.toString('utf8')).not.toMatch(npmImportPattern('react'));
-    expect(componentPost.body.vendorHash).toBe(hash);
-    expect(componentPost.body.vendorCode).toBeUndefined();
-    expect(JSON.stringify(componentPost.body)).not.toContain(
-      putBytes.toString('utf8'),
-    );
+    expect(componentPosts()).toHaveLength(0);
+    expect(
+      undiciRequestMock.mock.calls.some(
+        ([url, init]) =>
+          String(url).includes('/canopy/v2/uploads') ||
+          String(init?.method).toUpperCase() === 'PUT',
+      ),
+    ).toBe(false);
   });
 
   test('component publish re-uploads the canopy-v2 application', async () => {

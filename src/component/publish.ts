@@ -1,13 +1,10 @@
-import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import shell from 'shelljs';
 import {
-  createCanopyV2Upload,
   createOrUpdateComponentFunction,
   getPolyVendor,
-  putCanopyV2Upload,
 } from '../api';
 import { refreshCanopyV2Applications } from './applications';
 import {
@@ -17,26 +14,17 @@ import {
   CreateComponentFunctionDto,
   Visibility,
 } from '../types';
-import {
-  bundleVendor,
-  resolveExternalDependencies,
-  uniquePreserve,
-} from './compile';
+import { uniquePreserve } from './compile';
 import {
   extraVendorSpecifiers,
-  instanceVendorPackageRoots,
   reactFamilyMismatchWarnings,
 } from './instanceVendor';
 import {
   compileComponentGraph,
   topoLeavesFirst,
 } from './graph';
-import {
-  findAncestorRoots,
-  findRootsInContext,
-  saveManifest,
-} from './manifest';
-import { ComponentManifest, packageRoot } from './types';
+import { saveManifest } from './manifest';
+import { packageRoot } from './types';
 
 export type PublishComponentOptions = {
   context: string;
@@ -48,26 +36,10 @@ export type PublishComponentOptions = {
   npmResolveDir?: string;
 };
 
-const allowedVendorPackages = (
-  ancestorRoots: string[],
-  manifest: ComponentManifest,
-  instancePackages: Record<string, string>,
-): Set<string> => {
-  const allowed = instanceVendorPackageRoots(instancePackages);
-  for (const rootPath of ancestorRoots) {
-    const deps = manifest[rootPath]?.externalDependencies || {};
-    for (const pkg of Object.keys(deps)) {
-      allowed.add(pkg);
-    }
-  }
-  return allowed;
-};
-
-export const newVendorImportError = (pkg: string, rootPath?: string) => {
-  if (rootPath) {
-    return `new vendor import ${pkg}; re-publish the root \`${rootPath}\`.`;
-  }
-  return `new vendor import ${pkg}; re-publish the root.`;
+export const unsupportedPackageError = (specifiers: string[]) => {
+  const packages = uniquePreserve(specifiers.map(packageRoot)).sort();
+  const label = packages.length === 1 ? 'package' : 'packages';
+  return `Unsupported ${label} ${packages.join(', ')}. Only poly vendor libraries can be imported.`;
 };
 
 const VISIBILITIES = new Set<string>(Object.values(Visibility));
@@ -150,40 +122,8 @@ export const publishComponents = async (
   const extraNpm = uniquePreserve(extraVendorSpecifiers(
     uniquePreserve(compiledNodes.flatMap((node) => node.npmSpecifiers)),
   ));
-
-  let vendorHash: string | undefined;
-  let externalDependencies: Record<string, string> | undefined;
-
-  if (kind === 'root') {
-    if (extraNpm.length) {
-      const bundled = await bundleVendor(extraNpm, npmResolveDir);
-      vendorHash = createHash('sha256').update(bundled, 'utf8').digest('hex');
-      const upload = await createCanopyV2Upload({
-        hash: vendorHash,
-        contentType: 'application/javascript',
-      });
-      await putCanopyV2Upload(upload, bundled);
-      externalDependencies = resolveExternalDependencies(
-        extraNpm,
-        npmResolveDir,
-      );
-    }
-  } else {
-    const ancestors = uniquePreserve([
-      ...findAncestorRoots(startPolyPath, originalManifest),
-      ...findRootsInContext(options.context, originalManifest, startPolyPath),
-    ]);
-    const allowed = allowedVendorPackages(
-      ancestors,
-      originalManifest,
-      instanceVendor.packages || {},
-    );
-    for (const spec of extraNpm) {
-      const rootPkg = packageRoot(spec);
-      if (!allowed.has(rootPkg)) {
-        throw new Error(newVendorImportError(rootPkg, ancestors[0]));
-      }
-    }
+  if (extraNpm.length) {
+    throw new Error(unsupportedPackageError(extraNpm));
   }
 
   const ordered = topoLeavesFirst(compiledNodes);
@@ -207,14 +147,7 @@ export const publishComponents = async (
       visibility,
     };
     if (node.kind === 'root') {
-      if (vendorHash) {
-        body.vendorHash = vendorHash;
-      } else {
-        body.vendorCode = null;
-      }
-      if (externalDependencies && Object.keys(externalDependencies).length) {
-        body.externalDependencies = externalDependencies;
-      }
+      body.vendorCode = null;
     }
 
     const saved = await createOrUpdateComponentFunction(body);
@@ -225,9 +158,6 @@ export const publishComponents = async (
       kind: node.kind,
       imports: node.imports,
       visibility,
-      ...(node.kind === 'root' && externalDependencies
-        ? { externalDependencies }
-        : {}),
     };
     saveManifest(graph.projectRoot, manifest);
   }
