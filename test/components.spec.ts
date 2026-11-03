@@ -2,52 +2,88 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { request as undiciRequest } from 'undici';
-import shell from 'shelljs';
-import { resetHttpDispatchers } from '../src/http';
-import { publishComponents } from '../src/component/publish';
-import { loadManifest } from '../src/component/manifest';
 import {
   findBareNpmSpecifiersInCode,
   readPackageVersion,
+  uniquePreserve,
 } from '../src/component/compile';
-import { NO_POLY_VENDOR_ERROR } from '../src/api';
-import { reactFamilyMismatchWarnings } from '../src/component/instanceVendor';
-import { publishInstanceVendor } from '../src/commands/vendor';
+import { compileComponentGraph, topoLeavesFirst } from '../src/component/graph';
+import {
+  extraVendorSpecifiers,
+  reactFamilyMismatchWarnings,
+} from '../src/component/instanceVendor';
+import { unsupportedPackageError } from '../src/component/publish';
 
-jest.mock('undici', () => {
-  const actual = jest.requireActual('undici');
-  return {
-    ...actual,
-    request: jest.fn(),
-  };
-});
-
-const undiciRequestMock = undiciRequest as jest.MockedFunction<
-  typeof undiciRequest
->;
-
-const jsonResponse = (
-  body: unknown,
-  init: { statusCode?: number; headers?: Record<string, string> } = {},
+const writePackage = (
+  root: string,
+  name: string,
+  version: string,
+  files: Record<string, string>,
 ) => {
-  const text = typeof body === 'string' ? body : JSON.stringify(body);
-  const bytes = new TextEncoder().encode(text);
-  return {
-    statusCode: init.statusCode ?? 200,
-    headers: {
-      'content-type': 'application/json',
-      ...(init.headers || {}),
-    },
-    body: {
-      text: async () => text,
-      arrayBuffer: async () =>
-        bytes.buffer.slice(
-          bytes.byteOffset,
-          bytes.byteOffset + bytes.byteLength,
-        ),
-    },
-  };
+  const pkgDir = path.join(root, 'node_modules', ...name.split('/'));
+  fs.mkdirSync(pkgDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(pkgDir, 'package.json'),
+    JSON.stringify({
+      name,
+      version,
+      types: 'index.d.ts',
+      exports: {
+        '.': { types: './index.d.ts', default: './index.js' },
+        './jsx-runtime': {
+          types: './jsx-runtime.d.ts',
+          default: './jsx-runtime.js',
+        },
+      },
+    }),
+  );
+  for (const [file, contents] of Object.entries(files)) {
+    fs.writeFileSync(path.join(pkgDir, file), contents);
+  }
+};
+
+const installResolveFixtures = (root: string) => {
+  fs.writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      devDependencies: {
+        react: '18.3.1',
+        'react-dom': '18.3.1',
+      },
+    }),
+  );
+  writePackage(root, 'react', '18.3.1', {
+    'index.d.ts': `export function useMemo<T>(factory: () => T, deps: readonly unknown[]): T;
+declare const React: { useMemo: typeof useMemo };
+export default React;
+`,
+    'jsx-runtime.d.ts': `export namespace JSX {
+  interface Element {}
+  interface IntrinsicElements {
+    [elemName: string]: any;
+  }
+}
+export function jsx(type: any, props: any, key?: string): JSX.Element;
+export function jsxs(type: any, props: any, key?: string): JSX.Element;
+`,
+    'index.js': 'export {};\n',
+    'jsx-runtime.js': 'export {};\n',
+  });
+  writePackage(root, 'react-dom', '18.3.1', {
+    'index.d.ts': 'export {};\n',
+    'index.js': 'export {};\n',
+  });
+  writePackage(root, 'lodash', '4.18.1', {
+    'index.d.ts': `export function toUpper(value: string): string;
+declare const _: { toUpper: typeof toUpper };
+export default _;
+`,
+    'index.js': 'export {};\n',
+  });
+  writePackage(root, 'chalk', '4.1.2', {
+    'index.d.ts': 'export {};\n',
+    'index.js': 'export {};\n',
+  });
 };
 
 const npmImportPattern = (pkg: string) =>
@@ -58,75 +94,12 @@ const npmImportPattern = (pkg: string) =>
     )}['"]`,
   );
 
-const parseBody = (init?: { body?: unknown }) => {
-  if (init?.body == null || init.body === '') return {};
-  try {
-    return JSON.parse(String(init.body));
-  } catch {
-    return {};
-  }
-};
+const extraPackages = (specifiers: string[]) =>
+  uniquePreserve(extraVendorSpecifiers(uniquePreserve(specifiers)));
 
-const INSTANCE_VENDOR = {
-  hash: 'vendor-hash-1',
-  url: 'https://poly.example.test/functions/vendor.js',
-  packages: {
-    react: '18.3.1',
-    'react-dom': '18.3.1',
-    'react/jsx-runtime': '18.3.1',
-  },
-};
-
-const httpCalls = () =>
-  undiciRequestMock.mock.calls.map(([url, init]) => ({
-    url: String(url),
-    method: String(init?.method || 'GET').toUpperCase(),
-    headers: (init?.headers || {}) as Record<string, string>,
-    rawBody: init?.body,
-    body: parseBody(init),
-  }));
-
-const vendorGets = () =>
-  httpCalls().filter(
-    (call) => call.url.includes('/functions/vendor') && call.method === 'GET',
-  );
-
-const vendorPosts = () =>
-  httpCalls().filter(
-    (call) => call.url.includes('/functions/vendor') && call.method === 'POST',
-  );
-
-type ComponentPost = {
-  url: string;
-  method: string;
-  headers: Record<string, string>;
-  body: Record<string, any>;
-};
-
-const componentPosts = (): ComponentPost[] =>
-  undiciRequestMock.mock.calls
-    .map(([url, init]) => ({
-      url: String(url),
-      method: String(init?.method || 'GET'),
-      headers: (init?.headers || {}) as Record<string, string>,
-      rawBody: init?.body,
-    }))
-    .filter(
-      (call) =>
-        call.url.includes('/functions/component') && call.method === 'POST',
-    )
-    .map((call) => ({
-      url: call.url,
-      method: call.method,
-      headers: call.headers,
-      body: JSON.parse(String(call.rawBody || '{}')),
-    }));
-
-describe('component function add', () => {
-  const npmResolveDir = path.resolve(__dirname, '..');
+describe('component compile', () => {
   let tmp: string;
-  const prevBaseUrl = process.env.POLY_API_BASE_URL;
-  const prevApiKey = process.env.POLY_API_KEY;
+  let npmResolveDir: string;
 
   const writeComponents = (files: Record<string, string>) => {
     for (const [rel, contents] of Object.entries(files)) {
@@ -138,71 +111,15 @@ describe('component function add', () => {
 
   beforeEach(() => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poly-components-'));
-    process.env.POLY_API_BASE_URL = 'https://poly.example.test';
-    process.env.POLY_API_KEY = 'test-token';
-    undiciRequestMock.mockReset();
-    resetHttpDispatchers();
-    let seq = 0;
-    undiciRequestMock.mockImplementation(async (url, init) => {
-      const href = String(url);
-      const method = String(init?.method || 'GET').toUpperCase();
-      if (href.includes('/functions/vendor') && method === 'GET') {
-        return jsonResponse(INSTANCE_VENDOR) as any;
-      }
-      if (href.includes('/functions/vendor') && method === 'POST') {
-        const posted = parseBody(init);
-        return jsonResponse(
-          {
-            hash: 'posted-vendor-hash',
-            url: 'https://poly.example.test/functions/vendor.js',
-            packages: posted.packages,
-          },
-          { statusCode: 201 },
-        ) as any;
-      }
-      if (href.includes('/canopy/v2/uploads') && method === 'POST') {
-        const posted = parseBody(init);
-        return jsonResponse(
-          {
-            url: `https://uploads.example.test/canopy/v2/npm/${posted.hash}/package.js`,
-            key: `canopy/v2/npm/${posted.hash}/package.js`,
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/javascript' },
-            expiresAt: '2099-01-01T00:00:00.000Z',
-          },
-          { statusCode: 201 },
-        ) as any;
-      }
-      if (method === 'PUT') {
-        return jsonResponse({ ok: true }) as any;
-      }
-      if (href.includes('/applications') && method === 'GET' && !href.includes('/applications/')) {
-        return jsonResponse([]) as any;
-      }
-      seq += 1;
-      const posted = parseBody(init);
-      return jsonResponse(
-        {
-          id: `comp-${seq}`,
-          name: posted.name,
-          context: posted.context,
-          kind: posted.kind,
-        },
-        { statusCode: seq === 1 ? 201 : 200 },
-      ) as any;
-    });
+    npmResolveDir = tmp;
+    installResolveFixtures(tmp);
   });
 
   afterEach(() => {
-    resetHttpDispatchers();
     fs.rmSync(tmp, { recursive: true, force: true });
-    if (prevBaseUrl === undefined) delete process.env.POLY_API_BASE_URL;
-    else process.env.POLY_API_BASE_URL = prevBaseUrl;
-    if (prevApiKey === undefined) delete process.env.POLY_API_KEY;
-    else process.env.POLY_API_KEY = prevApiKey;
   });
 
-  test('root with local child and react posts leaves then root', async () => {
+  test('root with a local child rewrites react to poly:vendor and orders the leaf first', async () => {
     const appSource = `import React from 'react';
 import { Button } from './Button';
 
@@ -222,7 +139,7 @@ export const Button = ({ label }: { label: string }) => {
       'src/Button.tsx': buttonSource,
     });
 
-    await publishComponents({
+    const graph = await compileComponentGraph({
       projectRoot: tmp,
       npmResolveDir,
       context: 'myapp',
@@ -230,92 +147,53 @@ export const Button = ({ label }: { label: string }) => {
       file: 'src/App.tsx',
       isRoot: true,
     });
+    const ordered = topoLeavesFirst(graph.nodes);
+    const leaf = ordered.find((node) => node.name === 'Button');
+    const root = ordered.find((node) => node.name === 'App');
 
-    const posts = componentPosts();
-    expect(posts).toHaveLength(2);
-    expect(posts.every((post) => post.method === 'POST')).toBe(true);
-    expect(
-      undiciRequestMock.mock.calls.every(
-        ([url, init]) =>
-          String(init?.method) !== 'PATCH' &&
-          !String(url).toLowerCase().includes('compile'),
-      ),
-    ).toBe(true);
-
-    const leaf = posts[0];
-    const root = posts[1];
-
-    expect(leaf.url).toBe('https://poly.example.test/functions/component');
-    expect(leaf.headers.Authorization).toBe('Bearer test-token');
-    expect(leaf.body).toMatchObject({
-      name: 'Button',
+    expect(ordered.map((node) => node.name)).toEqual(['Button', 'App']);
+    expect(leaf).toMatchObject({
       context: 'myapp',
       kind: 'leaf',
+      sourceCode: buttonSource,
     });
-    expect(leaf.body.sourceCode).toBe(buttonSource);
-    expect(leaf.body.code).toContain('poly:vendor');
-    expect(leaf.body.code).not.toContain('poly:app-vendor');
-    expect(leaf.body.vendorCode).toBeUndefined();
-    expect(leaf.body.bundleHash).toBeUndefined();
-    expect(leaf.body.vendorHash).toBeUndefined();
-
-    expect(root.body).toMatchObject({
-      name: 'App',
+    expect(root).toMatchObject({
       context: 'myapp',
       kind: 'root',
+      sourceCode: appSource,
       imports: ['myapp.Button'],
     });
-    expect(root.body.sourceCode).toBe(appSource);
-    expect(root.body.sourceCode).toContain("from 'react'");
-    expect(root.body.sourceCode).toContain("from './Button'");
-    expect(root.body.code).toContain('poly:myapp.Button');
-    expect(root.body.code).toContain('poly:vendor');
-    expect(root.body.code).not.toContain('poly:app-vendor');
-    expect(root.body.vendorCode).toBeNull();
-    expect(root.body.vendorHash).toBeUndefined();
-    expect(root.body.externalDependencies).toBeUndefined();
-    expect(root.body.bundleHash).toBeUndefined();
-    expect(vendorPosts()).toHaveLength(0);
-    expect(vendorGets().length).toBeGreaterThan(0);
-    expect(vendorGets()[0].headers.Authorization).not.toBe(
-      'Bearer test-token',
+    expect(root?.sourceCode).toContain("from 'react'");
+    expect(root?.sourceCode).toContain("from './Button'");
+    expect(extraPackages(graph.nodes.flatMap((node) => node.npmSpecifiers))).toEqual(
+      [],
     );
 
-    for (const post of posts) {
-      expect(post.body.code).not.toMatch(npmImportPattern('react'));
-      expect(findBareNpmSpecifiersInCode(post.body.code)).toEqual([]);
+    for (const node of graph.nodes) {
+      expect(node.code).toContain('poly:vendor');
+      expect(node.code).not.toContain('poly:app-vendor');
+      expect(node.code).not.toMatch(npmImportPattern('react'));
+      expect(findBareNpmSpecifiersInCode(node.code)).toEqual([]);
     }
-
-    const manifest = loadManifest(tmp);
-    expect(manifest['myapp.App']).toMatchObject({
+    expect(root?.code).toContain('poly:myapp.Button');
+    expect(graph.manifest['myapp.App']).toMatchObject({
       file: 'src/App.tsx',
       kind: 'root',
     });
-    expect(manifest['myapp.Button']).toMatchObject({
+    expect(graph.manifest['myapp.Button']).toMatchObject({
       file: 'src/Button.tsx',
       kind: 'leaf',
     });
   });
 
-  test('leaf update posts once without vendorCode and leaves the root unchanged', async () => {
+  test('a react-only file rewrites react to poly:vendor', async () => {
     writeComponents({
       'src/App.tsx': `import React from 'react';
-import { Button } from './Button';
-
-export const App = () => {
-  const label = React.useMemo(() => 'hello', []);
-  return <Button label={label} />;
-};
-`,
-      'src/Button.tsx': `import React from 'react';
-
-export const Button = ({ label }: { label: string }) => {
-  return <button>{label}</button>;
-};
+export const App = () => <div>hello</div>;
 `,
     });
 
-    await publishComponents({
+    const graph = await compileComponentGraph({
       projectRoot: tmp,
       npmResolveDir,
       context: 'myapp',
@@ -323,130 +201,40 @@ export const Button = ({ label }: { label: string }) => {
       file: 'src/App.tsx',
       isRoot: true,
     });
+    const root = graph.nodes[0];
 
-    const afterRoot = componentPosts();
-    const rootBody = afterRoot.find((post) => post.body.kind === 'root')?.body;
-    expect(rootBody).toBeDefined();
-    undiciRequestMock.mockClear();
-
-    const updatedButton = `import React from 'react';
-
-export const Button = ({ label }: { label: string }) => {
-  return <button className="updated">{label}</button>;
-};
-`;
-    writeComponents({ 'src/Button.tsx': updatedButton });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'Button',
-      file: 'src/Button.tsx',
-    });
-
-    const leafPosts = componentPosts();
-    expect(leafPosts).toHaveLength(1);
-    expect(leafPosts[0].body).toMatchObject({
-      name: 'Button',
-      context: 'myapp',
-      kind: 'leaf',
-    });
-    expect(leafPosts[0].body.sourceCode).toBe(updatedButton);
-    expect(leafPosts[0].body.vendorCode).toBeUndefined();
-    expect(leafPosts[0].body.externalDependencies).toBeUndefined();
-    expect(leafPosts[0].body.code).toContain('poly:vendor');
-    expect(leafPosts[0].body.code).not.toMatch(npmImportPattern('react'));
-    expect(leafPosts[0].body.code).not.toMatch(
-      npmImportPattern('react/jsx-runtime'),
-    );
-
-    const manifest = loadManifest(tmp);
-    expect(manifest['myapp.App']).toMatchObject({
-      file: 'src/App.tsx',
-      kind: 'root',
-    });
-    expect(manifest['myapp.App'].externalDependencies).toBeUndefined();
+    expect(graph.nodes).toHaveLength(1);
+    expect(root.code).toContain('poly:vendor');
+    expect(root.code).not.toContain('poly:app-vendor');
+    expect(root.code).not.toMatch(npmImportPattern('react'));
+    expect(extraPackages(root.npmSpecifiers)).toEqual([]);
   });
 
-  test('leaf with a new npm package fails and does not grow vendor', async () => {
+  test('reports a third-party package from the compiled specifiers', async () => {
     writeComponents({
       'src/App.tsx': `import React from 'react';
-import { Button } from './Button';
-
-export const App = () => {
-  return <Button label={React.useMemo(() => 'hello', [])} />;
-};
-`,
-      'src/Button.tsx': `import React from 'react';
-
-export const Button = ({ label }: { label: string }) => {
-  return <button>{label}</button>;
-};
-`,
-    });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    undiciRequestMock.mockClear();
-
-    writeComponents({
-      'src/Button.tsx': `import React from 'react';
 import _ from 'lodash';
-
-export const Button = ({ label }: { label: string }) => {
-  return <button>{_.toUpper(label)}</button>;
-};
+export const App = () => <div>{_.toUpper('hello')}</div>;
 `,
     });
 
-    await expect(
-      publishComponents({
-        projectRoot: tmp,
-        npmResolveDir,
-        context: 'myapp',
-        name: 'Button',
-        file: 'src/Button.tsx',
-      }),
-    ).rejects.toThrow(
+    const graph = await compileComponentGraph({
+      projectRoot: tmp,
+      npmResolveDir,
+      context: 'myapp',
+      name: 'App',
+      file: 'src/App.tsx',
+      isRoot: true,
+    });
+    const extra = extraPackages(graph.nodes.flatMap((node) => node.npmSpecifiers));
+
+    expect(extra).toEqual(['lodash']);
+    expect(unsupportedPackageError(extra)).toBe(
       'Unsupported package lodash. Only poly vendor libraries can be imported.',
     );
-    expect(componentPosts()).toHaveLength(0);
   });
 
-  test('leaf fails on unused npm imports that esbuild would tree-shake', async () => {
-    writeComponents({
-      'src/App.tsx': `import React from 'react';
-import { Button } from './Button';
-
-export const App = () => {
-  return <Button label="hello" />;
-};
-`,
-      'src/Button.tsx': `import React from 'react';
-
-export const Button = ({ label }: { label: string }) => {
-  return <button>{label}</button>;
-};
-`,
-    });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    undiciRequestMock.mockClear();
-
+  test('reports unused npm imports that esbuild would tree-shake', async () => {
     writeComponents({
       'src/Button.tsx': `import React from 'react';
 import _ from 'lodash';
@@ -458,40 +246,34 @@ export const Button = ({ label }: { label: string }) => {
 `,
     });
 
-    await expect(
-      publishComponents({
-        projectRoot: tmp,
-        npmResolveDir,
-        context: 'myapp',
-        name: 'Button',
-        file: 'src/Button.tsx',
-      }),
-    ).rejects.toThrow(
+    const graph = await compileComponentGraph({
+      projectRoot: tmp,
+      npmResolveDir,
+      context: 'myapp',
+      name: 'Button',
+      file: 'src/Button.tsx',
+    });
+    const extra = extraPackages(graph.nodes.flatMap((node) => node.npmSpecifiers));
+
+    expect(extra).toEqual(['lodash', 'chalk']);
+    expect(unsupportedPackageError(extra)).toBe(
       'Unsupported packages chalk, lodash. Only poly vendor libraries can be imported.',
     );
-    expect(componentPosts()).toHaveLength(0);
   });
 
-  test('undeclared identifier fails typecheck and does not upload', async () => {
+  test('undeclared identifier fails typecheck', async () => {
     writeComponents({
       'src/App.tsx': `import React from 'react';
-import { Button } from './Button';
 
 export const App = () => {
-  const label = React.useMemo(() => _.toUpper('hello'), []);
-  return <Button label={label} />;
-};
-`,
-      'src/Button.tsx': `import React from 'react';
-
-export const Button = ({ label }: { label: string }) => {
-  return <button>{label}</button>;
+  const label = _.toUpper('hello');
+  return <div>{label}</div>;
 };
 `,
     });
 
     await expect(
-      publishComponents({
+      compileComponentGraph({
         projectRoot: tmp,
         npmResolveDir,
         context: 'myapp',
@@ -500,7 +282,6 @@ export const Button = ({ label }: { label: string }) => {
         isRoot: true,
       }),
     ).rejects.toThrow(/Cannot find name '_'/);
-    expect(componentPosts()).toHaveLength(0);
   });
 
   test('window typechecks even when project tsconfig omits DOM', async () => {
@@ -514,88 +295,16 @@ export const Button = ({ label }: { label: string }) => {
         },
       }),
     );
-    writeComponents({
-      'src/App.tsx': `import React from 'react';
+    const source = `import React from 'react';
 
 export const App = () => {
   const width = window.innerWidth;
   return <div>{width}</div>;
 };
-`,
-    });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-
-    expect(componentPosts()).toHaveLength(1);
-    expect(componentPosts()[0].body.sourceCode).toContain('window.innerWidth');
-  });
-
-  const publicAppSource = `import React from 'react';
-import { Button } from './Button';
-
-export const App = () => {
-  const label = React.useMemo(() => 'hello', []);
-  return <Button label={label} />;
-};
 `;
-  const publicButtonSource = `import React from 'react';
+    writeComponents({ 'src/App.tsx': source });
 
-export const Button = ({ label }: { label: string }) => {
-  return <button>{label}</button>;
-};
-`;
-
-  test('root --public posts PUBLIC visibility on root and discovered leaves', async () => {
-    writeComponents({
-      'src/App.tsx': publicAppSource,
-      'src/Button.tsx': publicButtonSource,
-    });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-      visibility: 'PUBLIC',
-    });
-
-    const posts = componentPosts();
-    expect(posts).toHaveLength(2);
-    expect(posts.map((post) => post.body.kind).sort()).toEqual(['leaf', 'root']);
-    for (const post of posts) {
-      expect(post.body.visibility).toBe('PUBLIC');
-      expect(post.headers.Authorization).toBe('Bearer test-token');
-      expect(post.body.code).toContain('poly:vendor');
-      expect(post.body.code).not.toMatch(npmImportPattern('react'));
-    }
-    const root = posts.find((post) => post.body.kind === 'root')!;
-    const leaf = posts.find((post) => post.body.kind === 'leaf')!;
-    expect(root.body.code).toContain('poly:myapp.Button');
-    expect(root.body.vendorCode).toBeNull();
-    expect(root.body.vendorHash).toBeUndefined();
-    expect(leaf.body.vendorCode).toBeUndefined();
-
-    const manifest = loadManifest(tmp);
-    expect(manifest['myapp.App'].visibility).toBe('PUBLIC');
-    expect(manifest['myapp.Button'].visibility).toBe('PUBLIC');
-  });
-
-  test('component add without --public does not post PUBLIC visibility', async () => {
-    writeComponents({
-      'src/App.tsx': publicAppSource,
-      'src/Button.tsx': publicButtonSource,
-    });
-
-    await publishComponents({
+    const graph = await compileComponentGraph({
       projectRoot: tmp,
       npmResolveDir,
       context: 'myapp',
@@ -604,283 +313,8 @@ export const Button = ({ label }: { label: string }) => {
       isRoot: true,
     });
 
-    const posts = componentPosts();
-    expect(posts).toHaveLength(2);
-    for (const post of posts) {
-      expect(post.body.visibility).not.toBe('PUBLIC');
-      expect(post.body.visibility).toBe('ENVIRONMENT');
-      expect(post.body.code).toContain('poly:vendor');
-    }
-
-    const manifest = loadManifest(tmp);
-    expect(manifest['myapp.App'].visibility).toBe('ENVIRONMENT');
-    expect(manifest['myapp.Button'].visibility).toBe('ENVIRONMENT');
-  });
-
-  test('leaf --public only marks that leaf PUBLIC and does not upload the root', async () => {
-    writeComponents({
-      'src/App.tsx': publicAppSource,
-      'src/Button.tsx': publicButtonSource,
-    });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    undiciRequestMock.mockClear();
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'Button',
-      file: 'src/Button.tsx',
-      visibility: 'PUBLIC',
-    });
-
-    const leafPosts = componentPosts();
-    expect(leafPosts).toHaveLength(1);
-    expect(leafPosts[0].body).toMatchObject({
-      name: 'Button',
-      kind: 'leaf',
-      visibility: 'PUBLIC',
-    });
-    expect(leafPosts[0].body.vendorCode).toBeUndefined();
-
-    const manifest = loadManifest(tmp);
-    expect(manifest['myapp.Button'].visibility).toBe('PUBLIC');
-    expect(manifest['myapp.App'].visibility).toBe('ENVIRONMENT');
-  });
-
-  test('fails when GET /functions/vendor returns 404', async () => {
-    undiciRequestMock.mockImplementation(async (url, init) => {
-      const href = String(url);
-      const method = String(init?.method || 'GET').toUpperCase();
-      if (href.includes('/functions/vendor') && method === 'GET') {
-        return jsonResponse({ message: 'not found' }, { statusCode: 404 }) as any;
-      }
-      return jsonResponse({ id: 'should-not-post' }) as any;
-    });
-    writeComponents({
-      'src/App.tsx': `import React from 'react';
-export const App = () => <div>hello</div>;
-`,
-    });
-
-    await expect(
-      publishComponents({
-        projectRoot: tmp,
-        npmResolveDir,
-        context: 'myapp',
-        name: 'App',
-        file: 'src/App.tsx',
-        isRoot: true,
-      }),
-    ).rejects.toThrow(NO_POLY_VENDOR_ERROR);
-    expect(componentPosts()).toHaveLength(0);
-    expect(vendorPosts()).toHaveLength(0);
-  });
-
-  test('react-only root omits extra vendor.js and still rewrites react to poly:vendor', async () => {
-    writeComponents({
-      'src/App.tsx': `import React from 'react';
-export const App = () => <div>hello</div>;
-`,
-    });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-
-    const posts = componentPosts();
-    expect(posts).toHaveLength(1);
-    expect(posts[0].body.vendorCode).toBeNull();
-    expect(posts[0].body.externalDependencies).toBeUndefined();
-    expect(posts[0].body.code).toContain('poly:vendor');
-    expect(posts[0].body.code).not.toContain('poly:app-vendor');
-    expect(posts[0].body.code).not.toMatch(npmImportPattern('react'));
-    expect(vendorPosts()).toHaveLength(0);
-  });
-
-  test('rejects a third-party package and does not upload', async () => {
-    writeComponents({
-      'src/App.tsx': `import React from 'react';
-import _ from 'lodash';
-export const App = () => <div>{_.toUpper('hello')}</div>;
-`,
-    });
-
-    await expect(
-      publishComponents({
-        projectRoot: tmp,
-        npmResolveDir,
-        context: 'myapp',
-        name: 'App',
-        file: 'src/App.tsx',
-        isRoot: true,
-      }),
-    ).rejects.toThrow(
-      'Unsupported package lodash. Only poly vendor libraries can be imported.',
-    );
-    expect(componentPosts()).toHaveLength(0);
-    expect(
-      undiciRequestMock.mock.calls.some(
-        ([url, init]) =>
-          String(url).includes('/canopy/v2/uploads') ||
-          String(init?.method).toUpperCase() === 'PUT',
-      ),
-    ).toBe(false);
-  });
-
-  test('component publish re-uploads the canopy-v2 application', async () => {
-    undiciRequestMock.mockImplementation(async (url, init) => {
-      const href = String(url);
-      const method = String(init?.method || 'GET').toUpperCase();
-      if (href.includes('/functions/vendor') && method === 'GET') {
-        return jsonResponse(INSTANCE_VENDOR) as any;
-      }
-      if (href.endsWith('/auth') && method === 'GET') {
-        return jsonResponse({
-          tenant: { id: 'tenant-1' },
-          environment: { id: 'env-1', subdomain: 'dev' },
-        }) as any;
-      }
-      if (href.endsWith('/applications') && method === 'GET') {
-        return jsonResponse([
-          {
-            id: 'app-welcome',
-            name: 'Welcome display',
-            version: 2,
-            subdomain: 'demo',
-            rootComponent: 'myapp.App',
-            authenticatedRoot: null,
-          },
-          {
-            id: 'app-other',
-            name: 'demo',
-            version: 2,
-            subdomain: 'other',
-            rootComponent: 'other.App',
-          },
-        ]) as any;
-      }
-      if (href.includes('/applications/app-welcome') && method === 'PATCH') {
-        return jsonResponse({
-          id: 'app-welcome',
-          name: 'Welcome display',
-          version: 2,
-          subdomain: 'demo',
-        }) as any;
-      }
-      const posted = parseBody(init);
-      return jsonResponse({
-        id: 'comp-1',
-        name: posted.name,
-        context: posted.context,
-        kind: posted.kind,
-      }) as any;
-    });
-
-    writeComponents({
-      'src/App.tsx': `import React from 'react';
-import { Button } from './Button';
-export const App = () => <Button label="hi" />;
-`,
-      'src/Button.tsx': `import React from 'react';
-export const Button = ({ label }: { label: string }) => <button>{label}</button>;
-`,
-    });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-
-    const calls = httpCalls();
-    const lastComponentPost = calls
-      .map((call, index) => ({ call, index }))
-      .filter(
-        ({ call }) =>
-          call.url.includes('/functions/component') && call.method === 'POST',
-      )
-      .pop();
-    const patches = calls.filter(
-      (call) => call.url.includes('/applications/') && call.method === 'PATCH',
-    );
-    expect(lastComponentPost).toBeDefined();
-    expect(patches).toHaveLength(1);
-    expect(calls.indexOf(patches[0])).toBeGreaterThan(lastComponentPost!.index);
-    expect(patches[0].url).toBe(
-      'https://poly.example.test/applications/app-welcome',
-    );
-    expect(patches[0].headers.Authorization).toBe('Bearer test-token');
-    expect(patches[0].body).toEqual({
-      name: 'Welcome display',
-      version: 2,
-      subdomain: 'demo',
-      rootComponent: 'myapp.App',
-    });
-    expect(patches[0].body.runtime).toBeUndefined();
-    expect(patches[0].body.vendorHash).toBeUndefined();
-    expect(patches[0].body.vendorCode).toBeUndefined();
-  });
-
-  test('warns when instance react does not match the project', async () => {
-    const echo = jest.spyOn(shell, 'echo').mockImplementation(() => '');
-    undiciRequestMock.mockImplementation(async (url, init) => {
-      const href = String(url);
-      const method = String(init?.method || 'GET').toUpperCase();
-      if (href.includes('/functions/vendor') && method === 'GET') {
-        return jsonResponse({
-          ...INSTANCE_VENDOR,
-          packages: {
-            react: '16.14.0',
-            'react-dom': '16.14.0',
-            'react/jsx-runtime': '16.14.0',
-          },
-        }) as any;
-      }
-      const posted = parseBody(init);
-      return jsonResponse({
-        id: 'comp-1',
-        name: posted.name,
-        context: posted.context,
-        kind: posted.kind,
-      }) as any;
-    });
-    writeComponents({
-      'src/App.tsx': `import React from 'react';
-export const App = () => <div>hello</div>;
-`,
-    });
-
-    await publishComponents({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-
-    const warningText = echo.mock.calls.map((call) => call.join(' ')).join('\n');
-    expect(warningText).toMatch(/WARNING:/);
-    expect(warningText).toMatch(/16\.14\.0/);
-    expect(warningText).toMatch(/18\.3\.1/);
-    echo.mockRestore();
+    expect(graph.nodes).toHaveLength(1);
+    expect(graph.nodes[0].sourceCode).toContain('window.innerWidth');
   });
 });
 
@@ -908,8 +342,18 @@ describe('readPackageVersion', () => {
 });
 
 describe('reactFamilyMismatchWarnings', () => {
+  let npmResolveDir: string;
+
+  beforeEach(() => {
+    npmResolveDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poly-react-versions-'));
+    installResolveFixtures(npmResolveDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(npmResolveDir, { recursive: true, force: true });
+  });
+
   test('is silent when resolved versions match the instance', () => {
-    const npmResolveDir = path.resolve(__dirname, '..');
     expect(
       reactFamilyMismatchWarnings(
         {
@@ -921,72 +365,18 @@ describe('reactFamilyMismatchWarnings', () => {
       ),
     ).toEqual([]);
   });
-});
 
-describe('instance polyVendor publish', () => {
-  const prevBaseUrl = process.env.POLY_API_BASE_URL;
-  const prevApiKey = process.env.POLY_API_KEY;
-  const npmResolveDir = path.resolve(__dirname, '..');
+  test('warns when instance react does not match the project', () => {
+    const warnings = reactFamilyMismatchWarnings(
+      {
+        react: '16.14.0',
+        'react-dom': '16.14.0',
+        'react/jsx-runtime': '16.14.0',
+      },
+      npmResolveDir,
+    ).join('\n');
 
-  beforeEach(() => {
-    process.env.POLY_API_BASE_URL = 'https://poly.example.test';
-    process.env.POLY_API_KEY = 'test-token';
-    undiciRequestMock.mockReset();
-    resetHttpDispatchers();
-    undiciRequestMock.mockImplementation(async (url, init) => {
-      const href = String(url);
-      const method = String(init?.method || 'GET').toUpperCase();
-      if (href.includes('/functions/vendor') && method === 'POST') {
-        const posted = parseBody(init);
-        return jsonResponse(
-          {
-            hash: 'posted-vendor-hash',
-            url: 'https://poly.example.test/functions/vendor.js',
-            packages: posted.packages,
-          },
-          { statusCode: 201 },
-        ) as any;
-      }
-      return jsonResponse({ message: 'unexpected' }, { statusCode: 500 }) as any;
-    });
-  });
-
-  afterEach(() => {
-    resetHttpDispatchers();
-    if (prevBaseUrl === undefined) delete process.env.POLY_API_BASE_URL;
-    else process.env.POLY_API_BASE_URL = prevBaseUrl;
-    if (prevApiKey === undefined) delete process.env.POLY_API_KEY;
-    else process.env.POLY_API_KEY = prevApiKey;
-  });
-
-  test('bundles React-family ESM and POSTs /functions/vendor', async () => {
-    const echo = jest.spyOn(shell, 'echo').mockImplementation(() => '');
-    await publishInstanceVendor('node_modules/.poly', { npmResolveDir });
-    echo.mockRestore();
-
-    const posts = vendorPosts();
-    expect(posts).toHaveLength(1);
-    expect(posts[0].headers.Authorization).toBe('Bearer test-token');
-    expect(posts[0].body.packages).toMatchObject({
-      react: expect.any(String),
-      'react-dom': expect.any(String),
-    });
-    expect(posts[0].body.code).toEqual(expect.any(String));
-    expect(posts[0].body.code).toMatch(/react/i);
-    expect(posts[0].body.code).not.toMatch(/react\.development/);
-    expect(Buffer.byteLength(posts[0].body.code, 'utf8')).toBeLessThan(
-      400_000,
-    );
-  });
-
-  test('maps 403 to a SuperAdmin-only error', async () => {
-    undiciRequestMock.mockImplementation(async () =>
-      jsonResponse({ message: 'forbidden' }, { statusCode: 403 }) as any,
-    );
-    const echo = jest.spyOn(shell, 'echo').mockImplementation(() => '');
-    await expect(
-      publishInstanceVendor('node_modules/.poly', { npmResolveDir }),
-    ).rejects.toThrow('POST /functions/vendor is SuperAdmin only');
-    echo.mockRestore();
+    expect(warnings).toMatch(/16\.14\.0/);
+    expect(warnings).toMatch(/18\.3\.1/);
   });
 });
