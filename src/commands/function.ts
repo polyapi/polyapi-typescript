@@ -1,7 +1,6 @@
 import fs from 'fs';
 import chalk from 'chalk';
 import shell from 'shelljs';
-import { toPascalCase } from '../utils';
 import {
   CreateServerCustomFunctionResponseDto,
   FunctionDetailsDto,
@@ -14,11 +13,11 @@ import {
 import { loadConfig } from '../config';
 import { generateSingleCustomFunction } from './generate';
 import {
-  generateTypeSchemas,
+  functionDeployFields,
   getDependencies,
   getTSBaseUrl,
+  transpileFunction,
 } from '../transpiler';
-import { DeployableTypeEntries } from '../deployables';
 import { publishComponents } from '../component/publish';
 
 export const addOrUpdateComponentFunction = async (
@@ -123,30 +122,18 @@ export const addOrUpdateCustomFunction = async (
       }
     }
 
-    const [externalDependencies, internalDependencies] = await getDependencies(
-      code,
-      file,
-      tsConfigBaseUrl,
-      ignoreDependencies,
+    const [externalDependencies, internalDependencies, schemaRefs] =
+      await getDependencies(code, file, tsConfigBaseUrl, ignoreDependencies);
+    const referencedSchemas = Object.keys(schemaRefs).length
+      ? schemaRefs
+      : null;
+    const deployed = functionDeployFields(
+      transpileFunction(file, name, referencedSchemas),
+      context,
     );
-    const referencedSchemas =
-      internalDependencies && 'schema' in internalDependencies
-        ? Object.fromEntries(
-            internalDependencies.schema.map((schema) => [
-              `schemas.${schema.path
-                .split('.')
-                .map((s) => toPascalCase(s))
-                .join('.')}`,
-              { 'x-poly-ref': { path: schema.path } },
-            ]),
-          )
-        : null;
-    const typeSchemas = generateTypeSchemas(
-      file,
-      DeployableTypeEntries.map((d) => d[0]),
-      name,
-      referencedSchemas,
-    );
+    code = deployed.code;
+    const deployedContext = deployed.context;
+    const functionPayload = deployed.payload;
 
     if (server) {
       shell.echo(
@@ -162,7 +149,7 @@ export const addOrUpdateCustomFunction = async (
         );
       }
 
-      const other: Record<string, any> = {};
+      const other: Record<string, any> = { ...functionPayload };
       if (generateContexts) {
         other.generateContexts = generateContexts.split(',');
       }
@@ -171,12 +158,11 @@ export const addOrUpdateCustomFunction = async (
         other.cachePolyLibrary = cachePolyLibrary;
       if (image) other.image = image;
       customFunction = await createOrUpdateServerFunction(
-        context,
+        deployedContext,
         name,
         description,
         code,
         visibility,
-        typeSchemas,
         externalDependencies || null,
         ignoreDependencies ? null : internalDependencies || null,
         other,
@@ -208,14 +194,14 @@ export const addOrUpdateCustomFunction = async (
         } Client Function to PolyAPI Catalog...`,
       );
       customFunction = await createOrUpdateClientFunction(
-        context,
+        deployedContext,
         name,
         description,
         code,
         visibility,
-        typeSchemas,
         externalDependencies || null,
         ignoreDependencies ? null : internalDependencies || null,
+        functionPayload,
       );
       shell.echo(chalk.green('DONE'));
       shell.echo(`Client Function ID: ${customFunction.id}`);
@@ -229,10 +215,14 @@ export const addOrUpdateCustomFunction = async (
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));
 
-    shell.echo(
-      `${chalk.redBright.bold(
-        (e as any)?.message ?? 'Unexpected error.',
-      )}:\n    ${chalk.red.italic((e as any)?.response?.data?.message)}`,
-    );
+    const message = (e as any)?.message ?? 'Unexpected error.';
+    const apiMessage = (e as any)?.response?.data?.message;
+    if (apiMessage) {
+      shell.echo(
+        `${chalk.redBright.bold(message)}:\n    ${chalk.red.italic(apiMessage)}`,
+      );
+    } else {
+      shell.echo(chalk.redBright.bold(message));
+    }
   }
 };

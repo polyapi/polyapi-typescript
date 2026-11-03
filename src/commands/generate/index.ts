@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import handlebars from 'handlebars';
 import chalk from 'chalk';
 import shell from 'shelljs';
+import { EOL } from 'os';
 
 import {
   AiFunctionSpecification,
@@ -10,6 +11,8 @@ import {
   AuthFunctionSpecification,
   CustomFunctionSpecification,
   GraphQLSubscriptionSpecification,
+  LockSpecification,
+  QueueSpecification,
   ServerFunctionSpecification,
   ServerVariableSpecification,
   Specification,
@@ -38,8 +41,19 @@ import {
   getGenerationErrors,
   setGenerationErrors,
 } from './types';
+import {
+  countLinkableFunctions,
+  discoverLocalSources,
+  LocalLinkStats,
+  LocalSourceDiscovery,
+  LocalSourceScan,
+  localSourceScanFromConfig,
+} from './localSources';
 import { generateSchemaTSDeclarationFiles } from './schemaTypes';
 import { generateTableTSDeclarationFiles } from './table';
+import { generateQueueTSDeclarationFiles } from './queue';
+import { generateLockTSDeclarationFiles } from './lock';
+import { ws } from './shared';
 
 // Register the eq helper for equality comparison
 handlebars.registerHelper('eq', (a, b) => a === b);
@@ -70,6 +84,8 @@ const prepareDir = async (polyPath: string, temp = false) => {
   fs.mkdirSync(`${libPath}/vari`);
   fs.mkdirSync(`${libPath}/tabi`);
   fs.mkdirSync(`${libPath}/schemas`);
+  fs.mkdirSync(`${libPath}/que`);
+  fs.mkdirSync(`${libPath}/loxi`);
 
   if (polyPath !== DEFAULT_POLY_PATH) {
     try {
@@ -102,21 +118,21 @@ const generateRedirectIndexFiles = async (polyPath: string) => {
   fs.rmSync(defaultPolyLib, { recursive: true, force: true });
   fs.mkdirSync(defaultPolyLib, { recursive: true });
 
-  const indexRedirectJSTemplate = handlebars.compile(
-    loadTemplate('index-redirect.js.hbs'),
-  );
-  const indexTSRedirectJSTemplate = handlebars.compile(
-    loadTemplate('index-redirect.d.ts.hbs'),
-  );
-
   await Promise.all([
     fsWriteAsync(
       `${defaultPolyLib}/index.js`,
-      indexRedirectJSTemplate({ polyPath }),
+      [
+        'module.exports = {',
+        `  ...require('${polyPath}/lib/index.js'),`,
+        '}',
+      ].join(EOL)
     ),
     fsWriteAsync(
       `${defaultPolyLib}/index.d.ts`,
-      indexTSRedirectJSTemplate({ polyPath }),
+      [
+        `export {default} from '${polyPath}/lib';`,
+        `export * from '${polyPath}/lib';`
+      ].join(EOL)
     ),
   ]);
 };
@@ -154,6 +170,12 @@ const generateJSFiles = async (
   const gqlSubscriptions = specs.filter(
     (spec) => spec.type === 'graphqlSubscription',
   ) as GraphQLSubscriptionSpecification[];
+  const queues = specs.filter(
+    (spec) => spec.type === 'queue',
+  ) as QueueSpecification[];
+  const locks = specs.filter(
+    (spec) => spec.type === 'lock',
+  ) as LockSpecification[];
 
   await generateIndexJSFile(libPath);
   await generatePolyCustomJSFile(libPath);
@@ -190,32 +212,39 @@ const generateJSFiles = async (
   );
   await tryAsync(generateTableJSFiles(libPath, tables), 'tables');
 
+  fs.copyFileSync(templateUrl('qnats.js'), `${libPath}/qnats.js`);
+  await tryAsync(generateQueueJSFiles(libPath, queues), 'queues');
+  await tryAsync(generateLockJSFiles(libPath, locks), 'locks');
+
   return customFnCodeGenerationErrors;
 };
 
 const generateIndexJSFile = async (libPath: string) => {
-  const indexJSTemplate = handlebars.compile(loadTemplate('constants.js.hbs'));
   fs.writeFileSync(
     `${libPath}/constants.js`,
-    indexJSTemplate({
-      clientID: crypto.randomUUID(),
-      apiBaseUrl: getApiBaseUrl(),
-      apiKey: getApiKey(),
-    }),
+    ['module.exports = {',
+      `  CLIENT_ID: '${crypto.randomUUID()}',`,
+      `  API_KEY: '${getApiKey()}',`,
+      `  API_BASE_URL: '${getApiBaseUrl()}',`,
+      '};',
+    ].join(EOL)
   );
   fs.copyFileSync(templateUrl('index.js'), `${libPath}/index.js`);
 };
 
 const generatePolyCustomJSFile = async (libPath: string) => {
-  const polyCustomJSTemplate = handlebars.compile(
-    loadTemplate('poly-custom.js.hbs'),
-  );
   fs.writeFileSync(
     `${libPath}/poly-custom.js`,
-    polyCustomJSTemplate({
-      apiBaseUrl: getApiBaseUrl(),
-      apiKey: getApiKey(),
-    }),
+    [
+      'const polyCustom = {',
+      '  executionId: null,',
+      '  executionApiKey: null,',
+      '  responseStatusCode: 200,',
+      '  responseContentType: null,',
+      '  responseHeaders: {},',
+      '  authData: {},',
+      '};',
+    ].join(EOL),
   );
 };
 
@@ -268,8 +297,7 @@ const generateCustomFunctionJSFiles = async (
     await Promise.all(
       specifications.map((spec) =>
         fsWriteAsync(
-          `${libPath}/client/${spec.context ? `${spec.context}-` : ''}${
-            spec.name
+          `${libPath}/client/${spec.context ? `${spec.context}-` : ''}${spec.name
           }.js`,
           customFunctionJSTemplate(spec),
         ).catch((error) => {
@@ -318,15 +346,18 @@ const generateGraphQLSubscriptionJSFiles = async (
   libPath: string,
   specifications: GraphQLSubscriptionSpecification[],
 ) => {
-  const template = handlebars.compile(
-    loadTemplate('graphql-subscriptions.js.hbs'),
-  );
   fs.writeFileSync(
     `${libPath}/subscriptions/subscriptions.js`,
-    template({
-      specifications,
-      apiKey: getApiKey(),
-    }),
+    ['module.exports = {',
+      `  subscriptions: [`,
+
+      specifications
+        .map(s => `    ['${s.contextName}', '${s.id}']`)
+        .join(`,${EOL}`),
+
+      `  ]`,
+      '};'
+    ].join(EOL)
   );
   fs.copyFileSync(
     templateUrl('graphql-subscriptions-index.js'),
@@ -338,14 +369,18 @@ const generateServerFunctionJSFiles = async (
   libPath: string,
   specifications: ServerFunctionSpecification[],
 ) => {
-  const serverIndexJSTemplate = handlebars.compile(
-    loadTemplate('server-functions.js.hbs'),
-  );
   fs.writeFileSync(
     `${libPath}/server/functions.js`,
-    serverIndexJSTemplate({
-      specifications,
-    }),
+    ['module.exports = {',
+      `  functions: [`,
+
+      specifications
+        .map(s => `    ['${s.contextName}', '${s.id}', ${s.function.arguments.map(a => `'${a.name}'`).join(', ')}]`)
+        .join(`,${EOL}`),
+
+      `  ]`,
+      '};'
+    ].join(EOL)
   );
   fs.copyFileSync(templateUrl('server-index.js'), `${libPath}/server/index.js`);
 };
@@ -354,14 +389,18 @@ const generateAiFunctionJSFiles = async (
   libPath: string,
   specifications: AiFunctionSpecification[],
 ) => {
-  const aiFunctionsTemplate = handlebars.compile(
-    loadTemplate('ai-functions.js.hbs'),
-  );
   fs.writeFileSync(
     `${libPath}/ai/functions.js`,
-    aiFunctionsTemplate({
-      specifications,
-    }),
+    ['module.exports = {',
+      `  functions: [`,
+
+      specifications
+        .map(s => `    ['${s.contextName}', '${s.id}', ${s.function.arguments.map(a => `'${a.name}'`).join(', ')}]`)
+        .join(`,${EOL}`),
+
+      `  ]`,
+      '};'
+    ].join(EOL)
   );
   fs.copyFileSync(templateUrl('ai-index.js'), `${libPath}/ai/index.js`);
 };
@@ -403,14 +442,60 @@ const generateTableJSFiles = async (
   libPath: string,
   specifications: TableSpecification[],
 ) => {
-  const tablesJSTemplate = handlebars.compile(
-    loadTemplate('tabi/tables.js.hbs'),
-  );
   fs.writeFileSync(
     `${libPath}/tabi/tables.js`,
-    tablesJSTemplate({ specifications }),
+    ['module.exports = {',
+      `  tables: [`,
+
+      specifications
+        .map(s => `    ['${s.contextName}', '${s.id}']`)
+        .join(`,${EOL}`),
+
+      `  ]`,
+      '};'
+    ].join(EOL)
   );
   fs.copyFileSync(templateUrl('tabi/index.js'), `${libPath}/tabi/index.js`);
+};
+
+const generateQueueJSFiles = async (
+  libPath: string,
+  specifications: QueueSpecification[],
+) => {
+  fs.writeFileSync(
+    `${libPath}/que/queues.js`,
+    ['module.exports = {',
+      `  queues: [`,
+
+      specifications
+        .map(s => `    ['${s.contextName}', '${s.id}', '${s.streamId}', '${s.queueId}', ${s.ordered}, ${s.compress}, ${s.checksum}, '${s.durability}']`)
+        .join(`,${EOL}`),
+
+      `  ]`,
+      '};'
+    ].join(EOL)
+  );
+  fs.copyFileSync(templateUrl('que/index.js'), `${libPath}/que/index.js`);
+};
+
+const generateLockJSFiles = async (
+  libPath: string,
+  specifications: LockSpecification[],
+) => {
+  fs.writeFileSync(
+    `${libPath}/loxi/locks.js`,
+    ['module.exports = {',
+      `  locks: [`,
+
+      specifications
+        .map(s => `    ['${s.contextName}', '${s.id}', '${s.streamId}', '${s.lockId}', ${s.holdTimeout}, ${s.renewable}, ${s.capacity}]`)
+        .join(`,${EOL}`),
+
+      `  ]`,
+      '};'
+    ].join(EOL)
+  );
+  fs.copyFileSync(templateUrl('loxi/index.js'), `${libPath}/loxi/index.js`);
 };
 
 const generateAuthFunctionJSFiles = async (
@@ -447,8 +532,7 @@ const generateAuthFunctionJSFiles = async (
   await Promise.all(
     specifications.map((spec) =>
       fsWriteAsync(
-        `${libPath}/auth/${spec.context ? `${spec.context}-` : ''}${
-          spec.name
+        `${libPath}/auth/${spec.context ? `${spec.context}-` : ''}${spec.name
         }.js`,
         authFunctionJSTemplate({
           ...spec,
@@ -557,20 +641,17 @@ const generateSingleCustomFunction = async (
 
   setGenerationErrors(false);
 
-  await generateSpecs(tempPath, specs, noTypes);
+  const linkStats = await generateSpecs(
+    tempPath,
+    specs,
+    noTypes,
+    localSourceScanFromConfig(loadConfig(polyPath)),
+  );
   // Now remove old lib and rename temp directory to force a switchover in typescript
   fs.rmSync(libPath, { recursive: true, force: true });
   fs.renameSync(tempPath, libPath);
 
-  if (getGenerationErrors()) {
-    shell.echo(
-      chalk.yellow(
-        'Generate DONE with errors. Please investigate the errors and contact support@polyapi.io for assistance.',
-      ),
-    );
-  } else {
-    shell.echo(chalk.green('DONE'));
-  }
+  echoGenerateFinished(linkStats);
 };
 
 const updateLocalConfig = (
@@ -626,7 +707,7 @@ const generate = async ({
   shell.echo('-n', generateMsg);
 
   await prepareDir(polyPath, true);
-  loadConfig(polyPath);
+  const polyConfig = loadConfig(polyPath);
 
   const libPath = getPolyLibPath(polyPath);
   const tempPath = libPath.replace('/lib', '/temp');
@@ -641,20 +722,17 @@ const generate = async ({
   }
 
   setGenerationErrors(false);
-  await generateSpecs(tempPath, specs, noTypes);
+  const linkStats = await generateSpecs(
+    tempPath,
+    specs,
+    noTypes,
+    localSourceScanFromConfig(polyConfig),
+  );
   // Now remove old lib and rename temp directory to force a switchover in typescript
   fs.rmSync(libPath, { recursive: true, force: true });
   fs.renameSync(tempPath, libPath);
 
-  if (getGenerationErrors()) {
-    shell.echo(
-      chalk.yellow(
-        'Generate DONE with errors. Please investigate the errors and contact support@polyapi.io for assistance.',
-      ),
-    );
-  } else {
-    shell.echo(chalk.green('DONE'));
-  }
+  echoGenerateFinished(linkStats);
 };
 
 const tryAsync = async <R = unknown>(
@@ -672,11 +750,31 @@ const tryAsync = async <R = unknown>(
   }
 };
 
+const echoGenerateFinished = (linkStats?: LocalLinkStats) => {
+  if (getGenerationErrors()) {
+    shell.echo(
+      chalk.yellow(
+        'Generate DONE with errors. Please investigate the errors and contact support@polyapi.io for assistance.',
+      ),
+    );
+  } else {
+    shell.echo(chalk.green('DONE'));
+  }
+  if (!linkStats) return;
+  if (linkStats.indexError) {
+    shell.echo(
+      chalk.yellow(`Local source indexing failed: ${linkStats.indexError}`),
+    );
+  }
+};
+
 export const generateSpecs = async (
   libPath: string,
   specs: Specification[],
   noTypes: boolean,
-) => {
+  scan: LocalSourceScan = localSourceScanFromConfig(),
+): Promise<LocalLinkStats | undefined> => {
+  let linkStats: LocalLinkStats | undefined;
   try {
     let missingNames: Specification[] = [];
     [missingNames, specs] = specs.reduce(
@@ -697,10 +795,25 @@ export const generateSpecs = async (
     );
 
     if (!noTypes) {
-      await tryAsync(
-        generateFunctionsTSDeclarationFile(libPath, filteredSpecs),
+      const total = countLinkableFunctions(filteredSpecs);
+      let discovery: LocalSourceDiscovery | undefined;
+      let indexError: string | undefined;
+      if (total > 0) {
+        try {
+          discovery = await discoverLocalSources(undefined, scan);
+        } catch (error) {
+          indexError = error instanceof Error ? error.message : String(error);
+        }
+      }
+      const functionTypes = await tryAsync(
+        generateFunctionsTSDeclarationFile(libPath, filteredSpecs, discovery),
         'function types',
       );
+      linkStats = {
+        linked: functionTypes?.linked ?? 0,
+        total,
+        indexError,
+      };
       await tryAsync(
         generateVariablesTSDeclarationFile(libPath, filteredSpecs),
         'variable types',
@@ -721,6 +834,24 @@ export const generateSpecs = async (
         ),
         'table types',
       );
+      await tryAsync(
+        generateQueueTSDeclarationFiles(
+          libPath,
+          filteredSpecs.filter(
+            (s) => s.type === 'queue',
+          ) as QueueSpecification[],
+        ),
+        'queue types',
+      );
+      await tryAsync(
+        generateLockTSDeclarationFiles(
+          libPath,
+          filteredSpecs.filter(
+            (s) => s.type === 'lock',
+          ) as LockSpecification[],
+        ),
+        'lock types',
+      );
     }
 
     if (missingNames.length) {
@@ -736,6 +867,7 @@ export const generateSpecs = async (
   } catch (error) {
     showErrGeneratingFiles(error);
   }
+  return linkStats;
 };
 
 export { generate, generateSingleCustomFunction };

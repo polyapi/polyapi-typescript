@@ -4,6 +4,8 @@
 /// <reference path="./vari/index.d.ts" />
 /// <reference path="./schemas/index.d.ts" />
 /// <reference path="./tabi/index.d.ts" />
+/// <reference path="./loxi/index.d.ts" />
+/// <reference path="./que/index.d.ts" />
 
 {{#each contexts}}
 {{#if firstLevel}}
@@ -63,6 +65,8 @@ interface ErrorHandler {
 export const errorHandler: ErrorHandler;
 export const vari: vari.Vari;
 export const tabi: tabi.Tabi;
+export const loxi: loxi.Loxi;
+export const que: que.Que;
 
 /**
  * This type contain all schemas saved into poly.

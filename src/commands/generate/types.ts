@@ -2,6 +2,8 @@ import fs from 'fs';
 import handlebars from 'handlebars';
 import { compile } from 'json-schema-to-typescript';
 import * as ts from 'typescript';
+import chalk from 'chalk';
+import shell from 'shelljs';
 
 import {
   FunctionPropertyType,
@@ -30,6 +32,12 @@ import {
   toCamelCase
 } from '../../utils';
 import { getVariableValueTypeDeclarations } from './variTypes';
+import {
+  countLinkableFunctions,
+  LocalLinkStats,
+  LocalSourceDiscovery,
+  planLocalSourceNavigation,
+} from './localSources';
 
 interface Context {
   name: string;
@@ -647,6 +655,8 @@ const generateTSContextDeclarationFile = async (
   specifications: Specification[],
   subContexts: Context[],
   pathPrefix: string,
+  discovery?: LocalSourceDiscovery,
+  linkCounter?: { linked: number },
 ) => {
   const template = handlebars.compile(
     loadTemplate(`${pathPrefix}/{{context}}.d.ts.hbs`),
@@ -736,26 +746,48 @@ const generateTSContextDeclarationFile = async (
   };
 
   const outputPath = `${libPath}/${pathPrefix}/${context.fileName}`;
-  fs.writeFileSync(
-    outputPath,
-    await prettyPrint(
-      template({
-        interfaceName: context.interfaceName,
-        contextPaths,
-        typeDeclarations,
-        functionDeclarations: specifications
-          .filter((spec) => 'function' in spec)
-          .map(toFunctionDeclaration),
-        variableDeclarations: specifications
-          .filter((spec) => 'variable' in spec)
-          .map(toVariableDeclaration),
-        schemaDeclarations: specifications
-          .filter((spec) => spec.type === 'schema')
-          .map(toSchemaDeclaration),
-        subContexts,
-      }),
-    ),
+  let output = await prettyPrint(
+    template({
+      interfaceName: context.interfaceName,
+      contextPaths,
+      typeDeclarations,
+      functionDeclarations: specifications
+        .filter((spec) => 'function' in spec)
+        .map(toFunctionDeclaration),
+      variableDeclarations: specifications
+        .filter((spec) => 'variable' in spec)
+        .map(toVariableDeclaration),
+      schemaDeclarations: specifications
+        .filter((spec) => spec.type === 'schema')
+        .map(toSchemaDeclaration),
+      subContexts,
+    }),
   );
+
+  if (discovery && pathPrefix === '.' && linkCounter) {
+    try {
+      const plan = planLocalSourceNavigation({
+        dtsText: output,
+        dtsPath: outputPath,
+        specifications,
+        index: discovery.index,
+        repoRoot: discovery.repoRoot,
+      });
+      if (plan.map) fs.writeFileSync(plan.map.path, plan.map.text);
+      output = plan.dtsText;
+      linkCounter.linked += plan.linked;
+    } catch (error) {
+      shell.echo(
+        chalk.yellow(
+          `\nLocal source map skipped for ${context.fileName || outputPath}: ${
+            error instanceof Error ? error.message : error
+          }`,
+        ),
+      );
+    }
+  }
+
+  fs.writeFileSync(outputPath, output);
 };
 
 const generateTSDeclarationFilesForContext = async (
@@ -764,6 +796,8 @@ const generateTSDeclarationFilesForContext = async (
   contextData: Record<string, any>,
   pathPrefix: string,
   contextCollector: Context[] = [],
+  discovery?: LocalSourceDiscovery,
+  linkCounter?: { linked: number },
 ) => {
   const contextDataKeys = Object.keys(contextData);
   const contextDataSpecifications = contextDataKeys
@@ -789,6 +823,8 @@ const generateTSDeclarationFilesForContext = async (
     contextDataSpecifications,
     contextDataSubContexts,
     pathPrefix,
+    discovery,
+    linkCounter,
   );
   contextCollector = [...contextCollector, context];
 
@@ -799,6 +835,8 @@ const generateTSDeclarationFilesForContext = async (
       contextData[subContext.name],
       pathPrefix,
       contextCollector,
+      discovery,
+      linkCounter,
     );
   }
 
@@ -841,6 +879,8 @@ const generateTSDeclarationFiles = async (
   specs: Specification[],
   interfaceName: string,
   pathPrefix: string,
+  discovery?: LocalSourceDiscovery,
+  linkCounter?: { linked: number },
 ) => {
   const contextData = getContextData(specs);
 
@@ -855,6 +895,9 @@ const generateTSDeclarationFiles = async (
     },
     contextData,
     pathPrefix,
+    [],
+    discovery,
+    linkCounter,
   );
 
   await generateTSIndexDeclarationFile(libPath, contexts, pathPrefix);
@@ -884,7 +927,8 @@ const generateTSIndexDeclarationFile = async (
 export const generateFunctionsTSDeclarationFile = async (
   libPath: string,
   specs: Specification[],
-) => {
+  discovery?: LocalSourceDiscovery,
+): Promise<LocalLinkStats> => {
   const assignUnresolvedRefsRecursive = (fn: FunctionSpecification) => {
     for (const functionArg of fn.arguments) {
       if (functionArg.type.kind === 'object' && functionArg.type.schema) {
@@ -919,6 +963,7 @@ export const generateFunctionsTSDeclarationFile = async (
     }
   };
 
+  const linkCounter = { linked: 0 };
   await generateTSDeclarationFiles(
     libPath,
     specs
@@ -929,7 +974,13 @@ export const generateFunctionsTSDeclarationFile = async (
       }),
     'Poly',
     '.',
+    discovery,
+    linkCounter,
   );
+  return {
+    linked: linkCounter.linked,
+    total: countLinkableFunctions(specs),
+  };
 };
 
 export const generateVariablesTSDeclarationFile = async (

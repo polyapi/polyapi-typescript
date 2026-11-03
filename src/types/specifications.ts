@@ -1,6 +1,6 @@
 import { CreateApiFunctionDto } from './functions';
 import { CreateSchemaDto } from './schemas';
-import { LifecycleState, Visibility } from './shared';
+import { LifecycleState, Visibility, QueueDurability } from './shared';
 import { CreateWebhookHandleDto } from './webhooks';
 
 export type ValueType = string | number | boolean | object | null | any[];
@@ -16,6 +16,8 @@ export type SpecificationType =
   | 'table'
   | 'graphqlSubscription'
   | 'schema'
+  | 'queue'
+  | 'lock'
   | 'aiFunction';
 
 export interface ISpecification {
@@ -169,6 +171,27 @@ export interface TableSpecification extends ISpecification {
   unresolvedPolySchemaRefs?: SchemaRef[];
 }
 
+export interface QueueSpecification extends ISpecification {
+  type: 'queue';
+  ordered: boolean;
+  compress: boolean;
+  checksum: boolean;
+  durability: QueueDurability;
+  streamId: string;
+  queueId: string;
+  schema: null | Record<string, unknown>;
+  serverFunctionId?: string | null;
+}
+
+export interface LockSpecification extends ISpecification {
+  type: 'lock';
+  holdTimeout: number;
+  renewable: boolean;
+  capacity: number;
+  streamId: string;
+  lockId: string;
+}
+
 export interface AiFunctionSpecification extends ISpecification {
   type: 'aiFunction';
   function: FunctionSpecification;
@@ -190,6 +213,8 @@ export type Specification =
   | SchemaSpecification
   | GraphQLSubscriptionSpecification
   | TableSpecification
+  | QueueSpecification
+  | LockSpecification
   | AiFunctionSpecification;
 
 interface CreateWebhookHandleDtoForSpecificationInput
