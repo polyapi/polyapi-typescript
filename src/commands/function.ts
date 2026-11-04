@@ -46,9 +46,6 @@ export const addOrUpdateComponentFunction = async (
         : result.name;
       shell.echo(`Component ${polyPathName} (${result.kind}) ID: ${result.id}`);
     }
-    for (const application of published.applications) {
-      shell.echo(`Re-uploaded application ${application.name}.`);
-    }
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));
     const err = e as any;
@@ -58,6 +55,7 @@ export const addOrUpdateComponentFunction = async (
     shell.echo(
       `${chalk.redBright.bold(err?.message ?? 'Unexpected error.')}${details}`,
     );
+    process.exit(1);
   }
 };
 

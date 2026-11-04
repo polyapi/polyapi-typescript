@@ -6,8 +6,6 @@ import {
   CreateCanopyV2ApplicationDto,
   JOINED_SUBDOMAIN_PATTERN,
 } from '../types';
-import { ComponentManifest } from './types';
-
 export const assertApplicationSubdomain = (subdomain: string) => {
   if (!APPLICATION_SUBDOMAIN_PATTERN.test(subdomain)) {
     throw new Error(
@@ -135,75 +133,4 @@ export const addCanopyV2Application = async (
     environmentSubdomain,
     updating,
   };
-};
-
-const graphIncludesPublished = (
-  root: string,
-  published: Set<string>,
-  manifest: ComponentManifest,
-) => {
-  const stack = [root];
-  const seen = new Set<string>();
-  while (stack.length) {
-    const current = stack.pop();
-    if (!current || seen.has(current)) continue;
-    seen.add(current);
-    if (published.has(current)) return true;
-    for (const child of manifest[current]?.imports || []) {
-      stack.push(child);
-    }
-  }
-  return false;
-};
-
-export const refreshCanopyV2Applications = async (
-  publishedPaths: string[],
-  manifest: ComponentManifest,
-) => {
-  const published = new Set(publishedPaths.filter(Boolean));
-  if (!published.size) return [];
-  let applications;
-  try {
-    applications = await listApplications();
-  } catch (error) {
-    const err = error as { message?: string };
-    throw new Error(
-      `Components were published, but listing applications failed: ${err?.message || error}`,
-    );
-  }
-  const matches = applications.filter((application) => {
-    if (application.version !== CANOPY_V2_VERSION) return false;
-    const roots = [application.rootComponent, application.authenticatedRoot].filter(
-      (path): path is string => Boolean(path),
-    );
-    return roots.some((root) => graphIncludesPublished(root, published, manifest));
-  });
-  if (!matches.length) return [];
-
-  const environmentSubdomain = await getCurrentEnvironmentSubdomain();
-  const refreshed = [];
-  for (const application of matches) {
-    const subdomain = application.subdomain?.trim() || '';
-    if (!application.rootComponent || !subdomain) continue;
-    let saved;
-    try {
-      saved = await updateApplication(
-        application.id,
-        buildCanopyV2ApplicationBody({
-          name: application.name,
-          subdomain,
-          rootComponent: application.rootComponent,
-          authenticatedRoot: application.authenticatedRoot || undefined,
-          environmentSubdomain,
-        }),
-      );
-    } catch (error) {
-      const err = error as { message?: string };
-      throw new Error(
-        `Components were published, but re-uploading application ${application.subdomain || application.name} failed: ${err?.message || error}`,
-      );
-    }
-    refreshed.push(saved);
-  }
-  return refreshed;
 };

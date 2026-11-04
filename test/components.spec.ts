@@ -9,10 +9,20 @@ import {
 } from '../src/component/compile';
 import { compileComponentGraph, topoLeavesFirst } from '../src/component/graph';
 import {
+  assertComponentIdentifiers,
+  componentContextError,
+  componentNameError,
+} from '../src/component/identifiers';
+import {
   extraVendorSpecifiers,
   reactFamilyMismatchWarnings,
 } from '../src/component/instanceVendor';
-import { unsupportedPackageError } from '../src/component/publish';
+import {
+  resolveComponentVisibility,
+  unsupportedPackageError,
+  visibilityForPublish,
+} from '../src/component/publish';
+import { Visibility } from '../src/types';
 
 const writePackage = (
   root: string,
@@ -338,6 +348,93 @@ describe('readPackageVersion', () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('component identifiers', () => {
+  test('rejects a hyphenated filename the API would reject', () => {
+    expect(componentNameError('nav-bar')).toMatch(/nav-bar/);
+    expect(componentNameError('navBar')).toBeUndefined();
+    expect(componentNameError('nav_bar')).toBeUndefined();
+    expect(componentNameError('_nav')).toBeUndefined();
+    expect(componentNameError('123nav')).toMatch(/123nav/);
+    expect(() =>
+      assertComponentIdentifiers([
+        { name: 'nav-bar', context: 'myapp', file: 'src/nav-bar.tsx' },
+      ]),
+    ).toThrow(/src\/nav-bar\.tsx/);
+  });
+
+  test('rejects a context the API would reject', () => {
+    expect(componentContextError('')).toBeUndefined();
+    expect(componentContextError('myapp.nav')).toBeUndefined();
+    expect(componentContextError('my-app')).toMatch(/my-app/);
+    expect(() =>
+      assertComponentIdentifiers([{ name: 'App', context: 'my-app', file: 'src/App.tsx' }]),
+    ).toThrow(/my-app/);
+  });
+});
+
+describe('component visibility', () => {
+  test('leaves visibility unset when there is no flag and no manifest entry', () => {
+    expect(
+      resolveComponentVisibility({
+        nodePolyPath: 'myapp.Button',
+        startPolyPath: 'myapp.App',
+        publishKind: 'root',
+      }),
+    ).toBeUndefined();
+  });
+
+  test('keeps the manifest visibility when no flag is passed', () => {
+    expect(
+      resolveComponentVisibility({
+        nodePolyPath: 'myapp.Button',
+        startPolyPath: 'myapp.App',
+        publishKind: 'root',
+        manifestVisibility: Visibility.Public,
+      }),
+    ).toBe(Visibility.Public);
+  });
+
+  test('an explicit root visibility applies to every node', () => {
+    expect(
+      resolveComponentVisibility({
+        nodePolyPath: 'myapp.Button',
+        startPolyPath: 'myapp.App',
+        publishKind: 'root',
+        commandVisibility: Visibility.Public,
+        manifestVisibility: Visibility.Environment,
+      }),
+    ).toBe(Visibility.Public);
+  });
+
+  test('an explicit leaf visibility applies only to that leaf', () => {
+    expect(
+      resolveComponentVisibility({
+        nodePolyPath: 'myapp.Button',
+        startPolyPath: 'myapp.Button',
+        publishKind: 'leaf',
+        commandVisibility: Visibility.Public,
+      }),
+    ).toBe(Visibility.Public);
+    expect(
+      resolveComponentVisibility({
+        nodePolyPath: 'myapp.App',
+        startPolyPath: 'myapp.Button',
+        publishKind: 'leaf',
+        commandVisibility: Visibility.Public,
+        manifestVisibility: Visibility.Environment,
+      }),
+    ).toBe(Visibility.Environment);
+  });
+
+  test('keeps the server visibility when nothing local chooses one', () => {
+    expect(visibilityForPublish(undefined, Visibility.Public)).toBe(Visibility.Public);
+    expect(visibilityForPublish(undefined, undefined)).toBe(Visibility.Environment);
+    expect(visibilityForPublish(Visibility.Environment, Visibility.Public)).toBe(
+      Visibility.Environment,
+    );
   });
 });
 

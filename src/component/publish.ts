@@ -4,11 +4,11 @@ import chalk from 'chalk';
 import shell from 'shelljs';
 import {
   createOrUpdateComponentFunction,
+  getComponentFunction,
   getPolyVendor,
 } from '../api';
-import { refreshCanopyV2Applications } from './applications';
+import { assertComponentIdentifiers } from './identifiers';
 import {
-  ApplicationDto,
   ComponentFunctionDetailsDto,
   ComponentKind,
   CreateComponentFunctionDto,
@@ -63,7 +63,7 @@ export const resolveComponentVisibility = (options: {
   publishKind: ComponentKind;
   commandVisibility?: Visibility;
   manifestVisibility?: Visibility;
-}): Visibility => {
+}): Visibility | undefined => {
   const explicit = options.commandVisibility;
   if (explicit && options.publishKind === 'root') {
     return explicit;
@@ -75,15 +75,32 @@ export const resolveComponentVisibility = (options: {
   ) {
     return explicit;
   }
-  if (options.manifestVisibility) return options.manifestVisibility;
-  return Visibility.Environment;
+  return options.manifestVisibility;
+};
+
+export const visibilityForPublish = (
+  chosen: Visibility | undefined,
+  existing: Visibility | undefined,
+): Visibility => chosen ?? existing ?? Visibility.Environment;
+
+const readFailure = (error: unknown) => {
+  const err = error as {
+    message?: string;
+    response?: { status?: number; data?: { message?: string } };
+  };
+  const status = err.response?.status;
+  const serverMessage = err.response?.data?.message;
+  if (status && serverMessage) {
+    return `Request failed with status code ${status}: ${serverMessage}`;
+  }
+  if (status) return `Request failed with status code ${status}.`;
+  return err.message || 'Unexpected error.';
 };
 
 export const publishComponents = async (
   options: PublishComponentOptions,
 ): Promise<{
   components: ComponentFunctionDetailsDto[];
-  applications: ApplicationDto[];
 }> => {
   const projectRoot = path.resolve(options.projectRoot ?? process.cwd());
   const npmResolveDir = path.resolve(options.npmResolveDir ?? projectRoot);
@@ -94,6 +111,10 @@ export const publishComponents = async (
   ) {
     throw new Error(`Component file not found: ${options.file}`);
   }
+
+  assertComponentIdentifiers([
+    { name: options.name, context: options.context, file: options.file },
+  ]);
 
   const instanceVendor = await getPolyVendor();
   for (const warning of reactFamilyMismatchWarnings(
@@ -127,16 +148,47 @@ export const publishComponents = async (
   }
 
   const ordered = topoLeavesFirst(compiledNodes);
-  const results: ComponentFunctionDetailsDto[] = [];
-
+  assertComponentIdentifiers(
+    ordered.map((node) => ({
+      name: node.name,
+      context: node.context,
+      file: node.relFile,
+    })),
+  );
+  const visibilities = new Map<string, Visibility>();
   for (const node of ordered) {
-    const visibility = resolveComponentVisibility({
+    const chosen = resolveComponentVisibility({
       nodePolyPath: node.polyPath,
       startPolyPath,
       publishKind: kind,
       commandVisibility,
       manifestVisibility: originalManifest[node.polyPath]?.visibility,
     });
+    if (chosen) {
+      visibilities.set(node.polyPath, chosen);
+      continue;
+    }
+    let existing;
+    try {
+      existing = await getComponentFunction(node.polyPath);
+    } catch (error) {
+      throw new Error(
+        `Could not read the existing visibility for ${node.polyPath}, so it was not published. ${readFailure(error)}`,
+      );
+    }
+    const visibility = visibilityForPublish(undefined, existing?.visibility);
+    if (existing?.visibility && existing.visibility !== Visibility.Environment) {
+      shell.echo(
+        `Keeping ${existing.visibility} visibility for ${node.polyPath}.`,
+      );
+    }
+    visibilities.set(node.polyPath, visibility);
+  }
+
+  const results: ComponentFunctionDetailsDto[] = [];
+
+  for (const node of ordered) {
+    const visibility = visibilities.get(node.polyPath) ?? Visibility.Environment;
     const body: CreateComponentFunctionDto = {
       name: node.name,
       context: node.context,
@@ -162,10 +214,5 @@ export const publishComponents = async (
     saveManifest(graph.projectRoot, manifest);
   }
 
-  const applications = await refreshCanopyV2Applications(
-    ordered.map((node) => node.polyPath),
-    manifest,
-  );
-
-  return { components: results, applications };
+  return { components: results };
 };

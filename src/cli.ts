@@ -9,6 +9,10 @@ import { DEFAULT_POLY_PATH } from './constants';
 import { isValidHttpUrl, validateUUID } from './utils';
 import { ensurePermissions, makeRequirement } from './permissions';
 import { checkForClientVersionUpdate } from './version';
+import {
+  componentContextError,
+  componentNameError,
+} from './component/identifiers';
 
 if (process.env.NO_COLOR) {
   // Support NO_COLOR env variable https://no-color.org/
@@ -400,6 +404,16 @@ void yargs
         }
 
         if (isComponent) {
+          const identifierError = [
+            componentNameError(name),
+            componentContextError(context || ''),
+          ]
+            .filter(Boolean)
+            .join('\n');
+          if (identifierError) {
+            shell.echo(chalk.redBright('ERROR:'), identifierError);
+            process.exit(1);
+          }
           const { addOrUpdateComponentFunction } = await import(
             './commands/function'
           );

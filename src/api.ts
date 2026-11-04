@@ -327,6 +327,20 @@ export const createOrUpdateComponentFunction = async (
   ).data;
 };
 
+export const getComponentFunction = async (polyPath: string) => {
+  try {
+    return (
+      await http.get<ComponentFunctionDetailsDto>(
+        `${getApiBaseURL()}/functions/component/${encodeURIComponent(polyPath)}?usePathId=true`,
+        { headers: getApiHeaders() },
+      )
+    ).data;
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 404) return null;
+    throw error;
+  }
+};
+
 const applicationList = (data: unknown): ApplicationDto[] => {
   if (Array.isArray(data)) return data as ApplicationDto[];
   if (data && typeof data === 'object' && Array.isArray((data as { results?: unknown }).results)) {
