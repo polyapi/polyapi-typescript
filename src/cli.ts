@@ -511,39 +511,7 @@ void yargs
                 : authenticatedRoot || undefined,
           });
         },
-      )
-      .command(
-      'preview <app>',
-      'Serve the shared canopy-v2 bootstrap with locally compiled components',
-      (yargs) =>
-        yargs
-          .positional('app', {
-            describe:
-              'Joined subdomain {application.subdomain}-{environment.subdomain}. Loads GET /applications/{app}/spec. The page URL is /canopy/v2/?app={app}.',
-            type: 'string',
-          })
-          .option('port', {
-            describe: 'Local preview port',
-            type: 'number',
-            default: 4173,
-          }),
-      async ({ app, port }) => {
-        const resolvedApp = typeof app === 'string' ? app : undefined;
-        if (!resolvedApp) {
-          shell.echo(
-            chalk.redBright('ERROR:'),
-            'Provide the joined subdomain (`poly application preview myapp-dev`).',
-          );
-          yargs.showHelp();
-          return;
-        }
-        const { previewApplication } = await import('./commands/preview');
-        await previewApplication(DEFAULT_POLY_PATH, {
-          app: resolvedApp,
-          port,
-        });
-      },
-    );
+      );
   })
   .command('tenant <command>', 'Manages tenants', (yargs) => {
     yargs.command(

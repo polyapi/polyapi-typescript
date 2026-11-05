@@ -1,5 +1,6 @@
 build
 .poly
+manual/poly-vendor.js
 
 # Logs
 logs

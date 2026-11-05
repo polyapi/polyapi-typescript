@@ -33,7 +33,7 @@
     "preversion": "npm run lint",
     "postversion": "git push && git push --tags",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "vendor:publish": "node scripts/publish-vendor.js"
+    "vendor:build": "node scripts/publish-vendor.js"
   },
   "devDependencies": {
     "@polyapi/qnats": "0.1.11",

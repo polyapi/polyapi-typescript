@@ -1,7 +1,7 @@
+import fs from 'fs';
+import path from 'path';
 import chalk from 'chalk';
 import shell from 'shelljs';
-import { createPolyVendor } from '../api';
-import { loadConfig } from '../config';
 import {
   bundleVendor,
   readPackageVersion,
@@ -10,27 +10,21 @@ import {
 import { INSTANCE_REACT_VENDOR_SPECIFIERS } from '../component/types';
 
 const shortErrorMessage = (error: unknown) => {
-  const err = error as {
-    message?: string;
-    response?: { status?: number; data?: { message?: string } };
-  };
-  const status = err?.response?.status;
-  const serverMessage = err?.response?.data?.message;
-  if (status && serverMessage) {
-    return `Request failed with status code ${status}: ${serverMessage}`;
-  }
+  const err = error as { message?: string };
   return err?.message || 'Unexpected error.';
 };
 
-export const publishInstanceVendor = async (
-  polyPath: string,
-  options: { projectRoot?: string; npmResolveDir?: string } = {},
+export const buildInstanceVendor = async (
+  options: { npmResolveDir?: string; outFile?: string } = {},
 ) => {
-  loadConfig(polyPath);
-  const npmResolveDir =
-    options.npmResolveDir ?? options.projectRoot ?? process.cwd();
+  const npmResolveDir = path.resolve(
+    options.npmResolveDir ?? process.cwd(),
+  );
+  const outFile = path.resolve(
+    options.outFile ?? path.join(npmResolveDir, 'poly-vendor.js'),
+  );
 
-  shell.echo('-n', 'Publishing instance polyVendor...');
+  shell.echo('-n', 'Building instance polyVendor...');
   try {
     const code = await bundleVendor(
       [...INSTANCE_REACT_VENDOR_SPECIFIERS],
@@ -45,14 +39,16 @@ export const publishInstanceVendor = async (
     packages['react-dom'] = readPackageVersion('react-dom', npmResolveDir);
     packages['react/jsx-runtime'] = packages.react;
 
-    const saved = await createPolyVendor({ code, packages });
+    fs.mkdirSync(path.dirname(outFile), { recursive: true });
+    fs.writeFileSync(outFile, code);
     shell.echo(chalk.green('DONE'));
     shell.echo(
-      `polyVendor hash: ${saved.hash} (${Buffer.byteLength(code, 'utf8')} bytes)`,
+      `polyVendor file: ${outFile} (${Buffer.byteLength(code, 'utf8')} bytes)`,
     );
-    if (saved.url) {
-      shell.echo(`polyVendor url: ${saved.url}`);
+    for (const [name, version] of Object.entries(packages)) {
+      shell.echo(`  ${name} ${version}`);
     }
+    return { outFile, code, packages };
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));
     const message = shortErrorMessage(e);

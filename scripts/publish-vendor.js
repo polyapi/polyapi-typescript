@@ -10,16 +10,18 @@ if (!fs.existsSync(vendorPath)) {
   process.exit(1);
 }
 
-const { publishInstanceVendor } = require(vendorPath);
-const { DEFAULT_POLY_PATH } = require('../build/constants');
-const { loadConfig } = require('../build/config');
+const { buildInstanceVendor } = require(vendorPath);
 
-loadConfig(DEFAULT_POLY_PATH);
-if (!process.env.POLY_API_KEY) {
-  console.error('Poly is not configured. Please run `poly setup` to configure it.');
+const manualRoot = path.join(__dirname, '..', 'manual');
+const reactPackage = path.join(manualRoot, 'node_modules', 'react', 'package.json');
+if (!fs.existsSync(reactPackage)) {
+  console.error('Install the manual app first: npm install --prefix manual');
   process.exit(1);
 }
 
-publishInstanceVendor(DEFAULT_POLY_PATH).catch(() => {
+buildInstanceVendor({
+  npmResolveDir: manualRoot,
+  outFile: path.join(manualRoot, 'poly-vendor.js'),
+}).catch(() => {
   process.exit(1);
 });

@@ -243,9 +243,6 @@ export type PolyVendorDto = {
 export const NO_POLY_VENDOR_ERROR =
   'This instance has no polyVendor. A SuperAdmin must POST /functions/vendor first.';
 
-export const SUPERADMIN_VENDOR_FORBIDDEN_ERROR =
-  'POST /functions/vendor is SuperAdmin only. This API key is not allowed.';
-
 export const getPolyVendor = async (): Promise<PolyVendorDto> => {
   try {
     return (
@@ -258,31 +255,6 @@ export const getPolyVendor = async (): Promise<PolyVendorDto> => {
   } catch (error) {
     if (isAxiosError(error) && error.response?.status === 404) {
       throw new Error(NO_POLY_VENDOR_ERROR);
-    }
-    throw error;
-  }
-};
-
-export const createPolyVendor = async (data: {
-  code: string;
-  packages: Record<string, string>;
-}): Promise<PolyVendorDto> => {
-  try {
-    return (
-      await http.post<PolyVendorDto>(
-        `${getApiBaseURL()}/functions/vendor`,
-        data,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            ...getApiHeaders(),
-          },
-        },
-      )
-    ).data;
-  } catch (error) {
-    if (isAxiosError(error) && error.response?.status === 403) {
-      throw new Error(SUPERADMIN_VENDOR_FORBIDDEN_ERROR);
     }
     throw error;
   }
