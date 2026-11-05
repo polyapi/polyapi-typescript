@@ -29,7 +29,7 @@ const echoApplication = (
   const joined = `${saved.subdomain}-${saved.environmentSubdomain}`;
   shell.echo(`Origin host label: ${joined}`);
   shell.echo(`Spec: /applications/${joined}/spec`);
-  shell.echo(`HTTP page: /canopy/v2/?app=${joined}`);
+  shell.echo(`HTTP page: /?app=${joined}`);
 };
 
 export const addApplicationCommand = async (

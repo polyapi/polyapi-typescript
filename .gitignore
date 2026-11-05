@@ -140,3 +140,4 @@ dist
 .pnp.*
 .idea
 vendor-bundle*
+manual*

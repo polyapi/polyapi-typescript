@@ -350,7 +350,7 @@ void yargs
             '`--public` is an alias for `--visibility public` and conflicts with the given `--visibility`.',
           );
           yargs.showHelp();
-          return;
+          process.exit(1);
         }
         if (isComponent) {
           visibility = isPublic ? 'PUBLIC' : visibilityArg;
