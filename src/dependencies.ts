@@ -1,5 +1,6 @@
 import fs from 'fs';
 import semver from 'semver';
+import ts from 'typescript';
 import { execSync } from 'child_process';
 
 export const librariesToCheck = ['ts-node', 'typescript'];
@@ -67,15 +68,22 @@ export const checkTsConfig = async (steps: TsConfigSetupSteps) => {
       steps.saveTsConfig(JSON.stringify(DEFAULT_TS_CONFIG, null, 2));
     }
   } else {
-    let tsConfig: any;
-
-    try {
-      tsConfig = JSON.parse(currentConfig) as any;
-    } catch (error) {
+    const parsed = ts.parseConfigFileTextToJson(
+      'tsconfig.json',
+      currentConfig,
+    );
+    if (parsed.error) {
+      const detail = ts.flattenDiagnosticMessageText(
+        parsed.error.messageText,
+        '\n',
+      );
       throw new Error(
-        'tsconfig.json has invalid JSON syntax, please fix and try again',
+        `tsconfig.json has invalid JSON syntax, please fix and try again${
+          detail ? `: ${detail}` : ''
+        }`,
       );
     }
+    const tsConfig = parsed.config;
 
     if (!tsConfig.compilerOptions?.esModuleInterop) {
       const updateTsConfig =

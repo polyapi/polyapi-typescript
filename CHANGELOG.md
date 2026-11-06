@@ -1,3 +1,10 @@
+### 0.29.0
+* Adding canopy-v2 component publish and `poly application add`.
+* Rejecting component names and contexts the API would reject, including names taken from filenames such as `nav-bar.ts`.
+* Keeping a component's existing visibility when republishing without `--visibility`.
+* Removing the application refresh after component publish, so a key without application permission can still publish components.
+* Removing the unused `ts-node` dependency.
+
 ### 0.28.1
 * Fixing bug generating SDK for functions with arguments
 

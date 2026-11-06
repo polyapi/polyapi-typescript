@@ -622,6 +622,7 @@ export const getDependencies = async (
     ts.isElementAccessExpression(expr) ||
     ts.isIdentifier(expr);
   ts.transpileModule(code, {
+    fileName,
     compilerOptions,
     transformers: {
       before: [

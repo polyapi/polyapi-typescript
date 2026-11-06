@@ -6,3 +6,4 @@ export * from './functions';
 export * from './webhooks';
 export * from './snippets';
 export * from './schemas';
+export * from './applications';

@@ -9,6 +9,10 @@ import { DEFAULT_POLY_PATH } from './constants';
 import { isValidHttpUrl, validateUUID } from './utils';
 import { ensurePermissions, makeRequirement } from './permissions';
 import { checkForClientVersionUpdate } from './version';
+import {
+  componentContextError,
+  componentNameError,
+} from './component/identifiers';
 
 if (process.env.NO_COLOR) {
   // Support NO_COLOR env variable https://no-color.org/
@@ -220,7 +224,7 @@ void yargs
       (yargs) =>
         yargs
           .usage(
-            '$0 function add <name> <file> (--server | --client) [options]',
+            '$0 function add <name> <file> (--server | --client | --type component) [options]',
           )
           .default('context', '')
           .positional('name', {
@@ -228,7 +232,7 @@ void yargs
             type: 'string',
           })
           .positional('file', {
-            describe: 'Path to the function TS file',
+            describe: 'Path to the function TS or TSX file',
             type: 'string',
           })
           .option('context', {
@@ -245,6 +249,25 @@ void yargs
           })
           .option('server', {
             describe: 'Marks the function as a server function',
+            type: 'boolean',
+          })
+          .option('component', {
+            describe: 'Marks the function as a UI component',
+            type: 'boolean',
+          })
+          .option('type', {
+            describe: 'Function type: server, client, or component',
+            type: 'string',
+            choices: ['server', 'client', 'component'],
+          })
+          .option('root', {
+            describe:
+              'Component only - publish this file as a root component and walk its local import graph',
+            type: 'boolean',
+          })
+          .option('public', {
+            describe:
+              'Component only - alias for `--visibility public`. On a root, applies PUBLIC to every component upserted in this command',
             type: 'boolean',
           })
           .option('logs', {
@@ -293,6 +316,10 @@ void yargs
         context,
         client,
         server,
+        component,
+        type: functionType,
+        root,
+        public: isPublic,
         logs,
         generateContexts,
         skipGenerate,
@@ -304,28 +331,58 @@ void yargs
       }) => {
         const logsEnabled =
           logs === 'enabled' ? true : logs === 'disabled' ? false : undefined;
-        visibility = visibility ? visibility.toUpperCase() : 'ENVIRONMENT';
+        const typeName =
+          typeof functionType === 'string'
+            ? functionType.toLowerCase()
+            : undefined;
+        const isComponent = !!component || typeName === 'component';
+        const isClient = !!client || typeName === 'client';
+        const isServer = !!server || typeName === 'server';
+        const typeCount = [isClient, isServer, isComponent].filter(
+          Boolean,
+        ).length;
+        const visibilityArg = visibility
+          ? String(visibility).toUpperCase()
+          : undefined;
+        if (isPublic && visibilityArg && visibilityArg !== 'PUBLIC') {
+          shell.echo(
+            chalk.redBright('ERROR:'),
+            '`--public` is an alias for `--visibility public` and conflicts with the given `--visibility`.',
+          );
+          yargs.showHelp();
+          process.exit(1);
+        }
+        if (isComponent) {
+          visibility = isPublic ? 'PUBLIC' : visibilityArg;
+        } else {
+          visibility = visibilityArg || 'ENVIRONMENT';
+        }
         const err = !name
           ? 'Missing function name.'
           : !file
           ? 'Missing function file path.'
-          : !client && !server
-          ? 'You must specify `--server` or `--client`.`'
-          : client && server
-          ? 'Specify either `--server` or `--client`. Found both.'
-          : generateContexts && !server
+          : typeCount === 0
+          ? 'You must specify `--server`, `--client`, or `--type component`.'
+          : typeCount > 1
+          ? 'Specify exactly one of `--server`, `--client`, or `--type component`.'
+          : root && !isComponent
+          ? 'Option `--root` is only for component functions (--type component).'
+          : isPublic && !isComponent
+          ? 'Option `--public` is only for component functions (--type component).'
+          : generateContexts && !isServer
           ? 'Option `generateContexts` is only for server functions (--server).'
-          : logs && !server
+          : logs && !isServer
           ? 'Option `logs` is only for server functions (--server).'
           : logs && logsEnabled === undefined
           ? 'Invalid value for `logs` option.'
           : executionApiKey && !validateUUID(executionApiKey)
           ? 'Invalid value for `execution-api-key`. Must be a valid PolyAPI Key.'
-          : cachePolyLibrary && !server
+          : cachePolyLibrary && !isServer
           ? 'Option `cache-poly-library` is only for server functions (--server).'
-          : image && !server
+          : image && !isServer
           ? 'Option `image` is only for server functions (--server).'
-          : !['PUBLIC', 'TENANT', 'ENVIRONMENT'].includes(visibility)
+          : visibility &&
+            !['PUBLIC', 'TENANT', 'ENVIRONMENT'].includes(visibility)
           ? 'Option `visibility` must be either PUBLIC, TENANT, or ENVIRONMENT. Case insensitive.'
           : '';
         if (err) {
@@ -346,6 +403,31 @@ void yargs
           process.exit(1);
         }
 
+        if (isComponent) {
+          const identifierError = [
+            componentNameError(name),
+            componentContextError(context || ''),
+          ]
+            .filter(Boolean)
+            .join('\n');
+          if (identifierError) {
+            shell.echo(chalk.redBright('ERROR:'), identifierError);
+            process.exit(1);
+          }
+          const { addOrUpdateComponentFunction } = await import(
+            './commands/function'
+          );
+          await addOrUpdateComponentFunction(
+            DEFAULT_POLY_PATH,
+            context || '',
+            name,
+            file,
+            !!root,
+            visibility,
+          );
+          return;
+        }
+
         const { addOrUpdateCustomFunction } = await import(
           './commands/function'
         );
@@ -355,8 +437,8 @@ void yargs
           name,
           description,
           file,
-          client,
-          server,
+          isClient,
+          isServer,
           logsEnabled,
           generateContexts,
           executionApiKey,
@@ -368,6 +450,68 @@ void yargs
         );
       },
     );
+  })
+  .command('application <command>', 'Manages canopy-v2 applications', (yargs) => {
+    yargs
+      .command(
+        'add <name>',
+        'Adds or updates a canopy-v2 application',
+        (yargs) =>
+          yargs
+            .positional('name', {
+              describe:
+                'Display name. Defaults the application subdomain when --subdomain is omitted.',
+              type: 'string',
+            })
+            .option('subdomain', {
+              describe:
+                'Application subdomain (1–32). Origin is {subdomain}-{environment.subdomain}.{region}.polyapi.app. Defaults to <name>. Running add again with the same subdomain updates the application.',
+              type: 'string',
+            })
+            .option('root', {
+              describe:
+                'Unauthenticated PUBLIC root component (e.g. myapp.App2)',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('authenticated-root', {
+              describe:
+                'Authenticated root component. Pass an empty string to clear it. Omitted on update keeps the current root.',
+              type: 'string',
+            }),
+        async ({ name, subdomain, root, authenticatedRoot }) => {
+          if (!name || !root) {
+            shell.echo(
+              chalk.redBright('ERROR:'),
+              'Usage: poly application add <name> --root <component>',
+            );
+            yargs.showHelp();
+            return;
+          }
+          if (!checkPolyConfig(DEFAULT_POLY_PATH)) {
+            return shell.echo(
+              'Poly is not configured. Please run `poly setup` to configure it.',
+            );
+          }
+          if (
+            !(await ensurePermissions([makeRequirement('manageApplications')]))
+          ) {
+            process.exit(1);
+          }
+          const { addApplicationCommand } = await import(
+            './commands/application'
+          );
+          await addApplicationCommand(DEFAULT_POLY_PATH, {
+            name,
+            subdomain: subdomain || undefined,
+            rootComponent: root,
+            authenticatedRoot:
+              authenticatedRoot === ''
+                ? null
+                : authenticatedRoot || undefined,
+          });
+        },
+      );
   })
   .command('tenant <command>', 'Manages tenants', (yargs) => {
     yargs.command(

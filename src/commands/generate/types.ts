@@ -760,6 +760,11 @@ const generateTSContextDeclarationFile = async (
       schemaDeclarations: specifications
         .filter((spec) => spec.type === 'schema')
         .map(toSchemaDeclaration),
+      componentDeclarations: specifications
+        .filter((spec) => spec.type === 'componentFunction')
+        .map((spec) => ({
+          name: spec.name.split('.').pop(),
+        })),
       subContexts,
     }),
   );
@@ -967,9 +972,13 @@ export const generateFunctionsTSDeclarationFile = async (
   await generateTSDeclarationFiles(
     libPath,
     specs
-      .filter((spec) => 'function' in spec)
-      .map((spec: SpecificationWithFunction) => {
-        assignUnresolvedRefsRecursive(spec.function);
+      .filter(
+        (spec) => 'function' in spec || spec.type === 'componentFunction',
+      )
+      .map((spec) => {
+        if ('function' in spec) {
+          assignUnresolvedRefsRecursive(spec.function);
+        }
         return spec;
       }),
     'Poly',

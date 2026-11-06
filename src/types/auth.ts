@@ -4,6 +4,7 @@ export interface AuthData {
   };
   environment: {
     id: string;
+    subdomain?: string;
   };
 
   permissions?: Record<string, boolean>;

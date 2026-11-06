@@ -1,6 +1,6 @@
 {
   "name": "polyapi",
-  "version": "0.28.1",
+  "version": "0.29.0",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
@@ -10,6 +10,10 @@
   },
   "files": [
     "build/**/*",
+    "!build/commands/vendor.js",
+    "!build/commands/vendor.d.ts",
+    "!build/commands/vendor.js.map",
+    "!build/commands/vendor.d.ts.map",
     "index.js",
     "index.d.ts"
   ],
@@ -28,7 +32,8 @@
     "prepublishOnly": "npm run lint && npm run build",
     "preversion": "npm run lint",
     "postversion": "git push && git push --tags",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "vendor:build": "node scripts/publish-vendor.js"
   },
   "devDependencies": {
     "@polyapi/qnats": "0.1.11",
@@ -54,6 +59,7 @@
     "adm-zip": "0.6.1",
     "chalk": "4.1.2",
     "dotenv": "16.0.3",
+    "esbuild": "0.25.9",
     "handlebars": "4.7.10",
     "json-schema-to-typescript": "15.0.4",
     "lodash": "4.18.1",

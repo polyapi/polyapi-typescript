@@ -3,8 +3,56 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as api from '../src/api';
+import { checkTsConfig } from '../src/dependencies';
 import { generateTypeSchemas, getDependencies } from '../src/transpiler';
 import * as utils from '../src/utils';
+
+const steps = (currentConfig: string | undefined) => {
+  const saved: string[] = [];
+  return {
+    saved,
+    async getCurrentConfig() {
+      return currentConfig;
+    },
+    async requestUserPermissionToCreateTsConfig() {
+      return false;
+    },
+    async requestUserPermissionToUpdateTsConfig() {
+      return true;
+    },
+    async saveTsConfig(tsConfig: string) {
+      saved.push(tsConfig);
+    },
+  };
+};
+
+describe('checkTsConfig', () => {
+  test('accepts trailing commas and comments', async () => {
+    const config = steps(`{
+      // kept by the TypeScript parser
+      "compilerOptions": {
+        "esModuleInterop": true,
+      },
+    }
+`);
+    await checkTsConfig(config);
+    expect(config.saved).toEqual([]);
+  });
+
+  test('still updates a config that is missing esModuleInterop', async () => {
+    const config = steps(`{
+      "compilerOptions": {
+        "target": "es2021",
+      },
+    }
+`);
+    await checkTsConfig(config);
+    expect(JSON.parse(config.saved[0]).compilerOptions).toMatchObject({
+      target: 'es2021',
+      esModuleInterop: true,
+    });
+  });
+});
 
 jest.spyOn(utils, 'getPolyLibPath').mockReturnValue('/tmp/poly-lib');
 jest.spyOn(utils, 'writeCachedSpecs').mockImplementation(() => undefined);

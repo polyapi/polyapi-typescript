@@ -2,6 +2,7 @@
 import { request as undiciRequest } from 'undici';
 import {
   AxiosError,
+  browserInstanceUrl,
   get,
   http,
   isAxiosError,
@@ -68,6 +69,67 @@ describe('http client', () => {
 
     test('encodes spaces as plus', () => {
       expect(serializeParams({ q: 'hello world' })).toBe('q=hello+world');
+    });
+  });
+
+  describe('browserInstanceUrl', () => {
+    const withDocument = (run: () => void) => {
+      const previous = (globalThis as { document?: unknown }).document;
+      (globalThis as { document?: unknown }).document = {};
+      try {
+        run();
+      } finally {
+        if (previous === undefined) {
+          delete (globalThis as { document?: unknown }).document;
+        } else {
+          (globalThis as { document?: unknown }).document = previous;
+        }
+      }
+    };
+
+    test('leaves the instance url unchanged outside the browser', () => {
+      expect(browserInstanceUrl('https://na1.polyapi.io')).toBe(
+        'https://na1.polyapi.io',
+      );
+    });
+
+    test('rewrites a polyapi.io instance to polyapi.app/api in the browser', () => {
+      withDocument(() => {
+        expect(browserInstanceUrl('https://na1.polyapi.io')).toBe(
+          'https://na1.polyapi.app/api',
+        );
+        expect(browserInstanceUrl('https://eu1.polyapi.io/')).toBe(
+          'https://eu1.polyapi.app/api',
+        );
+        expect(browserInstanceUrl('https://polyapi.io')).toBe(
+          'https://polyapi.app/api',
+        );
+      });
+    });
+
+    test('appends /api when the instance url is already on polyapi.app', () => {
+      withDocument(() => {
+        expect(browserInstanceUrl('https://na1.polyapi.app')).toBe(
+          'https://na1.polyapi.app/api',
+        );
+        expect(browserInstanceUrl('https://na1.polyapi.app/api')).toBe(
+          'https://na1.polyapi.app/api',
+        );
+        expect(browserInstanceUrl('https://na1.polyapi.io/api/')).toBe(
+          'https://na1.polyapi.app/api',
+        );
+      });
+    });
+
+    test('leaves non-instance urls unchanged in the browser', () => {
+      withDocument(() => {
+        expect(browserInstanceUrl('http://localhost:8000')).toBe(
+          'http://localhost:8000',
+        );
+        expect(browserInstanceUrl('https://example.com')).toBe(
+          'https://example.com',
+        );
+      });
     });
   });
 

@@ -1,5 +1,6 @@
 build
 .poly
+manual/poly-vendor.js
 
 # Logs
 logs
@@ -138,3 +139,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 .idea
+vendor-bundle*
+manual*
+.DS_Store

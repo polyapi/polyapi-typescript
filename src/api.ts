@@ -1,9 +1,14 @@
 import dotenv from 'dotenv';
 import * as http from './http';
+import { isAxiosError } from './http';
 import {
   ApiFunctionDescriptionGenerationDto,
   ApiFunctionDetailsDto,
+  ApplicationDto,
   CreateApiFunctionDto,
+  CreateCanopyV2ApplicationDto,
+  CreateComponentFunctionDto,
+  ComponentFunctionDetailsDto,
   CreateSchemaDto,
   CreateServerCustomFunctionResponseDto,
   CreateSnippetDto,
@@ -22,7 +27,6 @@ import {
   Specification,
   SpecificationInputDto,
   TosDto,
-  Visibility,
   WebhookHandleBasicDto,
   WebhookHandleDescriptionGenerationDto,
   WebhookHandleDto,
@@ -228,6 +232,132 @@ export const getClientFunctionByName = async (
   ).data.results.find((fn) => fn.name === name && fn.context === context);
   if (!detail || !basic) return basic;
   return getClientFunctionById(basic.id);
+};
+
+export type PolyVendorDto = {
+  hash: string;
+  url: string;
+  packages: Record<string, string>;
+};
+
+export const NO_POLY_VENDOR_ERROR =
+  'This instance has no polyVendor. A SuperAdmin must POST /functions/vendor first.';
+
+export const getPolyVendor = async (): Promise<PolyVendorDto> => {
+  try {
+    return (
+      await http.get<PolyVendorDto>(`${getApiBaseURL()}/functions/vendor`, {
+        headers: {
+          [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
+        },
+      })
+    ).data;
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 404) {
+      throw new Error(NO_POLY_VENDOR_ERROR);
+    }
+    throw error;
+  }
+};
+
+export const createOrUpdateComponentFunction = async (
+  data: CreateComponentFunctionDto,
+) => {
+  const body: Record<string, unknown> = {
+    name: data.name,
+    context: data.context,
+    kind: data.kind,
+    sourceCode: data.sourceCode,
+    code: data.code,
+    imports: data.imports,
+  };
+  if (data.visibility) {
+    body.visibility = data.visibility;
+  }
+  if (data.kind === 'root') {
+    if (data.vendorHash) {
+      body.vendorHash = data.vendorHash;
+    } else {
+      body.vendorCode = data.vendorCode ?? null;
+    }
+    if (data.externalDependencies) {
+      body.externalDependencies = data.externalDependencies;
+    }
+  }
+
+  return (
+    await http.post<ComponentFunctionDetailsDto>(
+      `${getApiBaseURL()}/functions/component`,
+      body,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getApiHeaders(),
+        },
+      },
+    )
+  ).data;
+};
+
+export const getComponentFunction = async (polyPath: string) => {
+  try {
+    return (
+      await http.get<ComponentFunctionDetailsDto>(
+        `${getApiBaseURL()}/functions/component/${encodeURIComponent(polyPath)}?usePathId=true`,
+        { headers: getApiHeaders() },
+      )
+    ).data;
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 404) return null;
+    throw error;
+  }
+};
+
+const applicationList = (data: unknown): ApplicationDto[] => {
+  if (Array.isArray(data)) return data as ApplicationDto[];
+  if (data && typeof data === 'object' && Array.isArray((data as { results?: unknown }).results)) {
+    return (data as { results: ApplicationDto[] }).results;
+  }
+  return [];
+};
+
+export const listApplications = async () => {
+  return applicationList(
+    (
+      await http.get<unknown>(`${getApiBaseURL()}/applications`, {
+        headers: getApiHeaders(),
+      })
+    ).data,
+  );
+};
+
+export const createApplication = async (data: CreateCanopyV2ApplicationDto) => {
+  return (
+    await http.post<ApplicationDto>(`${getApiBaseURL()}/applications`, data, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...getApiHeaders(),
+      },
+    })
+  ).data;
+};
+
+export const updateApplication = async (
+  id: string,
+  data: CreateCanopyV2ApplicationDto,
+) => {
+  return (
+    await http.patch<ApplicationDto>(
+      `${getApiBaseURL()}/applications/${encodeURIComponent(id)}`,
+      data,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getApiHeaders(),
+        },
+      },
+    )
+  ).data;
 };
 
 export const deleteClientFunction = async (id: string) => {
