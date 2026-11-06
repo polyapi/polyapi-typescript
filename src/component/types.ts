@@ -12,19 +12,11 @@ export type ComponentManifestEntry = {
 
 export type ComponentManifest = Record<string, ComponentManifestEntry>;
 
-export type LocalComponentRef = {
-  absFile: string;
-  context: string;
-  name: string;
-  polyPath: string;
-};
-
 export type CompileResult = {
   sourceCode: string;
   code: string;
   imports: string[];
   npmSpecifiers: string[];
-  localFiles: LocalComponentRef[];
 };
 
 export const COMPONENTS_MANIFEST_RELATIVE = '.poly/components.json';
@@ -71,6 +63,9 @@ export const isRelativeSpecifier = (specifier: string) =>
 
 export const isPolySpecifier = (specifier: string) =>
   specifier.startsWith('poly:');
+
+export const isPolyApiSpecifier = (specifier: string) =>
+  packageRoot(specifier) === 'polyapi';
 
 export const isBareNpmSpecifier = (specifier: string) => {
   if (!specifier) return false;

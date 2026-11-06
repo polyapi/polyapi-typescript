@@ -33,6 +33,9 @@ declare module "./index" {
       {{/if}}
       {{name}}: {{typeDeclaration}}
     {{/each}}
+    {{#each componentDeclarations}}
+      {{name}}: any;
+    {{/each}}
   }
 
   {{#each contextPaths}}

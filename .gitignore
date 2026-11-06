@@ -141,3 +141,4 @@ dist
 .idea
 vendor-bundle*
 manual*
+.DS_Store

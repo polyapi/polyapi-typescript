@@ -3,12 +3,13 @@ import path from 'path';
 import { createRequire } from 'module';
 import ts from 'typescript';
 import * as esbuild from 'esbuild';
-import { assignPolyPath, posixRel, resolveExistingPath } from './manifest';
+import { assignPolyPath, resolveExistingPath } from './manifest';
+import { resolvePolyComponentImports } from './polyImports';
 import {
   CompileResult,
   ComponentManifest,
   isBareNpmSpecifier,
-  LocalComponentRef,
+  isPolyApiSpecifier,
   packageRoot,
   POLY_APP_VENDOR,
   POLY_INSTANCE_VENDOR,
@@ -108,7 +109,8 @@ export const collectNpmSpecifiersFromSource = (
     ) {
       if (!node.importClause?.isTypeOnly) {
         const spec = node.moduleSpecifier.text;
-        if (isBareNpmSpecifier(spec)) found.push(spec);
+        if (isBareNpmSpecifier(spec) && !isPolyApiSpecifier(spec))
+          found.push(spec);
       }
     }
     if (
@@ -117,14 +119,20 @@ export const collectNpmSpecifiersFromSource = (
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
       const spec = node.moduleSpecifier.text;
-      if (isBareNpmSpecifier(spec)) found.push(spec);
+      if (isBareNpmSpecifier(spec) && !isPolyApiSpecifier(spec))
+        found.push(spec);
     }
     if (
       ts.isCallExpression(node) &&
       node.expression.kind === ts.SyntaxKind.ImportKeyword
     ) {
       const arg = node.arguments[0];
-      if (arg && ts.isStringLiteral(arg) && isBareNpmSpecifier(arg.text)) {
+      if (
+        arg &&
+        ts.isStringLiteral(arg) &&
+        isBareNpmSpecifier(arg.text) &&
+        !isPolyApiSpecifier(arg.text)
+      ) {
         found.push(arg.text);
       }
     }
@@ -175,7 +183,7 @@ const rewriteDynamicNpmImports = (code: string): string =>
   code.replace(
     /import\s*\(\s*(['"])([^'"]+)\1\s*\)/g,
     (match, quote: string, spec: string) => {
-      if (!isBareNpmSpecifier(spec)) return match;
+      if (!isBareNpmSpecifier(spec) || isPolyApiSpecifier(spec)) return match;
       const modulePath = vendorModuleForNpmSpecifier(spec);
       return `import(${quote}${modulePath}${quote}).then(m => m.${vendorExportName(
         spec,
@@ -216,7 +224,7 @@ export const rewriteNpmImportsToVendor = (code: string): string => {
       ts.isStringLiteral(stmt.moduleSpecifier)
     ) {
       const spec = stmt.moduleSpecifier.text;
-      if (isBareNpmSpecifier(spec)) {
+      if (isBareNpmSpecifier(spec) && !isPolyApiSpecifier(spec)) {
         npmSpecifiers.add(spec);
         npmBindings.push(...collectImportBindings(stmt, spec));
         continue;
@@ -231,7 +239,7 @@ export const rewriteNpmImportsToVendor = (code: string): string => {
       ts.isStringLiteral(stmt.moduleSpecifier)
     ) {
       const spec = stmt.moduleSpecifier.text;
-      if (isBareNpmSpecifier(spec)) {
+      if (isBareNpmSpecifier(spec) && !isPolyApiSpecifier(spec)) {
         npmSpecifiers.add(spec);
         extraAfter.push(
           ...convertNpmReexport(
@@ -254,7 +262,9 @@ export const rewriteNpmImportsToVendor = (code: string): string => {
   }
 
   const instanceSpecs = [...npmSpecifiers]
-    .filter((spec) => vendorModuleForNpmSpecifier(spec) === POLY_INSTANCE_VENDOR)
+    .filter(
+      (spec) => vendorModuleForNpmSpecifier(spec) === POLY_INSTANCE_VENDOR,
+    )
     .sort();
   const appSpecs = [...npmSpecifiers]
     .filter((spec) => vendorModuleForNpmSpecifier(spec) === POLY_APP_VENDOR)
@@ -332,7 +342,8 @@ export const findBareNpmSpecifiersInCode = (code: string): string[] => {
     if (
       ts.isImportDeclaration(node) &&
       ts.isStringLiteral(node.moduleSpecifier) &&
-      isBareNpmSpecifier(node.moduleSpecifier.text)
+      isBareNpmSpecifier(node.moduleSpecifier.text) &&
+      !isPolyApiSpecifier(node.moduleSpecifier.text)
     ) {
       found.push(node.moduleSpecifier.text);
     }
@@ -340,7 +351,8 @@ export const findBareNpmSpecifiersInCode = (code: string): string[] => {
       ts.isExportDeclaration(node) &&
       node.moduleSpecifier &&
       ts.isStringLiteral(node.moduleSpecifier) &&
-      isBareNpmSpecifier(node.moduleSpecifier.text)
+      isBareNpmSpecifier(node.moduleSpecifier.text) &&
+      !isPolyApiSpecifier(node.moduleSpecifier.text)
     ) {
       found.push(node.moduleSpecifier.text);
     }
@@ -349,7 +361,12 @@ export const findBareNpmSpecifiersInCode = (code: string): string[] => {
       node.expression.kind === ts.SyntaxKind.ImportKeyword
     ) {
       const arg = node.arguments[0];
-      if (arg && ts.isStringLiteral(arg) && isBareNpmSpecifier(arg.text)) {
+      if (
+        arg &&
+        ts.isStringLiteral(arg) &&
+        isBareNpmSpecifier(arg.text) &&
+        !isPolyApiSpecifier(arg.text)
+      ) {
         found.push(arg.text);
       }
     }
@@ -519,14 +536,19 @@ export const compileComponentFile = async (
     npmResolveDir: options.npmResolveDir,
   });
   const sourceCode = fs.readFileSync(absFile, 'utf8');
-  const localFiles: LocalComponentRef[] = [];
+  const resolvedPoly = await resolvePolyComponentImports(sourceCode, absFile);
   const npmSpecifiers = new Set<string>(
     collectNpmSpecifiersFromSource(sourceCode, absFile),
   );
 
   const result = await esbuild.build({
     absWorkingDir: options.projectRoot,
-    entryPoints: [absFile],
+    stdin: {
+      contents: resolvedPoly.source,
+      sourcefile: absFile,
+      loader: esbuildLoaderForFile(absFile),
+      resolveDir: path.dirname(absFile),
+    },
     bundle: true,
     format: 'esm',
     platform: 'browser',
@@ -542,6 +564,9 @@ export const compileComponentFile = async (
           build.onResolve({ filter: /.*/ }, (args) => {
             if (args.kind === 'entry-point') return undefined;
             if (args.path.startsWith('poly:')) {
+              return { path: args.path, external: true };
+            }
+            if (isPolyApiSpecifier(args.path)) {
               return { path: args.path, external: true };
             }
 
@@ -563,7 +588,7 @@ export const compileComponentFile = async (
               }
               if (
                 isJsModuleFile(resolved) &&
-                path.normalize(resolved) !== absFile
+                path.normalize(resolved) !== path.normalize(absFile)
               ) {
                 const assigned = assignPolyPath(
                   resolved,
@@ -571,19 +596,13 @@ export const compileComponentFile = async (
                   options.defaultContext,
                   options.manifest,
                 );
-                if (!options.manifest[assigned.polyPath]) {
-                  options.manifest[assigned.polyPath] = {
-                    file: posixRel(options.projectRoot, resolved),
-                    kind: 'leaf',
-                  };
-                }
-                localFiles.push({
-                  absFile: resolved,
-                  context: assigned.context,
-                  name: assigned.name,
-                  polyPath: assigned.polyPath,
-                });
-                return { path: `poly:${assigned.polyPath}`, external: true };
+                return {
+                  errors: [
+                    {
+                      text: `Import ${assigned.polyPath} via polyapi, not from another file.`,
+                    },
+                  ],
+                };
               }
               return { path: args.path, external: true };
             }
@@ -613,20 +632,27 @@ export const compileComponentFile = async (
     );
   }
 
-  const uniqueLocals = new Map<string, LocalComponentRef>();
-  for (const local of localFiles) {
-    uniqueLocals.set(local.absFile, local);
-  }
-
   return {
     sourceCode,
     code,
-    imports: uniquePreserve(
-      [...uniqueLocals.values()].map((local) => local.polyPath),
-    ),
+    imports: uniquePreserve(resolvedPoly.imports),
     npmSpecifiers: uniquePreserve([...npmSpecifiers]),
-    localFiles: [...uniqueLocals.values()],
   };
+};
+
+const esbuildLoaderForFile = (filePath: string): esbuild.Loader => {
+  switch (path.extname(filePath).toLowerCase()) {
+    case '.tsx':
+      return 'tsx';
+    case '.jsx':
+      return 'jsx';
+    case '.js':
+    case '.mjs':
+    case '.cjs':
+      return 'js';
+    default:
+      return 'ts';
+  }
 };
 
 export type BundleVendorOptions = {

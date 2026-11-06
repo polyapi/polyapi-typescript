@@ -4,7 +4,6 @@ import { ComponentKind } from '../types';
 import { compileComponentFile } from './compile';
 import {
   cloneManifest,
-  findPolyPathByFile,
   loadManifest,
   posixRel,
   resolveExistingPath,
@@ -66,23 +65,19 @@ export const compileComponentGraph = async (
   const kind: ComponentKind =
     options.isRoot || existing?.kind === 'root' ? 'root' : 'leaf';
 
-  const nodes = await compileGraphs(
-    [
-      {
-        absFile,
-        context: options.context,
-        name: options.name,
-        kind,
-      },
-    ],
-    {
-      projectRoot,
-      npmResolveDir,
-      originalManifest,
-      manifest,
-      walkChildrenFromLeaves: kind === 'root',
-    },
-  );
+  const compiled = await compileComponentFile(absFile, {
+    projectRoot,
+    npmResolveDir,
+    defaultContext: options.context,
+    manifest,
+  });
+  const relFile = posixRel(projectRoot, absFile);
+  manifest[startPolyPath] = {
+    ...manifest[startPolyPath],
+    file: relFile,
+    kind,
+    imports: compiled.imports,
+  };
 
   return {
     projectRoot,
@@ -91,102 +86,19 @@ export const compileComponentGraph = async (
     kind,
     originalManifest,
     manifest,
-    nodes: [...nodes.values()],
+    nodes: [
+      {
+        polyPath: startPolyPath,
+        context: options.context,
+        name: options.name,
+        kind,
+        absFile,
+        relFile,
+        sourceCode: compiled.sourceCode,
+        code: compiled.code,
+        imports: compiled.imports,
+        npmSpecifiers: compiled.npmSpecifiers,
+      },
+    ],
   };
-};
-
-export type GraphStart = {
-  absFile: string;
-  context: string;
-  name: string;
-  kind: ComponentKind;
-};
-
-export const compileGraphs = async (
-  starts: GraphStart[],
-  options: {
-    projectRoot: string;
-    npmResolveDir: string;
-    originalManifest: ComponentManifest;
-    manifest: ComponentManifest;
-    walkChildrenFromLeaves: boolean;
-  },
-): Promise<Map<string, CompiledComponentNode>> => {
-  const nodes = new Map<string, CompiledComponentNode>();
-  const queue = [...starts];
-
-  while (queue.length) {
-    const item = queue.shift()!;
-    const itemAbs = resolveExistingPath(item.absFile);
-    if (nodes.has(itemAbs)) continue;
-
-    const compiled = await compileComponentFile(itemAbs, {
-      projectRoot: options.projectRoot,
-      npmResolveDir: options.npmResolveDir,
-      defaultContext: item.context,
-      manifest: options.manifest,
-    });
-
-    const polyPath = toPolyPath(item.context, item.name);
-    const relFile = posixRel(options.projectRoot, itemAbs);
-    nodes.set(itemAbs, {
-      polyPath,
-      context: item.context,
-      name: item.name,
-      kind: item.kind,
-      absFile: itemAbs,
-      relFile,
-      sourceCode: compiled.sourceCode,
-      code: compiled.code,
-      imports: compiled.imports,
-      npmSpecifiers: compiled.npmSpecifiers,
-    });
-
-    options.manifest[polyPath] = {
-      ...options.manifest[polyPath],
-      file: relFile,
-      kind: item.kind,
-      imports: compiled.imports,
-    };
-
-    for (const child of compiled.localFiles) {
-      const childAbs = resolveExistingPath(child.absFile);
-      if (nodes.has(childAbs)) continue;
-      const knownBefore = !!findPolyPathByFile(
-        options.originalManifest,
-        options.projectRoot,
-        childAbs,
-      );
-      if (!options.walkChildrenFromLeaves && knownBefore) continue;
-      queue.push({
-        absFile: childAbs,
-        context: child.context,
-        name: child.name,
-        kind: 'leaf',
-      });
-    }
-  }
-
-  return nodes;
-};
-
-export const topoLeavesFirst = (
-  nodes: CompiledComponentNode[],
-): CompiledComponentNode[] => {
-  const byPath = new Map(nodes.map((node) => [node.polyPath, node]));
-  const remaining = new Set(byPath.keys());
-  const ordered: CompiledComponentNode[] = [];
-
-  while (remaining.size) {
-    const ready = [...remaining].filter((polyPath) => {
-      const node = byPath.get(polyPath)!;
-      return node.imports.every((child) => !remaining.has(child));
-    });
-    const batch = ready.length ? ready : [...remaining];
-    for (const polyPath of batch) {
-      remaining.delete(polyPath);
-      ordered.push(byPath.get(polyPath)!);
-    }
-  }
-  return ordered;
 };

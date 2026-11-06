@@ -19,10 +19,7 @@ import {
   extraVendorSpecifiers,
   reactFamilyMismatchWarnings,
 } from './instanceVendor';
-import {
-  compileComponentGraph,
-  topoLeavesFirst,
-} from './graph';
+import { compileComponentGraph } from './graph';
 import { saveManifest } from './manifest';
 import { packageRoot } from './types';
 
@@ -140,23 +137,24 @@ export const publishComponents = async (
     nodes: compiledNodes,
   } = graph;
   const commandVisibility = normalizeVisibility(options.visibility);
-  const extraNpm = uniquePreserve(extraVendorSpecifiers(
-    uniquePreserve(compiledNodes.flatMap((node) => node.npmSpecifiers)),
-  ));
+  const extraNpm = uniquePreserve(
+    extraVendorSpecifiers(
+      uniquePreserve(compiledNodes.flatMap((node) => node.npmSpecifiers)),
+    ),
+  );
   if (extraNpm.length) {
     throw new Error(unsupportedPackageError(extraNpm));
   }
 
-  const ordered = topoLeavesFirst(compiledNodes);
   assertComponentIdentifiers(
-    ordered.map((node) => ({
+    compiledNodes.map((node) => ({
       name: node.name,
       context: node.context,
       file: node.relFile,
     })),
   );
   const visibilities = new Map<string, Visibility>();
-  for (const node of ordered) {
+  for (const node of compiledNodes) {
     const chosen = resolveComponentVisibility({
       nodePolyPath: node.polyPath,
       startPolyPath,
@@ -177,7 +175,10 @@ export const publishComponents = async (
       );
     }
     const visibility = visibilityForPublish(undefined, existing?.visibility);
-    if (existing?.visibility && existing.visibility !== Visibility.Environment) {
+    if (
+      existing?.visibility &&
+      existing.visibility !== Visibility.Environment
+    ) {
       shell.echo(
         `Keeping ${existing.visibility} visibility for ${node.polyPath}.`,
       );
@@ -187,8 +188,9 @@ export const publishComponents = async (
 
   const results: ComponentFunctionDetailsDto[] = [];
 
-  for (const node of ordered) {
-    const visibility = visibilities.get(node.polyPath) ?? Visibility.Environment;
+  for (const node of compiledNodes) {
+    const visibility =
+      visibilities.get(node.polyPath) ?? Visibility.Environment;
     const body: CreateComponentFunctionDto = {
       name: node.name,
       context: node.context,

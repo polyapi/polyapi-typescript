@@ -14,6 +14,7 @@ const que = require('./que');
 const polyCustom = require('./poly-custom');
 const { createErrorHandler, sendLocalErrorEvent } = require('./error-handler');
 const { CLIENT_ID, API_KEY, API_BASE_URL } = require('./constants');
+const { browserInstanceUrl } = require('./http');
 
 const nodeEnv = process.env.NODE_ENV;
 const isDevEnv = nodeEnv === 'development';
@@ -26,6 +27,7 @@ const getSocket = () => {
   if (!isDevEnv) {
     apiBaseUrl = apiBaseUrl.replace(/^http:/, 'https:');
   }
+  apiBaseUrl = browserInstanceUrl(apiBaseUrl);
 
   if (!socket) {
     socket = io(`${apiBaseUrl}/events`, {

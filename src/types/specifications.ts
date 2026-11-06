@@ -18,7 +18,8 @@ export type SpecificationType =
   | 'schema'
   | 'queue'
   | 'lock'
-  | 'aiFunction';
+  | 'aiFunction'
+  | 'componentFunction';
 
 export interface ISpecification {
   id: string;
@@ -192,6 +193,10 @@ export interface LockSpecification extends ISpecification {
   lockId: string;
 }
 
+export interface ComponentFunctionSpecification extends ISpecification {
+  type: 'componentFunction';
+}
+
 export interface AiFunctionSpecification extends ISpecification {
   type: 'aiFunction';
   function: FunctionSpecification;
@@ -215,7 +220,8 @@ export type Specification =
   | TableSpecification
   | QueueSpecification
   | LockSpecification
-  | AiFunctionSpecification;
+  | AiFunctionSpecification
+  | ComponentFunctionSpecification;
 
 interface CreateWebhookHandleDtoForSpecificationInput
   extends CreateWebhookHandleDto {

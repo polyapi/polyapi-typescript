@@ -2,10 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import semver from 'semver';
 import { readPackageVersion } from './compile';
-import { isReactFamilySpecifier } from './types';
+import { isPolyApiSpecifier, isReactFamilySpecifier } from './types';
 
 export const extraVendorSpecifiers = (specifiers: string[]): string[] =>
-  specifiers.filter((spec) => !isReactFamilySpecifier(spec));
+  specifiers.filter(
+    (spec) => !isReactFamilySpecifier(spec) && !isPolyApiSpecifier(spec),
+  );
 
 export const readDeclaredDependencyVersions = (
   projectDir: string,
