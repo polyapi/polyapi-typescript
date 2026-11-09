@@ -2,13 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { ComponentKind } from '../types';
 import { compileComponentFile } from './compile';
-import {
-  cloneManifest,
-  loadManifest,
-  posixRel,
-  resolveExistingPath,
-} from './manifest';
-import { ComponentManifest, toPolyPath } from './types';
+import { posixRel, resolveExistingPath } from './manifest';
+import { toPolyPath } from './types';
 
 export type CompiledComponentNode = {
   polyPath: string;
@@ -37,8 +32,6 @@ export type CompiledComponentGraph = {
   npmResolveDir: string;
   startPolyPath: string;
   kind: ComponentKind;
-  originalManifest: ComponentManifest;
-  manifest: ComponentManifest;
   nodes: CompiledComponentNode[];
 };
 
@@ -58,34 +51,20 @@ export const compileComponentGraph = async (
   options: CompileComponentGraphOptions,
 ): Promise<CompiledComponentGraph> => {
   const { projectRoot, npmResolveDir, absFile } = resolveGraphPaths(options);
-  const originalManifest = loadManifest(projectRoot);
-  const manifest = cloneManifest(originalManifest);
   const startPolyPath = toPolyPath(options.context, options.name);
-  const existing = manifest[startPolyPath];
-  const kind: ComponentKind =
-    options.isRoot || existing?.kind === 'root' ? 'root' : 'leaf';
+  const kind: ComponentKind = options.isRoot ? 'root' : 'leaf';
 
   const compiled = await compileComponentFile(absFile, {
     projectRoot,
     npmResolveDir,
-    defaultContext: options.context,
-    manifest,
   });
   const relFile = posixRel(projectRoot, absFile);
-  manifest[startPolyPath] = {
-    ...manifest[startPolyPath],
-    file: relFile,
-    kind,
-    imports: compiled.imports,
-  };
 
   return {
     projectRoot,
     npmResolveDir,
     startPolyPath,
     kind,
-    originalManifest,
-    manifest,
     nodes: [
       {
         polyPath: startPolyPath,

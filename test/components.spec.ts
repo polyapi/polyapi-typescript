@@ -22,11 +22,9 @@ import {
   reactFamilyMismatchWarnings,
 } from '../src/component/instanceVendor';
 import {
-  resolveComponentVisibility,
+  componentIdFromSpecs,
   unsupportedPackageError,
-  visibilityForPublish,
 } from '../src/component/publish';
-import { Visibility } from '../src/types';
 
 const writePackage = (
   root: string,
@@ -187,7 +185,7 @@ export const Button = ({ label }: { label: string }) => <button>{label}</button>
         isRoot: true,
       }),
     ).rejects.toThrow(
-      /Import myapp\.Button via polyapi, not from another file/,
+      /Import '\.\/Button' via polyapi, not from another file/,
     );
   });
 
@@ -230,12 +228,6 @@ export const App = () => {
     expect(root.code).not.toMatch(npmImportPattern('react'));
     expect(root.code).not.toMatch(npmImportPattern('polyapi'));
     expect(findBareNpmSpecifiersInCode(root.code)).toEqual([]);
-    expect(graph.manifest['myapp.App']).toMatchObject({
-      file: 'src/App.tsx',
-      kind: 'root',
-      imports: ['myapp.Button'],
-    });
-    expect(graph.manifest['myapp.Button']).toBeUndefined();
   });
 
   test('a component module member is imported as that module', async () => {
@@ -540,69 +532,13 @@ describe('component identifiers', () => {
 });
 
 describe('component visibility', () => {
-  test('leaves visibility unset when there is no flag and no manifest entry', () => {
-    expect(
-      resolveComponentVisibility({
-        nodePolyPath: 'myapp.Button',
-        startPolyPath: 'myapp.App',
-        publishKind: 'root',
-      }),
-    ).toBeUndefined();
-  });
-
-  test('keeps the manifest visibility when no flag is passed', () => {
-    expect(
-      resolveComponentVisibility({
-        nodePolyPath: 'myapp.Button',
-        startPolyPath: 'myapp.App',
-        publishKind: 'root',
-        manifestVisibility: Visibility.Public,
-      }),
-    ).toBe(Visibility.Public);
-  });
-
-  test('an explicit root visibility applies to every node', () => {
-    expect(
-      resolveComponentVisibility({
-        nodePolyPath: 'myapp.Button',
-        startPolyPath: 'myapp.App',
-        publishKind: 'root',
-        commandVisibility: Visibility.Public,
-        manifestVisibility: Visibility.Environment,
-      }),
-    ).toBe(Visibility.Public);
-  });
-
-  test('an explicit leaf visibility applies only to that leaf', () => {
-    expect(
-      resolveComponentVisibility({
-        nodePolyPath: 'myapp.Button',
-        startPolyPath: 'myapp.Button',
-        publishKind: 'leaf',
-        commandVisibility: Visibility.Public,
-      }),
-    ).toBe(Visibility.Public);
-    expect(
-      resolveComponentVisibility({
-        nodePolyPath: 'myapp.App',
-        startPolyPath: 'myapp.Button',
-        publishKind: 'leaf',
-        commandVisibility: Visibility.Public,
-        manifestVisibility: Visibility.Environment,
-      }),
-    ).toBe(Visibility.Environment);
-  });
-
-  test('keeps the server visibility when nothing local chooses one', () => {
-    expect(visibilityForPublish(undefined, Visibility.Public)).toBe(
-      Visibility.Public,
-    );
-    expect(visibilityForPublish(undefined, undefined)).toBe(
-      Visibility.Environment,
-    );
-    expect(
-      visibilityForPublish(Visibility.Environment, Visibility.Public),
-    ).toBe(Visibility.Environment);
+  test('reads a component id from specs and ignores other types', () => {
+    const specs = [
+      polySpec('serverFunction', 'myapp.Button', 'server-id'),
+      polySpec('componentFunction', 'myapp.Button', 'component-id'),
+    ];
+    expect(componentIdFromSpecs(specs, 'myapp.Button')).toBe('component-id');
+    expect(componentIdFromSpecs(specs, 'myapp.Missing')).toBeNull();
   });
 });
 

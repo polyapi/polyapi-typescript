@@ -1,16 +1,6 @@
-import { ComponentKind, Visibility } from '../types';
+import { ComponentKind } from '../types';
 
 export type { ComponentKind };
-
-export type ComponentManifestEntry = {
-  file: string;
-  kind: ComponentKind;
-  imports?: string[];
-  visibility?: Visibility;
-  externalDependencies?: Record<string, string>;
-};
-
-export type ComponentManifest = Record<string, ComponentManifestEntry>;
 
 export type CompileResult = {
   sourceCode: string;
@@ -19,16 +9,8 @@ export type CompileResult = {
   npmSpecifiers: string[];
 };
 
-export const COMPONENTS_MANIFEST_RELATIVE = '.poly/components.json';
-
 export const toPolyPath = (context: string, name: string) =>
   context ? `${context}.${name}` : name;
-
-export const splitPolyPath = (polyPath: string) => {
-  const i = polyPath.lastIndexOf('.');
-  if (i <= 0) return { context: '', name: polyPath };
-  return { context: polyPath.slice(0, i), name: polyPath.slice(i + 1) };
-};
 
 export const packageRoot = (specifier: string): string => {
   if (specifier.startsWith('@')) {

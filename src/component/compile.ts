@@ -3,11 +3,10 @@ import path from 'path';
 import { createRequire } from 'module';
 import ts from 'typescript';
 import * as esbuild from 'esbuild';
-import { assignPolyPath, resolveExistingPath } from './manifest';
+import { resolveExistingPath } from './manifest';
 import { resolvePolyComponentImports } from './polyImports';
 import {
   CompileResult,
-  ComponentManifest,
   isBareNpmSpecifier,
   isPolyApiSpecifier,
   packageRoot,
@@ -378,8 +377,6 @@ export const findBareNpmSpecifiersInCode = (code: string): string[] => {
 
 export type CompileComponentOptions = {
   projectRoot: string;
-  defaultContext: string;
-  manifest: ComponentManifest;
   npmResolveDir?: string;
 };
 
@@ -590,16 +587,10 @@ export const compileComponentFile = async (
                 isJsModuleFile(resolved) &&
                 path.normalize(resolved) !== path.normalize(absFile)
               ) {
-                const assigned = assignPolyPath(
-                  resolved,
-                  options.projectRoot,
-                  options.defaultContext,
-                  options.manifest,
-                );
                 return {
                   errors: [
                     {
-                      text: `Import ${assigned.polyPath} via polyapi, not from another file.`,
+                      text: `Import '${args.path}' via polyapi, not from another file.`,
                     },
                   ],
                 };

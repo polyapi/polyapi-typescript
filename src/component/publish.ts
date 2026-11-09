@@ -4,14 +4,17 @@ import chalk from 'chalk';
 import shell from 'shelljs';
 import {
   createOrUpdateComponentFunction,
-  getComponentFunction,
   getPolyVendor,
+  getSpecs,
+  updateComponentFunction,
 } from '../api';
+import { DEFAULT_POLY_PATH } from '../constants';
+import { getCachedSpecs, getPolyLibPath, writeCachedSpecs } from '../utils';
 import { assertComponentIdentifiers } from './identifiers';
 import {
   ComponentFunctionDetailsDto,
-  ComponentKind,
   CreateComponentFunctionDto,
+  Specification,
   Visibility,
 } from '../types';
 import { uniquePreserve } from './compile';
@@ -20,7 +23,6 @@ import {
   reactFamilyMismatchWarnings,
 } from './instanceVendor';
 import { compileComponentGraph } from './graph';
-import { saveManifest } from './manifest';
 import { packageRoot } from './types';
 
 export type PublishComponentOptions = {
@@ -54,44 +56,26 @@ export const normalizeVisibility = (
   return normalized as Visibility;
 };
 
-export const resolveComponentVisibility = (options: {
-  nodePolyPath: string;
-  startPolyPath: string;
-  publishKind: ComponentKind;
-  commandVisibility?: Visibility;
-  manifestVisibility?: Visibility;
-}): Visibility | undefined => {
-  const explicit = options.commandVisibility;
-  if (explicit && options.publishKind === 'root') {
-    return explicit;
-  }
-  if (
-    explicit &&
-    options.publishKind === 'leaf' &&
-    options.nodePolyPath === options.startPolyPath
-  ) {
-    return explicit;
-  }
-  return options.manifestVisibility;
+export const componentIdFromSpecs = (
+  specs: Specification[],
+  polyPath: string,
+): string | null => {
+  const found = specs.find(
+    (spec) =>
+      spec.type === 'componentFunction' &&
+      spec.contextName.toLowerCase() === polyPath.toLowerCase() &&
+      Boolean(spec.id),
+  );
+  return found?.id || null;
 };
 
-export const visibilityForPublish = (
-  chosen: Visibility | undefined,
-  existing: Visibility | undefined,
-): Visibility => chosen ?? existing ?? Visibility.Environment;
-
-const readFailure = (error: unknown) => {
-  const err = error as {
-    message?: string;
-    response?: { status?: number; data?: { message?: string } };
-  };
-  const status = err.response?.status;
-  const serverMessage = err.response?.data?.message;
-  if (status && serverMessage) {
-    return `Request failed with status code ${status}: ${serverMessage}`;
-  }
-  if (status) return `Request failed with status code ${status}.`;
-  return err.message || 'Unexpected error.';
+const findComponentId = async (polyPath: string): Promise<string | null> => {
+  const libPath = getPolyLibPath(DEFAULT_POLY_PATH);
+  const cached = componentIdFromSpecs(getCachedSpecs(libPath), polyPath);
+  if (cached) return cached;
+  const specs = await getSpecs();
+  writeCachedSpecs(libPath, specs);
+  return componentIdFromSpecs(specs, polyPath);
 };
 
 export const publishComponents = async (
@@ -129,13 +113,7 @@ export const publishComponents = async (
     projectRoot,
     npmResolveDir,
   });
-  const {
-    startPolyPath,
-    kind,
-    originalManifest,
-    manifest,
-    nodes: compiledNodes,
-  } = graph;
+  const { nodes: compiledNodes } = graph;
   const commandVisibility = normalizeVisibility(options.visibility);
   const extraNpm = uniquePreserve(
     extraVendorSpecifiers(
@@ -153,67 +131,30 @@ export const publishComponents = async (
       file: node.relFile,
     })),
   );
-  const visibilities = new Map<string, Visibility>();
-  for (const node of compiledNodes) {
-    const chosen = resolveComponentVisibility({
-      nodePolyPath: node.polyPath,
-      startPolyPath,
-      publishKind: kind,
-      commandVisibility,
-      manifestVisibility: originalManifest[node.polyPath]?.visibility,
-    });
-    if (chosen) {
-      visibilities.set(node.polyPath, chosen);
-      continue;
-    }
-    let existing;
-    try {
-      existing = await getComponentFunction(node.polyPath);
-    } catch (error) {
-      throw new Error(
-        `Could not read the existing visibility for ${node.polyPath}, so it was not published. ${readFailure(error)}`,
-      );
-    }
-    const visibility = visibilityForPublish(undefined, existing?.visibility);
-    if (
-      existing?.visibility &&
-      existing.visibility !== Visibility.Environment
-    ) {
-      shell.echo(
-        `Keeping ${existing.visibility} visibility for ${node.polyPath}.`,
-      );
-    }
-    visibilities.set(node.polyPath, visibility);
-  }
-
   const results: ComponentFunctionDetailsDto[] = [];
 
   for (const node of compiledNodes) {
-    const visibility =
-      visibilities.get(node.polyPath) ?? Visibility.Environment;
+    const componentId = await findComponentId(node.polyPath);
     const body: CreateComponentFunctionDto = {
       name: node.name,
       context: node.context,
-      kind: node.kind,
       sourceCode: node.sourceCode,
       code: node.code,
       imports: node.imports,
-      visibility,
+      kind: node.kind,
     };
+    if (commandVisibility) body.visibility = commandVisibility;
     if (node.kind === 'root') {
       body.vendorCode = null;
     }
 
-    const saved = await createOrUpdateComponentFunction(body);
-    results.push({ ...saved, kind: node.kind });
-
-    manifest[node.polyPath] = {
-      file: node.relFile,
-      kind: node.kind,
-      imports: node.imports,
-      visibility,
-    };
-    saveManifest(graph.projectRoot, manifest);
+    const saved = componentId
+      ? await updateComponentFunction(componentId, {
+          ...body,
+          kind: node.kind === 'root' ? node.kind : undefined,
+        })
+      : await createOrUpdateComponentFunction(body);
+    results.push({ ...saved, kind: saved.kind ?? node.kind });
   }
 
   return { components: results };

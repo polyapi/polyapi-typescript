@@ -299,18 +299,48 @@ export const createOrUpdateComponentFunction = async (
   ).data;
 };
 
-export const getComponentFunction = async (polyPath: string) => {
-  try {
-    return (
-      await http.get<ComponentFunctionDetailsDto>(
-        `${getApiBaseURL()}/functions/component/${encodeURIComponent(polyPath)}?usePathId=true`,
-        { headers: getApiHeaders() },
-      )
-    ).data;
-  } catch (error) {
-    if (isAxiosError(error) && error.response?.status === 404) return null;
-    throw error;
+export const updateComponentFunction = async (
+  id: string,
+  data: Omit<CreateComponentFunctionDto, 'kind'> & {
+    kind?: CreateComponentFunctionDto['kind'];
+  },
+) => {
+  const body: Record<string, unknown> = {
+    name: data.name,
+    context: data.context,
+    sourceCode: data.sourceCode,
+    code: data.code,
+    imports: data.imports,
+  };
+  if (data.kind) {
+    body.kind = data.kind;
   }
+  if (data.visibility) {
+    body.visibility = data.visibility;
+  }
+  if (data.kind === 'root') {
+    if (data.vendorHash) {
+      body.vendorHash = data.vendorHash;
+    } else if (data.vendorCode !== undefined) {
+      body.vendorCode = data.vendorCode;
+    }
+    if (data.externalDependencies) {
+      body.externalDependencies = data.externalDependencies;
+    }
+  }
+
+  return (
+    await http.patch<ComponentFunctionDetailsDto>(
+      `${getApiBaseURL()}/functions/component/${encodeURIComponent(id)}`,
+      body,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getApiHeaders(),
+        },
+      },
+    )
+  ).data;
 };
 
 const applicationList = (data: unknown): ApplicationDto[] => {

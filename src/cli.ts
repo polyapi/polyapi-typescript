@@ -262,12 +262,12 @@ void yargs
           })
           .option('root', {
             describe:
-              'Component only - publish this file as a root component and walk its local import graph',
+              'Component only - publish this file as a root component',
             type: 'boolean',
           })
           .option('public', {
             describe:
-              'Component only - alias for `--visibility public`. On a root, applies PUBLIC to every component upserted in this command',
+              'Component only - alias for `--visibility public`',
             type: 'boolean',
           })
           .option('logs', {
