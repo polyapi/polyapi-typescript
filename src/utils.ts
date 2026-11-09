@@ -70,6 +70,7 @@ export const echoGenerationError = (specification: Specification) => {
     aiFunction: 'AI Function',
     queue: 'Queue',
     lock: 'Lock',
+    componentFunction: 'Component Function',
   };
 
   const type = typeMap[specification.type];

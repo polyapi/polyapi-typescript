@@ -47,6 +47,8 @@ export type HttpRequestConfig = {
   timeout?: number;
   throttleRetries?: number;
   didRetry?: boolean;
+  skipGeneratedAuth?: boolean;
+  transformRequest?: Array<(data: unknown) => unknown>;
 };
 
 export type HttpResponse<T = unknown> = {
@@ -212,6 +214,7 @@ export const encodeBody = (
   headers: Record<string, string>,
 ): Dispatcher.DispatchOptions['body'] | undefined => {
   if (body === undefined || body === null) return undefined;
+  if (Buffer.isBuffer(body)) return body;
   if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
     if (!getHeader(headers, 'content-type')) {
       setHeader(
@@ -428,11 +431,52 @@ const createRequestInfo = (
   headers: Record<string, string>,
 ) => ({ url, method, headers: { ...headers } });
 
+const runningInBrowser = (): boolean =>
+  typeof globalThis !== 'undefined' &&
+  typeof (globalThis as { document?: unknown }).document !== 'undefined';
+
+const instanceHostKind = (hostname: string): 'io' | 'app' | null => {
+  const host = hostname.toLowerCase();
+  if (host === 'polyapi.io' || host.endsWith('.polyapi.io')) return 'io';
+  if (host === 'polyapi.app' || host.endsWith('.polyapi.app')) return 'app';
+  return null;
+};
+
+// Browser calls must stay on polyapi.app so the SameSite=strict session cookie
+// is sent. CloudFront rewrites those requests back to the polyapi.io instance.
+// The public prefix on that host is /api.
+export const browserInstanceUrl = (url: string): string => {
+  if (!runningInBrowser()) return url;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  const kind = instanceHostKind(parsed.hostname);
+  if (!kind) return url;
+  if (kind === 'io') {
+    parsed.hostname = parsed.hostname.replace(/polyapi\.io$/i, 'polyapi.app');
+  }
+  const path = parsed.pathname.replace(/\/+$/, '');
+  if (path.endsWith('/api')) {
+    parsed.pathname = path;
+  } else if (path === '') {
+    parsed.pathname = '/api';
+  } else {
+    parsed.pathname = `${path}/api`;
+  }
+  return parsed.toString().replace(/\/$/, '');
+};
+
 const getDefaultBaseURL = (): string | undefined => {
   const generated = getGeneratedRuntime();
   if (!generated) return undefined;
-  if (process.env.NODE_ENV === 'development') return generated.apiBaseUrl;
-  return generated.apiBaseUrl.replace(/^http:/, 'https:');
+  const base =
+    process.env.NODE_ENV === 'development'
+      ? generated.apiBaseUrl
+      : generated.apiBaseUrl.replace(/^http:/, 'https:');
+  return browserInstanceUrl(base);
 };
 
 const applyGeneratedAuth = (headers: Record<string, string>) => {
@@ -466,8 +510,13 @@ const send = async <T = unknown>(
 ): Promise<HttpResponse<T>> => {
   const method = (config.method || 'GET').toUpperCase();
   const headers = normalizeHeaders(config.headers);
-  applyGeneratedAuth(headers);
-  const payload = config.body !== undefined ? config.body : config.data;
+  if (!config.skipGeneratedAuth) applyGeneratedAuth(headers);
+  let payload = config.body !== undefined ? config.body : config.data;
+  if (payload !== undefined && config.transformRequest?.length) {
+    for (const transform of config.transformRequest) {
+      payload = transform(payload);
+    }
+  }
   const body = ['GET', 'HEAD'].includes(method)
     ? undefined
     : encodeBody(payload, headers);

@@ -18,6 +18,46 @@ import {
   getTSBaseUrl,
   transpileFunction,
 } from '../transpiler';
+import { publishComponents } from '../component/publish';
+
+export const addOrUpdateComponentFunction = async (
+  polyPath: string,
+  context: string,
+  name: string,
+  file: string,
+  isRoot: boolean,
+  visibility?: string,
+) => {
+  loadConfig(polyPath);
+
+  try {
+    shell.echo('-n', 'Publishing component function...');
+    const published = await publishComponents({
+      context,
+      name,
+      file,
+      isRoot,
+      visibility,
+    });
+    shell.echo(chalk.green('DONE'));
+    for (const result of published.components) {
+      const polyPathName = result.context
+        ? `${result.context}.${result.name}`
+        : result.name;
+      shell.echo(`Component ${polyPathName} (${result.kind}) ID: ${result.id}`);
+    }
+  } catch (e) {
+    shell.echo(chalk.redBright('ERROR\n'));
+    const err = e as any;
+    const details = err?.response?.data?.message
+      ? `:\n    ${chalk.red.italic(err.response.data.message)}`
+      : '';
+    shell.echo(
+      `${chalk.redBright.bold(err?.message ?? 'Unexpected error.')}${details}`,
+    );
+    process.exit(1);
+  }
+};
 
 export const addOrUpdateCustomFunction = async (
   polyPath: string,
