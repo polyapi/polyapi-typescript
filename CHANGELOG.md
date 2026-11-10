@@ -1,3 +1,6 @@
+### 0.28.2
+* Fixing bug preventing use of queues and locks
+
 ### 0.28.1
 * Fixing bug generating SDK for functions with arguments
 

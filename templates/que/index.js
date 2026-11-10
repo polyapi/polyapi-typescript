@@ -1,6 +1,6 @@
 const set = require('lodash/set');
 const { queues } = require('./queues');
-const { loadQnats } = require('../qnats');
+const { loadQnats, isShuttingDown } = require('../qnats');
 
 
 class QueueQnats {

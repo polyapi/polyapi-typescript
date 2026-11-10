@@ -1,6 +1,6 @@
 const set = require('lodash/set');
 const { locks } = require('./locks');
-const { loadQnats } = require('../qnats');
+const { loadQnats, isShuttingDown } = require('../qnats');
 
 
 class LockManagerQnats {
