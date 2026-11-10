@@ -470,20 +470,19 @@ void yargs
             })
             .option('root', {
               describe:
-                'Unauthenticated PUBLIC root component (e.g. myapp.App2)',
-              type: 'string',
-              demandOption: true,
+                'Route and component as <path>:<context.name>. Repeat for each root; "/" is required. Example: --root /:myapp.App --root /settings:myapp.Settings. On update, any --root replaces the whole roots map.',
+              type: 'array',
             })
-            .option('authenticated-root', {
+            .option('public-access', {
               describe:
-                'Authenticated root component. Pass an empty string to clear it. Omitted on update keeps the current root.',
-              type: 'string',
+                'Serve these roots without a session. Omit on update to leave the current value. --public-access sets true; --no-public-access or --public-access=false sets false.',
+              type: 'boolean',
             }),
-        async ({ name, subdomain, root, authenticatedRoot }) => {
-          if (!name || !root) {
+        async ({ name, subdomain, root, publicAccess }) => {
+          if (!name) {
             shell.echo(
               chalk.redBright('ERROR:'),
-              'Usage: poly application add <name> --root <component>',
+              'Usage: poly application add <name> --root /:context.Name',
             );
             yargs.showHelp();
             return;
@@ -501,14 +500,14 @@ void yargs
           const { addApplicationCommand } = await import(
             './commands/application'
           );
+          const roots = (Array.isArray(root) ? root : root ? [root] : []).map(
+            (value) => `${value}`,
+          );
           await addApplicationCommand(DEFAULT_POLY_PATH, {
             name,
             subdomain: subdomain || undefined,
-            rootComponent: root,
-            authenticatedRoot:
-              authenticatedRoot === ''
-                ? null
-                : authenticatedRoot || undefined,
+            roots: roots.length ? roots : undefined,
+            publicAccess,
           });
         },
       );

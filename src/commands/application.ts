@@ -1,7 +1,10 @@
 import chalk from 'chalk';
 import shell from 'shelljs';
 import { loadConfig } from '../config';
-import { addCanopyV2Application } from '../component/applications';
+import {
+  addCanopyV2Application,
+  parseApplicationRoots,
+} from '../component/applications';
 
 const shortErrorMessage = (error: unknown) => {
   const err = error as {
@@ -28,8 +31,7 @@ const echoApplication = (
   shell.echo(`Application ${saved.application.name} ID: ${saved.application.id}`);
   const joined = `${saved.subdomain}-${saved.environmentSubdomain}`;
   shell.echo(`Origin host label: ${joined}`);
-  shell.echo(`Spec: /applications/${joined}/spec`);
-  shell.echo(`HTTP page: /?app=${joined}`);
+  shell.echo(`GET /applications/${joined}/config`);
 };
 
 export const addApplicationCommand = async (
@@ -37,8 +39,8 @@ export const addApplicationCommand = async (
   options: {
     name: string;
     subdomain?: string;
-    rootComponent: string;
-    authenticatedRoot?: string | null;
+    roots?: string[];
+    publicAccess?: boolean;
   },
 ) => {
   loadConfig(polyPath);
@@ -47,8 +49,10 @@ export const addApplicationCommand = async (
       {
         name: options.name,
         subdomain: options.subdomain,
-        rootComponent: options.rootComponent,
-        authenticatedRoot: options.authenticatedRoot,
+        roots: options.roots?.length
+          ? parseApplicationRoots(options.roots)
+          : undefined,
+        publicAccess: options.publicAccess,
       },
       (updating) => {
         shell.echo(

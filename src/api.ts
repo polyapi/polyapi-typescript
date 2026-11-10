@@ -361,6 +361,15 @@ export const listApplications = async () => {
   );
 };
 
+export const getApplication = async (id: string) => {
+  return (
+    await http.get<ApplicationDto>(
+      `${getApiBaseURL()}/applications/${encodeURIComponent(id)}`,
+      { headers: getApiHeaders() },
+    )
+  ).data;
+};
+
 export const createApplication = async (data: CreateCanopyV2ApplicationDto) => {
   return (
     await http.post<ApplicationDto>(`${getApiBaseURL()}/applications`, data, {
