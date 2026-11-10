@@ -401,6 +401,7 @@ describe('function dependency tracking', () => {
       }
     `);
     expect(external).toEqual({
+      axios: 'latest',
       lodash: '4.18.1',
       chalk: '4.1.2',
       yargs: '17.7.1',

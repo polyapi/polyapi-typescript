@@ -77,13 +77,13 @@ class QueueQnats {
   async next() {
     if (isShuttingDown()) throw new Error(`Cannot get next event from queue: Container is shutting down.`);
     const { queueConsumer } = loadQnats();
-    return queueConsumer.next(this.streamId, queues);
+    return queueConsumer.next(this.streamId, this.queueId);
   }
 
   async drain(handler, concurrency) {
     if (isShuttingDown()) throw new Error(`Cannot drain queue events: Container is shutting down.`);
     const { queueConsumer } = loadQnats();
-    return queueConsumer.drainAll(this.streamId, queues, handler, concurrency);
+    return queueConsumer.drainAll(this.streamId, this.queueId, handler, concurrency);
   }
 
   status() {

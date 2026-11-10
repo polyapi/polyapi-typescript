@@ -1,3 +1,6 @@
+### 0.28.5
+* Fixing bug with queue next() method
+
 ### 0.28.4
 * Updating base queue library
 
