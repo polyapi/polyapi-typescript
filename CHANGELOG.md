@@ -1,3 +1,6 @@
+### 0.28.4
+* Updating base queue library
+
 ### 0.28.3
 * Adding drain() method to queues
 * Adding next() method to queues

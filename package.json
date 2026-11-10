@@ -1,6 +1,6 @@
 {
   "name": "polyapi",
-  "version": "0.28.3",
+  "version": "0.28.4",
   "description": "Poly is a CLI tool to help create and manage your Poly definitions.",
   "license": "MIT",
   "repository": {
@@ -30,8 +30,26 @@
     "postversion": "git push && git push --tags",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
-  "devDependencies": {
+  "dependencies": {
+    "@inquirer/prompts": "8.6.0",
     "@polyapi/qnats": "0.1.13",
+    "adm-zip": "0.6.1",
+    "chalk": "4.1.2",
+    "dotenv": "16.0.3",
+    "handlebars": "4.7.10",
+    "json-schema-to-typescript": "15.0.4",
+    "lodash": "4.18.1",
+    "prettier": "3.9.6",
+    "semver": "7.5.4",
+    "shelljs": "0.8.5",
+    "socket.io-client": "4.8.3",
+    "ts-json-schema-generator": "2.9.0",
+    "typescript": "6.0.3",
+    "undici": "6.29.1",
+    "validator": "13.15.26",
+    "yargs": "17.7.1"
+  },
+  "devDependencies": {
     "@types/adm-zip": "0.5.5",
     "@types/jest": "30.0.0",
     "@types/lodash": "4.17.9",
@@ -48,24 +66,6 @@
     "jest-summary-reporter": "0.0.2",
     "rimraf": "4.4.1",
     "ts-jest": "29.4.15"
-  },
-  "dependencies": {
-    "@inquirer/prompts": "8.6.0",
-    "adm-zip": "0.6.1",
-    "chalk": "4.1.2",
-    "dotenv": "16.0.3",
-    "handlebars": "4.7.10",
-    "json-schema-to-typescript": "15.0.4",
-    "lodash": "4.18.1",
-    "prettier": "3.9.6",
-    "semver": "7.5.4",
-    "shelljs": "0.8.5",
-    "socket.io-client": "4.8.3",
-    "ts-json-schema-generator": "2.9.0",
-    "typescript": "6.0.3",
-    "undici": "6.29.1",
-    "validator": "13.15.26",
-    "yargs": "17.7.1"
   },
   "overrides": {
     "brace-expansion": "5.0.12",
