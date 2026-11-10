@@ -17,13 +17,13 @@ import {
   Specification,
   Visibility,
 } from '../types';
-import { uniquePreserve } from './compile';
+import { compileComponentFile, uniquePreserve } from './compile';
 import {
   extraVendorSpecifiers,
   reactFamilyMismatchWarnings,
 } from './instanceVendor';
-import { compileComponentGraph } from './graph';
-import { packageRoot } from './types';
+import { posixRel, resolveExistingPath } from './manifest';
+import { packageRoot, toPolyPath } from './types';
 
 export type PublishComponentOptions = {
   context: string;
@@ -83,18 +83,18 @@ export const publishComponents = async (
 ): Promise<{
   components: ComponentFunctionDetailsDto[];
 }> => {
-  const projectRoot = path.resolve(options.projectRoot ?? process.cwd());
-  const npmResolveDir = path.resolve(options.npmResolveDir ?? projectRoot);
-
-  if (
-    !fs.existsSync(path.resolve(projectRoot, options.file)) ||
-    !fs.statSync(path.resolve(projectRoot, options.file)).isFile()
-  ) {
+  const projectRoot = resolveExistingPath(options.projectRoot ?? process.cwd());
+  const npmResolveDir = resolveExistingPath(
+    options.npmResolveDir ?? projectRoot,
+  );
+  const absFile = resolveExistingPath(path.resolve(projectRoot, options.file));
+  if (!fs.existsSync(absFile) || !fs.statSync(absFile).isFile()) {
     throw new Error(`Component file not found: ${options.file}`);
   }
 
+  const relFile = posixRel(projectRoot, absFile);
   assertComponentIdentifiers([
-    { name: options.name, context: options.context, file: options.file },
+    { name: options.name, context: options.context, file: relFile },
   ]);
 
   const instanceVendor = await getPolyVendor();
@@ -105,57 +105,37 @@ export const publishComponents = async (
     shell.echo(chalk.yellow('WARNING:'), warning);
   }
 
-  const graph = await compileComponentGraph({
-    context: options.context,
-    name: options.name,
-    file: options.file,
-    isRoot: options.isRoot,
+  const compiled = await compileComponentFile(absFile, {
     projectRoot,
     npmResolveDir,
   });
-  const { nodes: compiledNodes } = graph;
+  const kind = options.isRoot ? 'root' : 'leaf';
   const commandVisibility = normalizeVisibility(options.visibility);
   const extraNpm = uniquePreserve(
-    extraVendorSpecifiers(
-      uniquePreserve(compiledNodes.flatMap((node) => node.npmSpecifiers)),
-    ),
+    extraVendorSpecifiers(uniquePreserve(compiled.npmSpecifiers)),
   );
   if (extraNpm.length) {
     throw new Error(unsupportedPackageError(extraNpm));
   }
 
-  assertComponentIdentifiers(
-    compiledNodes.map((node) => ({
-      name: node.name,
-      context: node.context,
-      file: node.relFile,
-    })),
-  );
-  const results: ComponentFunctionDetailsDto[] = [];
+  const polyPath = toPolyPath(options.context, options.name);
+  const componentId = await findComponentId(polyPath);
+  const body: CreateComponentFunctionDto = {
+    name: options.name,
+    context: options.context,
+    sourceCode: compiled.sourceCode,
+    code: compiled.code,
+    imports: compiled.imports,
+    kind,
+  };
+  if (commandVisibility) body.visibility = commandVisibility;
 
-  for (const node of compiledNodes) {
-    const componentId = await findComponentId(node.polyPath);
-    const body: CreateComponentFunctionDto = {
-      name: node.name,
-      context: node.context,
-      sourceCode: node.sourceCode,
-      code: node.code,
-      imports: node.imports,
-      kind: node.kind,
-    };
-    if (commandVisibility) body.visibility = commandVisibility;
-    if (node.kind === 'root') {
-      body.vendorCode = null;
-    }
+  const saved = componentId
+    ? await updateComponentFunction(componentId, {
+        ...body,
+        kind: kind === 'root' ? kind : undefined,
+      })
+    : await createOrUpdateComponentFunction(body);
 
-    const saved = componentId
-      ? await updateComponentFunction(componentId, {
-          ...body,
-          kind: node.kind === 'root' ? node.kind : undefined,
-        })
-      : await createOrUpdateComponentFunction(body);
-    results.push({ ...saved, kind: saved.kind ?? node.kind });
-  }
-
-  return { components: results };
+  return { components: [{ ...saved, kind: saved.kind ?? kind }] };
 };

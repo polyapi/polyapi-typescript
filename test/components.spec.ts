@@ -5,11 +5,11 @@ import path from 'path';
 import * as api from '../src/api';
 import { generateFunctionsTSDeclarationFile } from '../src/commands/generate/types';
 import {
+  compileComponentFile,
   findBareNpmSpecifiersInCode,
   readPackageVersion,
   uniquePreserve,
 } from '../src/component/compile';
-import { compileComponentGraph } from '../src/component/graph';
 import { Specification } from '../src/types';
 import * as utils from '../src/utils';
 import {
@@ -149,6 +149,12 @@ describe('component compile', () => {
     }
   };
 
+  const compileFile = (file: string) =>
+    compileComponentFile(path.join(tmp, file), {
+      projectRoot: tmp,
+      npmResolveDir,
+    });
+
   beforeEach(() => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poly-components-'));
     npmResolveDir = tmp;
@@ -176,14 +182,7 @@ export const Button = ({ label }: { label: string }) => <button>{label}</button>
     });
 
     await expect(
-      compileComponentGraph({
-        projectRoot: tmp,
-        npmResolveDir,
-        context: 'myapp',
-        name: 'App',
-        file: 'src/App.tsx',
-        isRoot: true,
-      }),
+      compileFile('src/App.tsx'),
     ).rejects.toThrow(
       /Import '\.\/Button' via polyapi, not from another file/,
     );
@@ -202,21 +201,9 @@ export const App = () => {
       'src/App.tsx': appSource,
     });
 
-    const graph = await compileComponentGraph({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    const root = graph.nodes[0];
+    const root = await compileFile('src/App.tsx');
 
-    expect(graph.nodes).toHaveLength(1);
     expect(root).toMatchObject({
-      context: 'myapp',
-      name: 'App',
-      kind: 'root',
       sourceCode: appSource,
       imports: ['myapp.Button'],
     });
@@ -242,20 +229,11 @@ export const App = () => {
 `,
     });
 
-    const graph = await compileComponentGraph({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    const root = graph.nodes[0];
+    const root = await compileFile('src/App.tsx');
 
     expect(root.imports).toEqual(['myapp.polySession']);
     expect(root.code).toContain('poly:myapp.polySession');
     expect(root.code).toContain('createPolySession');
-    expect(graph.nodes).toHaveLength(1);
   });
 
   test('a server function is resolved and is not a downloaded import', async () => {
@@ -270,15 +248,7 @@ export const App = () => {
 `,
     });
 
-    const graph = await compileComponentGraph({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    const root = graph.nodes[0];
+    const root = await compileFile('src/App.tsx');
 
     expect(root.imports).toEqual(['myapp.Button']);
     expect(root.code).toContain('poly:myapp.Button');
@@ -304,15 +274,7 @@ export const App = () => {
 `,
     });
 
-    const graph = await compileComponentGraph({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    const root = graph.nodes[0];
+    const root = await compileFile('src/App.tsx');
 
     expect(root.imports).toEqual([]);
     expect(root.code).toContain(
@@ -335,14 +297,7 @@ export const App = () => <poly.missing.Thing />;
     });
 
     await expect(
-      compileComponentGraph({
-        projectRoot: tmp,
-        npmResolveDir,
-        context: 'myapp',
-        name: 'App',
-        file: 'src/App.tsx',
-        isRoot: true,
-      }),
+      compileFile('src/App.tsx'),
     ).rejects.toThrow(/missing\.Thing/);
   });
 
@@ -353,17 +308,8 @@ export const App = () => <div>hello</div>;
 `,
     });
 
-    const graph = await compileComponentGraph({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    const root = graph.nodes[0];
+    const root = await compileFile('src/App.tsx');
 
-    expect(graph.nodes).toHaveLength(1);
     expect(root.code).toContain('poly:vendor');
     expect(root.code).not.toContain('poly:app-vendor');
     expect(root.code).not.toMatch(npmImportPattern('react'));
@@ -378,17 +324,10 @@ export const App = () => <div>{_.toUpper('hello')}</div>;
 `,
     });
 
-    const graph = await compileComponentGraph({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
-    const extra = extraPackages(
-      graph.nodes.flatMap((node) => node.npmSpecifiers),
-    );
+    const compiled = await compileFile('src/App.tsx');
+    const extra = extraPackages(compiled.npmSpecifiers);
+
+    expect(compiled.code).not.toContain('poly:app-vendor');
 
     expect(extra).toEqual(['lodash']);
     expect(unsupportedPackageError(extra)).toBe(
@@ -408,16 +347,8 @@ export const Button = ({ label }: { label: string }) => {
 `,
     });
 
-    const graph = await compileComponentGraph({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'Button',
-      file: 'src/Button.tsx',
-    });
-    const extra = extraPackages(
-      graph.nodes.flatMap((node) => node.npmSpecifiers),
-    );
+    const compiled = await compileFile('src/Button.tsx');
+    const extra = extraPackages(compiled.npmSpecifiers);
 
     expect(extra).toEqual(['lodash', 'chalk']);
     expect(unsupportedPackageError(extra)).toBe(
@@ -437,14 +368,7 @@ export const App = () => {
     });
 
     await expect(
-      compileComponentGraph({
-        projectRoot: tmp,
-        npmResolveDir,
-        context: 'myapp',
-        name: 'App',
-        file: 'src/App.tsx',
-        isRoot: true,
-      }),
+      compileFile('src/App.tsx'),
     ).rejects.toThrow(/Cannot find name '_'/);
   });
 
@@ -468,17 +392,9 @@ export const App = () => {
 `;
     writeComponents({ 'src/App.tsx': source });
 
-    const graph = await compileComponentGraph({
-      projectRoot: tmp,
-      npmResolveDir,
-      context: 'myapp',
-      name: 'App',
-      file: 'src/App.tsx',
-      isRoot: true,
-    });
+    const compiled = await compileFile('src/App.tsx');
 
-    expect(graph.nodes).toHaveLength(1);
-    expect(graph.nodes[0].sourceCode).toContain('window.innerWidth');
+    expect(compiled.sourceCode).toContain('window.innerWidth');
   });
 });
 

@@ -28,17 +28,6 @@ export const isReactFamilySpecifier = (specifier: string) =>
   isReactFamilyPackage(packageRoot(specifier));
 
 export const POLY_INSTANCE_VENDOR = 'poly:vendor';
-export const POLY_APP_VENDOR = 'poly:app-vendor';
-
-export const vendorModuleForNpmSpecifier = (specifier: string) =>
-  isReactFamilySpecifier(specifier) ? POLY_INSTANCE_VENDOR : POLY_APP_VENDOR;
-
-export const INSTANCE_REACT_VENDOR_SPECIFIERS = [
-  'react',
-  'react/jsx-runtime',
-  'react-dom',
-  'react-dom/client',
-];
 
 export const isRelativeSpecifier = (specifier: string) =>
   specifier.startsWith('./') || specifier.startsWith('../');

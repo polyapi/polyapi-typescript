@@ -9,10 +9,8 @@ import {
   CompileResult,
   isBareNpmSpecifier,
   isPolyApiSpecifier,
-  packageRoot,
-  POLY_APP_VENDOR,
+  isReactFamilySpecifier,
   POLY_INSTANCE_VENDOR,
-  vendorModuleForNpmSpecifier,
 } from './types';
 
 const nodeRequire = createRequire(__filename);
@@ -182,9 +180,8 @@ const rewriteDynamicNpmImports = (code: string): string =>
   code.replace(
     /import\s*\(\s*(['"])([^'"]+)\1\s*\)/g,
     (match, quote: string, spec: string) => {
-      if (!isBareNpmSpecifier(spec) || isPolyApiSpecifier(spec)) return match;
-      const modulePath = vendorModuleForNpmSpecifier(spec);
-      return `import(${quote}${modulePath}${quote}).then(m => m.${vendorExportName(
+      if (!isReactFamilySpecifier(spec)) return match;
+      return `import(${quote}${POLY_INSTANCE_VENDOR}${quote}).then(m => m.${vendorExportName(
         spec,
       )})`;
     },
@@ -223,7 +220,7 @@ export const rewriteNpmImportsToVendor = (code: string): string => {
       ts.isStringLiteral(stmt.moduleSpecifier)
     ) {
       const spec = stmt.moduleSpecifier.text;
-      if (isBareNpmSpecifier(spec) && !isPolyApiSpecifier(spec)) {
+      if (isReactFamilySpecifier(spec)) {
         npmSpecifiers.add(spec);
         npmBindings.push(...collectImportBindings(stmt, spec));
         continue;
@@ -238,13 +235,13 @@ export const rewriteNpmImportsToVendor = (code: string): string => {
       ts.isStringLiteral(stmt.moduleSpecifier)
     ) {
       const spec = stmt.moduleSpecifier.text;
-      if (isBareNpmSpecifier(spec) && !isPolyApiSpecifier(spec)) {
+      if (isReactFamilySpecifier(spec)) {
         npmSpecifiers.add(spec);
         extraAfter.push(
           ...convertNpmReexport(
             stmt,
             vendorExportName(spec),
-            vendorModuleForNpmSpecifier(spec),
+            POLY_INSTANCE_VENDOR,
           ),
         );
         continue;
@@ -260,20 +257,10 @@ export const rewriteNpmImportsToVendor = (code: string): string => {
     return rewriteDynamicNpmImports(code);
   }
 
-  const instanceSpecs = [...npmSpecifiers]
-    .filter(
-      (spec) => vendorModuleForNpmSpecifier(spec) === POLY_INSTANCE_VENDOR,
-    )
-    .sort();
-  const appSpecs = [...npmSpecifiers]
-    .filter((spec) => vendorModuleForNpmSpecifier(spec) === POLY_APP_VENDOR)
-    .sort();
-  const vendorImports = [
-    ...(instanceSpecs.length
-      ? [vendorImportLine(POLY_INSTANCE_VENDOR, instanceSpecs)]
-      : []),
-    ...(appSpecs.length ? [vendorImportLine(POLY_APP_VENDOR, appSpecs)] : []),
-  ];
+  const instanceSpecs = [...npmSpecifiers].sort();
+  const vendorImports = instanceSpecs.length
+    ? [vendorImportLine(POLY_INSTANCE_VENDOR, instanceSpecs)]
+    : [];
 
   const consts = npmBindings.flatMap((binding) => {
     if (binding.kind === 'sideEffect' || !binding.local) return [];
@@ -616,7 +603,9 @@ export const compileComponentFile = async (
   }
 
   const code = rewriteNpmImportsToVendor(output);
-  const leftover = findBareNpmSpecifiersInCode(code);
+  const leftover = findBareNpmSpecifiersInCode(code).filter(
+    isReactFamilySpecifier,
+  );
   if (leftover.length) {
     throw new Error(
       `Compiled component still contains npm specifiers: ${leftover.join(', ')}`,
@@ -644,68 +633,6 @@ const esbuildLoaderForFile = (filePath: string): esbuild.Loader => {
     default:
       return 'ts';
   }
-};
-
-export type BundleVendorOptions = {
-  minify?: boolean;
-  production?: boolean;
-};
-
-export const bundleVendor = async (
-  specifiers: string[],
-  npmResolveDir: string,
-  options: BundleVendorOptions = {},
-): Promise<string> => {
-  const unique = uniquePreserve(specifiers).sort();
-  if (!unique.length) {
-    return 'export {};\n';
-  }
-
-  const usedNames = new Map<string, string>();
-  const lines = unique.map((spec) => {
-    let name = vendorExportName(spec);
-    if ([...usedNames.values()].includes(name)) {
-      name = `${name}$${usedNames.size}`;
-    }
-    usedNames.set(spec, name);
-    return `export * as ${name} from ${JSON.stringify(spec)};`;
-  });
-
-  const production = options.production === true;
-  const minify = options.minify === true;
-  const result = await esbuild.build({
-    stdin: {
-      contents: `${lines.join('\n')}\n`,
-      resolveDir: npmResolveDir,
-      sourcefile: 'poly-vendor.js',
-      loader: 'js',
-    },
-    absWorkingDir: npmResolveDir,
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    write: false,
-    sourcemap: false,
-    logLevel: 'silent',
-    minify,
-    keepNames: !minify,
-    mainFields: ['module', 'browser', 'main'],
-    conditions: ['import', 'module', 'browser', 'default'],
-    nodePaths: [path.join(npmResolveDir, 'node_modules')],
-    ...(production
-      ? { define: { 'process.env.NODE_ENV': '"production"' } }
-      : {}),
-  });
-
-  if (result.errors.length) {
-    throw new Error(result.errors.map((err) => err.text).join('\n'));
-  }
-
-  const output = result.outputFiles?.[0]?.text;
-  if (!output) {
-    throw new Error('esbuild produced no vendor output');
-  }
-  return output;
 };
 
 const readVersionFromPackageJson = (
@@ -780,17 +707,4 @@ export const readPackageVersion = (pkg: string, resolveDir: string): string => {
   throw new Error(
     `Unable to resolve version for npm package '${pkg}' from ${resolveDir}`,
   );
-};
-
-export const resolveExternalDependencies = (
-  specifiers: string[],
-  npmResolveDir: string,
-): Record<string, string> => {
-  const deps: Record<string, string> = {};
-  for (const spec of uniquePreserve(specifiers).sort()) {
-    const root = packageRoot(spec);
-    if (deps[root]) continue;
-    deps[root] = readPackageVersion(root, npmResolveDir);
-  }
-  return deps;
 };

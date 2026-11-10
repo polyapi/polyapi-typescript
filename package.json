@@ -10,10 +10,6 @@
   },
   "files": [
     "build/**/*",
-    "!build/commands/vendor.js",
-    "!build/commands/vendor.d.ts",
-    "!build/commands/vendor.js.map",
-    "!build/commands/vendor.d.ts.map",
     "index.js",
     "index.d.ts"
   ],
@@ -32,8 +28,7 @@
     "prepublishOnly": "npm run lint && npm run build",
     "preversion": "npm run lint",
     "postversion": "git push && git push --tags",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "vendor:build": "node scripts/publish-vendor.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "devDependencies": {
     "@polyapi/qnats": "0.1.11",

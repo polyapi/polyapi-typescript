@@ -241,7 +241,7 @@ export type PolyVendorDto = {
 };
 
 export const NO_POLY_VENDOR_ERROR =
-  'This instance has no polyVendor. A SuperAdmin must POST /functions/vendor first.';
+  'This instance has no polyVendor bundle.';
 
 export const getPolyVendor = async (): Promise<PolyVendorDto> => {
   try {
@@ -273,16 +273,6 @@ export const createOrUpdateComponentFunction = async (
   };
   if (data.visibility) {
     body.visibility = data.visibility;
-  }
-  if (data.kind === 'root') {
-    if (data.vendorHash) {
-      body.vendorHash = data.vendorHash;
-    } else {
-      body.vendorCode = data.vendorCode ?? null;
-    }
-    if (data.externalDependencies) {
-      body.externalDependencies = data.externalDependencies;
-    }
   }
 
   return (
@@ -317,16 +307,6 @@ export const updateComponentFunction = async (
   }
   if (data.visibility) {
     body.visibility = data.visibility;
-  }
-  if (data.kind === 'root') {
-    if (data.vendorHash) {
-      body.vendorHash = data.vendorHash;
-    } else if (data.vendorCode !== undefined) {
-      body.vendorCode = data.vendorCode;
-    }
-    if (data.externalDependencies) {
-      body.externalDependencies = data.externalDependencies;
-    }
   }
 
   return (

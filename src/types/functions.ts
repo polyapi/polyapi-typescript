@@ -244,9 +244,6 @@ export interface CreateComponentFunctionDto {
   code: string;
   imports: string[];
   visibility?: Visibility;
-  vendorCode?: string | null;
-  vendorHash?: string | null;
-  externalDependencies?: Record<string, string>;
 }
 
 export interface ComponentFunctionDetailsDto extends FunctionDetailsDto {
