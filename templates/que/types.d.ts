@@ -64,6 +64,7 @@ interface QueueEvent<T extends EventPayload = EventPayload> {
 
 interface Subscription {
   unsubscribe: () => Promise<void>;
+  block: () => Promise<number>;
 }
 
 declare namespace queue {

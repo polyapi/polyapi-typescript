@@ -1,3 +1,8 @@
+### 0.28.3
+* Adding drain() method to queues
+* Adding next() method to queues
+* Adding ability to block() on a queue subscription
+
 ### 0.28.2
 * Fixing bug preventing use of queues and locks
 

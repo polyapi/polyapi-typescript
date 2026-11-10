@@ -20,6 +20,8 @@ const printQueueInterface = (queue: QueueSpecification, depth: number): string =
     `${_ws}deleteAll(): Promise<void>;`,
     `${_ws}skip(eventId: string): Promise<void>;`,
     `${_ws}retry(eventId: string, fromDLQ?: boolean): Promise<void>;`,
+    `${_ws}next(): Promise<QueueEvent<${formattedName}.${queue.schema.title || 'Payload'}>>;`,
+    `${_ws}drain(handler: (event: QueueEvent<${formattedName}.${queue.schema.title || 'Payload'}>) => any, concurrency?: number): Promise<void>;`,
     `${_ws}subscribe(handler: (event: QueueEvent<${formattedName}.${queue.schema.title || 'Payload'}>) => any, concurrency?: number): Promise<Subscription>;`,
     `${_ws}status(): Promise<QueueStatus>;`,
   ].join(`${EOL}${ws(depth + 1)}`);
