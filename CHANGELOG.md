@@ -1,3 +1,6 @@
+### 0.28.6
+* Updating base queue library to pull in fix for delay when getting lock status
+
 ### 0.28.5
 * Fixing bug with queue next() method
 
