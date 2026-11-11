@@ -16,9 +16,7 @@ export type DeployableTypes = 'server-function' | 'client-function' | 'webhook';
 
 // NOTE: Make sure these names line up with the public types in `src/index.d.ts`
 export type DeployableTypeNames =
-  | 'PolyServerFunction'
-  | 'PolyClientFunction'
-  | 'PolyWebhook';
+  'PolyServerFunction' | 'PolyClientFunction' | 'PolyWebhook';
 // | "PolyApiFunction"
 // | "PolyVariable"
 // | "PolyWebhook"
@@ -77,10 +75,12 @@ export type DeployableRecord = ParsedDeployableConfig & {
       description: string;
     };
   };
-  typeSchemas?: Record<string, any>;
   dependencies?: string[]; // old version of external dependencies
   externalDependencies?: Record<string, string>;
-  internalDependencies?: Record<string, Array<{ path: string; id: string }>>;
+  internalDependencies?: Record<
+    string,
+    Array<{ path: string; id?: string }> | string[]
+  >;
   description?: string;
   deployments: Deployment[];
   deploymentCommentRanges?: Array<[startIndex: number, endIndex: number]>;
@@ -96,7 +96,6 @@ export type SyncDeployment = {
   type: DeployableTypes;
   fileRevision: string;
   file: string; // ex. "/project/path/to/poly/deployable/file.ts";
-  typeSchemas?: Record<string, any>;
   dependencies?: string[];
   config: Record<string, unknown>;
   instance: string; // ex. "https://na1.polyapi.io"

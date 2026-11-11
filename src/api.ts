@@ -75,11 +75,10 @@ export const createOrUpdateServerFunction = async (
   description: string | null,
   code: string,
   visibility: string,
-  typeSchemas: Record<string, any>,
   externalDependencies: Record<string, string> | null,
   internalDependencies: Record<
     string,
-    Array<{ path: string; id: string }> | string[]
+    Array<{ path: string; id?: string }> | string[]
   > | null,
   other?: Record<string, any>,
   executionApiKey?: string,
@@ -93,7 +92,6 @@ export const createOrUpdateServerFunction = async (
         description,
         code,
         visibility,
-        typeSchemas,
         // Keeping backwards compatability on requirements
         requirements: externalDependencies
           ? Object.keys(externalDependencies)
@@ -165,11 +163,10 @@ export const createOrUpdateClientFunction = async (
   description: string | null,
   code: string,
   visibility: string,
-  typeSchemas: Record<string, any>,
   externalDependencies: Record<string, string> | null,
   internalDependencies: Record<
     string,
-    Array<{ path: string; id: string }> | string[]
+    Array<{ path: string; id?: string }> | string[]
   > | null,
   other?: Record<string, any>,
 ) => {
@@ -182,7 +179,6 @@ export const createOrUpdateClientFunction = async (
         description,
         code,
         visibility,
-        typeSchemas,
         externalDependencies,
         internalDependencies,
         ...other,
@@ -303,14 +299,11 @@ export const resendVerificationCode = (instance: string, email: string) => {
 
 export const getLastTos = async (instance: string) => {
   return (
-    await http.get<TosDto>(
-      `${getInstanceUrl(instance)}/tos`,
-      {
-        headers: {
-          [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
-        },
+    await http.get<TosDto>(`${getInstanceUrl(instance)}/tos`, {
+      headers: {
+        [POLY_API_VERSION_HEADER]: process.env.POLY_API_VERSION || '',
       },
-    )
+    })
   ).data;
 };
 
@@ -328,25 +321,17 @@ export const upsertApiFunction = async (data: CreateApiFunctionDto) => {
 
 export const upsertWebhookHandle = async (data: CreateWebhookHandleDto) => {
   return (
-    await http.put<WebhookHandleDto>(
-      `${getApiBaseURL()}/webhooks`,
-      data,
-      {
-        headers: getApiHeaders(),
-      },
-    )
+    await http.put<WebhookHandleDto>(`${getApiBaseURL()}/webhooks`, data, {
+      headers: getApiHeaders(),
+    })
   ).data;
 };
 
 export const upsertSchema = async (data: CreateSchemaDto) => {
   return (
-    await http.put<SchemaDto>(
-      `${getApiBaseURL()}/schemas`,
-      data,
-      {
-        headers: getApiHeaders(),
-      },
-    )
+    await http.put<SchemaDto>(`${getApiBaseURL()}/schemas`, data, {
+      headers: getApiHeaders(),
+    })
   ).data;
 };
 
@@ -523,15 +508,12 @@ export const createOrUpdateWebhook = async (
 
 export const getWebhookById = async (id: string) => {
   return (
-    await http.get<WebhookHandleDto>(
-      `${getApiBaseURL()}/webhooks/${id}`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getApiHeaders(),
-        },
+    await http.get<WebhookHandleDto>(`${getApiBaseURL()}/webhooks/${id}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...getApiHeaders(),
       },
-    )
+    })
   ).data;
 };
 
@@ -541,15 +523,12 @@ export const getWebhookByName = async (
   detail = false,
 ) => {
   const basic = (
-    await http.get<WebhookHandleBasicDto[]>(
-      `${getApiBaseURL()}/webhooks`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getApiHeaders(),
-        },
+    await http.get<WebhookHandleBasicDto[]>(`${getApiBaseURL()}/webhooks`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...getApiHeaders(),
       },
-    )
+    })
   ).data.find(
     (webhook) => webhook.name === name && webhook.context === context,
   );
@@ -558,13 +537,10 @@ export const getWebhookByName = async (
 };
 
 export const deleteWebhook = async (webhookId: string) => {
-  return await http.delete(
-    `${getApiBaseURL()}/webhooks/${webhookId}`,
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        ...getApiHeaders(),
-      },
+  return await http.delete(`${getApiBaseURL()}/webhooks/${webhookId}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...getApiHeaders(),
     },
-  );
+  });
 };

@@ -29,6 +29,12 @@ import {
   getWebhookByName,
 } from '../api';
 import { FunctionDetailsDto, WebhookHandleDto } from '../types';
+import {
+  functionDeployFields,
+  getDependencies,
+  getTSBaseUrl,
+  transpileFunction,
+} from '../transpiler';
 
 const DEPLOY_ORDER: DeployableTypes[] = [
   'client-function',
@@ -73,16 +79,55 @@ const removeDeployable = async (
   }
 };
 
-const syncDeployableAndGetId = async (deployable, code, apiKey) => {
+/**
+ * Compile a prepared function and build the create body.
+ * Missing poly resources do not abort the sync; unresolved schema types are
+ * generated from the source instead of sent as `x-poly-ref`.
+ */
+export const syncedFunctionUpdate = async (
+  deployable: {
+    file: string;
+    name: string;
+    context: string;
+    config?: Record<string, unknown>;
+  },
+  code: string,
+) => {
+  const [, , schemaRefs] = await getDependencies(
+    code,
+    deployable.file,
+    getTSBaseUrl(),
+    true,
+  );
+  const referencedSchemas = Object.keys(schemaRefs).length ? schemaRefs : null;
+  const deployed = functionDeployFields(
+    transpileFunction(deployable.file, deployable.name, referencedSchemas),
+    deployable.context,
+  );
+  return {
+    context: deployed.context,
+    code: deployed.code,
+    other: { ...(deployable.config ?? {}), ...deployed.payload },
+  };
+};
+
+const syncDeployableAndGetId = async (
+  deployable,
+  code,
+  apiKey,
+): Promise<{ id: string; context: string | null }> => {
   if (deployable.type === 'webhook') {
-    return (
-      await createOrUpdateWebhook(
-        deployable.context,
-        deployable.name,
-        deployable.description,
-        deployable.config,
-      )
-    ).id;
+    return {
+      id: (
+        await createOrUpdateWebhook(
+          deployable.context,
+          deployable.name,
+          deployable.description,
+          deployable.config,
+        )
+      ).id,
+      context: deployable.context,
+    };
   }
   let { externalDependencies, dependencies } = deployable;
   if (Array.isArray(dependencies) && !externalDependencies) {
@@ -90,35 +135,40 @@ const syncDeployableAndGetId = async (deployable, code, apiKey) => {
       dependencies.map((d) => [d, 'latest']),
     );
   }
+  const synced = await syncedFunctionUpdate(deployable, code);
   if (deployable.type === 'server-function') {
-    return (
-      await createOrUpdateServerFunction(
-        deployable.context,
-        deployable.name,
-        deployable.description,
-        code,
-        deployable.config.visibility,
-        deployable.typeSchemas,
-        externalDependencies,
-        deployable.internalDependencies,
-        deployable.config,
-        apiKey
-      )
-    ).id;
+    return {
+      id: (
+        await createOrUpdateServerFunction(
+          synced.context,
+          deployable.name,
+          deployable.description,
+          synced.code,
+          deployable.config.visibility,
+          externalDependencies,
+          deployable.internalDependencies,
+          synced.other,
+          apiKey,
+        )
+      ).id,
+      context: synced.context,
+    };
   } else if (deployable.type === 'client-function') {
-    return (
-      await createOrUpdateClientFunction(
-        deployable.context,
-        deployable.name,
-        deployable.description,
-        code,
-        deployable.config.visibility,
-        deployable.typeSchemas,
-        externalDependencies,
-        deployable.internalDependencies,
-        deployable.config,
-      )
-    ).id;
+    return {
+      id: (
+        await createOrUpdateClientFunction(
+          synced.context,
+          deployable.name,
+          deployable.description,
+          synced.code,
+          deployable.config.visibility,
+          externalDependencies,
+          deployable.internalDependencies,
+          synced.other,
+        )
+      ).id,
+      context: synced.context,
+    };
   }
   throw new Error(`Unsupported deployable type: '${deployable.type}'`);
 };
@@ -161,13 +211,17 @@ const getDeployableFromServer = async <
 
 const syncDeployable = async (
   deployable: SyncDeployment,
-  apiKey: string | null | undefined
+  apiKey: string | null | undefined,
 ): Promise<Deployment> => {
   const code = fs.readFileSync(deployable.file, 'utf8');
-  const id = await syncDeployableAndGetId(deployable, code, apiKey);
+  const { id, context } = await syncDeployableAndGetId(
+    deployable,
+    code,
+    apiKey,
+  );
   return {
     name: deployable.name,
-    context: deployable.context,
+    context: context ?? deployable.context,
     instance: deployable.instance,
     type: deployable.type,
     id,
@@ -219,50 +273,59 @@ export const syncDeployables = async (
       const serverFileRevision = !deployed
         ? ''
         : type === 'webhook'
-        ? // TODO: Actually calculate real revision on webhook
-          getRandomString(8)
-        : (deployed as FunctionDetailsDto).hash ||
-          getDeployableFileRevision((deployed as FunctionDetailsDto).code);
+          ? // TODO: Actually calculate real revision on webhook
+            getRandomString(8)
+          : (deployed as FunctionDetailsDto).hash ||
+            getDeployableFileRevision((deployed as FunctionDetailsDto).code);
       const fileRevisionChanged =
         serverFileRevision !== deployable.fileRevision;
       // TODO: If deployed variabnt exists AND was deployed after timestamp on previousDeployment then sync it back to the repo
       let action = gitRevisionChanged
         ? 'REMOVED'
         : !previousDeployment?.id && !deployed
-        ? 'ADDED'
-        : fileRevisionChanged
-        ? 'UPDATED'
-        : 'SKIPPED';
+          ? 'ADDED'
+          : fileRevisionChanged
+            ? 'UPDATED'
+            : 'SKIPPED';
 
       if (!dryRun && action !== 'SKIPPED') {
-        // if user is changing type, ex. server -> client function or vice versa
-        // then try to cleanup the old type first
-        if (previousDeployment && deployable.type !== previousDeployment.type) {
-          await removeDeployable(previousDeployment);
-        }
-        if (gitRevisionChanged) {
-          // This deployable no longer exists so let's remove it
-          const found = await removeDeployable(syncDeployment);
-          if (!found) action = 'NOT FOUND';
-          const removeIndex = allDeployables.findIndex(
-            (d) =>
-              d.name === deployable.name &&
-              d.context === deployable.context &&
-              d.file === deployable.file,
-          );
-          toRemove.push(...allDeployables.splice(removeIndex, 1));
-        } else {
-          const deployment = await syncDeployable(syncDeployment, apiKey);
-          if (previousDeployment) {
-            previousDeployment.id = deployment.id;
-            previousDeployment.context = deployment.context;
-            previousDeployment.name = deployment.name;
-            previousDeployment.type = deployment.type;
-            previousDeployment.deployed = deployment.deployed;
-            previousDeployment.fileRevision = deployment.fileRevision;
-          } else {
-            deployable.deployments.unshift(deployment);
+        try {
+          // if user is changing type, ex. server -> client function or vice versa
+          // then try to cleanup the old type first
+          if (
+            previousDeployment &&
+            deployable.type !== previousDeployment.type
+          ) {
+            await removeDeployable(previousDeployment);
           }
+          if (gitRevisionChanged) {
+            // This deployable no longer exists so let's remove it
+            const found = await removeDeployable(syncDeployment);
+            if (!found) action = 'NOT FOUND';
+            const removeIndex = allDeployables.findIndex(
+              (d) =>
+                d.name === deployable.name &&
+                d.context === deployable.context &&
+                d.file === deployable.file,
+            );
+            toRemove.push(...allDeployables.splice(removeIndex, 1));
+          } else {
+            const deployment = await syncDeployable(syncDeployment, apiKey);
+            if (previousDeployment) {
+              previousDeployment.id = deployment.id;
+              previousDeployment.context = deployment.context;
+              previousDeployment.name = deployment.name;
+              previousDeployment.type = deployment.type;
+              previousDeployment.deployed = deployment.deployed;
+              previousDeployment.fileRevision = deployment.fileRevision;
+            } else {
+              deployable.deployments.unshift(deployment);
+            }
+          }
+        } catch (err: any) {
+          // One failed function must not abort the batch or record a deployment.
+          action = 'ERROR';
+          console.error(err?.message ?? err);
         }
       }
 

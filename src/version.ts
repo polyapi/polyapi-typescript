@@ -102,27 +102,26 @@ export const checkForClientVersionUpdate = async (polyPath: string, nonInteracti
 
   const warningMessage = `Instance "${instanceTag}" uses ${usingOlderVersion ? 'a later' : 'an older'} version of the Poly client. Current: ${currentVersion}, Instance: ${availableVersion}.`;
 
-  if (nonInteractiveMode) {
-    shell.echo(
-      chalk.yellow(
-        `${warningMessage} Please update to avoid any issues.`,
-      ),
-    );
-    return;
-  }
+  shell.echo(
+    chalk.yellow(
+      `${warningMessage} Please update to avoid any issues.`,
+    ),
+  );
+  
 
-  const shouldUpdate = await confirm({
-    message: `${warningMessage} Update now?`,
-    default: true,
-  });
+  // Silencing the interactive path for now as it's very annoying Maybe revisit in the future
+  // const shouldUpdate = await confirm({
+  //   message: `${warningMessage} Update now?`,
+  //   default: true,
+  // });
 
-  if (shouldUpdate) {
-    await updateClient(instanceTag);
-  } else {
-    shell.echo(
-      chalk.yellow(
-        `Continuing with ${usingOlderVersion ? 'older' : 'newer'} Poly client version ${currentVersion}. Please update to avoid any issues.`,
-      ),
-    );
-  }
+  // if (shouldUpdate) {
+  //   await updateClient(instanceTag);
+  // } else {
+  //   shell.echo(
+  //     chalk.yellow(
+  //       `Continuing with ${usingOlderVersion ? 'older' : 'newer'} Poly client version ${currentVersion}. Please update to avoid any issues.`,
+  //     ),
+  //   );
+  // }
 };

@@ -59,11 +59,3 @@ jobs:
             exit $PUBLISH_EXIT
           fi
         fi
-
-    - name: Hit endpoint and build from scratch pre-built image
-      run: |
-        curl --fail-with-body -X POST \
-        https://dev.polyapi.io/functions/server/prebuilt-base-image \
-        -H "Authorization: Bearer ${{ secrets.POLY_SUPER_ADMIN_USER_KEY }}" \
-        -H "Content-Type: application/json" \
-        -d '{}'

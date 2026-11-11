@@ -282,9 +282,9 @@ void yargs
           })
           .option('ignore-dependencies', {
             describe:
-              'Skip parsing internal dependencies referenced within function.',
+              'Do not fail when a Poly resource cannot be resolved, and omit internal dependencies from the deployment.',
             type: 'boolean',
-            default: true, // TODO: Remove me once we have the internal dependency tracking kinks worked out!
+            default: true,
           }),
       async ({
         name,

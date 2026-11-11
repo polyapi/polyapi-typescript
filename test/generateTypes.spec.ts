@@ -1,9 +1,9 @@
+/// <reference types="jest" />
 import { EOL } from 'node:os';
 import { JsonSchema, SchemaSpec, printSchemaAsType, __test } from '../src/commands/generate/schemaTypes';
+import { formatName, printComment } from '../src/commands/generate/shared';
 
 const {
-  formatName,
-  printComment,
   buildSchemaTree,
   printSchemaSpecs
 } = __test;
@@ -1732,9 +1732,9 @@ describe('Generate types from specs', () => {
           '  namespace Aaron {',
           '    namespace Testing {',
           '      type ProjectApiKeyDeleteResponse = {',
-          '        object: Aaron.Testing.ProjectApiKeyDeleteResponse1;',
-          '        id: Aaron.Testing.Id;',
-          '        deleted: Aaron.Testing.Deleted;',
+          '        object: unknown;',
+          '        id: unknown;',
+          '        deleted: unknown;',
           '      };',
           '      type ProjectApiKeyDeleteResponse1 = \'organization.project.api_key.deleted\';',
           '      type Id = string;',
