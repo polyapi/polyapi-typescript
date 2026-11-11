@@ -265,11 +265,6 @@ void yargs
               'Component only - publish this file as a root component',
             type: 'boolean',
           })
-          .option('public', {
-            describe:
-              'Component only - alias for `--visibility public`',
-            type: 'boolean',
-          })
           .option('logs', {
             describe:
               'Server function only - `--logs=enabled` or `--logs=disabled` to enable to disable logging respectively',
@@ -319,7 +314,6 @@ void yargs
         component,
         type: functionType,
         root,
-        public: isPublic,
         logs,
         generateContexts,
         skipGenerate,
@@ -344,19 +338,9 @@ void yargs
         const visibilityArg = visibility
           ? String(visibility).toUpperCase()
           : undefined;
-        if (isPublic && visibilityArg && visibilityArg !== 'PUBLIC') {
-          shell.echo(
-            chalk.redBright('ERROR:'),
-            '`--public` is an alias for `--visibility public` and conflicts with the given `--visibility`.',
-          );
-          yargs.showHelp();
-          process.exit(1);
-        }
-        if (isComponent) {
-          visibility = isPublic ? 'PUBLIC' : visibilityArg;
-        } else {
-          visibility = visibilityArg || 'ENVIRONMENT';
-        }
+        visibility = isComponent
+          ? visibilityArg
+          : visibilityArg || 'ENVIRONMENT';
         const err = !name
           ? 'Missing function name.'
           : !file
@@ -367,8 +351,6 @@ void yargs
           ? 'Specify exactly one of `--server`, `--client`, or `--type component`.'
           : root && !isComponent
           ? 'Option `--root` is only for component functions (--type component).'
-          : isPublic && !isComponent
-          ? 'Option `--public` is only for component functions (--type component).'
           : generateContexts && !isServer
           ? 'Option `generateContexts` is only for server functions (--server).'
           : logs && !isServer
@@ -473,12 +455,21 @@ void yargs
                 'Route and component as <path>:<context.name>. Repeat for each root; "/" is required. Example: --root /:myapp.App --root /settings:myapp.Settings. On update, any --root replaces the whole roots map.',
               type: 'array',
             })
+            .parserConfiguration({ 'boolean-negation': false })
             .option('public-access', {
               describe:
-                'Serve these roots without a session. Omit on update to leave the current value. --public-access sets true; --no-public-access or --public-access=false sets false.',
+                'Serve these roots without a session. Omit on update to leave the current value. --public-access or --public-access=true sets true. --public-access=false sets false.',
               type: 'boolean',
             }),
-        async ({ name, subdomain, root, publicAccess }) => {
+        async ({ name, subdomain, root, publicAccess, noPublicAccess }) => {
+          if (noPublicAccess) {
+            shell.echo(
+              chalk.redBright('ERROR:'),
+              'Use `--public-access=false` to turn public access off.',
+            );
+            yargs.showHelp();
+            return;
+          }
           if (!name) {
             shell.echo(
               chalk.redBright('ERROR:'),
