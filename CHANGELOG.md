@@ -1,4 +1,4 @@
-### 0.28.6
+### 0.28.7
 * Updating base queue library to pull in fix for delay when getting lock status
 
 ### 0.28.5

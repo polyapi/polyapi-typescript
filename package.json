@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "8.6.0",
-    "@polyapi/qnats": "0.1.13",
+    "@polyapi/qnats": "0.1.14",
     "adm-zip": "0.6.1",
     "chalk": "4.1.2",
     "dotenv": "16.0.3",
