@@ -236,8 +236,36 @@ const matchComponent = (
   };
 };
 
+const componentSpecByPath = (
+  specs: Specification[],
+  polyPath: string,
+): Specification | undefined =>
+  specs.find(
+    (spec) =>
+      spec.type === 'componentFunction' &&
+      spec.contextName.toLowerCase() === polyPath.toLowerCase(),
+  );
+
+const specForPath = (
+  specs: Specification[],
+  resourcePath: string,
+): Specification | undefined => {
+  const component = matchComponent(specs, resourcePath);
+  if (component) return componentSpecByPath(specs, component.polyPath);
+  return exactSpec(specs, resourcePath);
+};
+
 const pathIsResolved = (specs: Specification[], resourcePath: string) =>
-  !!matchComponent(specs, resourcePath) || !!exactSpec(specs, resourcePath);
+  !!specForPath(specs, resourcePath)?.id;
+
+const missingPolyImportError = (paths: string[]) => {
+  const listed = [...new Set(paths)].sort();
+  return `Cannot resolve poly imports:\n\n${listed
+    .map((resourcePath) => `  '${resourcePath}'`)
+    .join(
+      '\n',
+    )}\n\nPublish each missing function or component so it is listed in /specs, then upload this component again.`;
+};
 
 type ClientCall = {
   local: string;
@@ -755,6 +783,8 @@ export const resolvePolyComponentImports = async (
 
   const paths = collectResourcePaths(sourceFile, bindings);
   const specs = paths.length ? await loadSpecs(paths) : [];
+  const missing = paths.filter((resourcePath) => !specForPath(specs, resourcePath));
+  if (missing.length) throw new Error(missingPolyImportError(missing));
   const rewritten = rewriteComponents(sourceFile, bindings, specs);
   const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
   const unresolved = printer.printFile(rewritten.sourceFile);

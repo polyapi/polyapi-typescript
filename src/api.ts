@@ -266,7 +266,6 @@ export const createOrUpdateComponentFunction = async (
   const body: Record<string, unknown> = {
     name: data.name,
     context: data.context,
-    kind: data.kind,
     sourceCode: data.sourceCode,
     code: data.code,
     imports: data.imports,
@@ -291,9 +290,7 @@ export const createOrUpdateComponentFunction = async (
 
 export const updateComponentFunction = async (
   id: string,
-  data: Omit<CreateComponentFunctionDto, 'kind'> & {
-    kind?: CreateComponentFunctionDto['kind'];
-  },
+  data: CreateComponentFunctionDto,
 ) => {
   const body: Record<string, unknown> = {
     name: data.name,
@@ -302,9 +299,6 @@ export const updateComponentFunction = async (
     code: data.code,
     imports: data.imports,
   };
-  if (data.kind) {
-    body.kind = data.kind;
-  }
   if (data.visibility) {
     body.visibility = data.visibility;
   }

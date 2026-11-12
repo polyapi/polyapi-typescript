@@ -29,7 +29,6 @@ export type PublishComponentOptions = {
   context: string;
   name: string;
   file: string;
-  isRoot?: boolean;
   visibility?: Visibility | string;
   projectRoot?: string;
   npmResolveDir?: string;
@@ -109,7 +108,6 @@ export const publishComponents = async (
     projectRoot,
     npmResolveDir,
   });
-  const kind = options.isRoot ? 'root' : 'leaf';
   const commandVisibility = normalizeVisibility(options.visibility);
   const extraNpm = uniquePreserve(
     extraVendorSpecifiers(uniquePreserve(compiled.npmSpecifiers)),
@@ -126,16 +124,12 @@ export const publishComponents = async (
     sourceCode: compiled.sourceCode,
     code: compiled.code,
     imports: compiled.imports,
-    kind,
   };
   if (commandVisibility) body.visibility = commandVisibility;
 
   const saved = componentId
-    ? await updateComponentFunction(componentId, {
-        ...body,
-        kind: kind === 'root' ? kind : undefined,
-      })
+    ? await updateComponentFunction(componentId, body)
     : await createOrUpdateComponentFunction(body);
 
-  return { components: [{ ...saved, kind: saved.kind ?? kind }] };
+  return { components: [saved] };
 };

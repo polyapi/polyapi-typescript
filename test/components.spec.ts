@@ -296,9 +296,9 @@ export const App = () => <poly.missing.Thing />;
 `,
     });
 
-    await expect(
-      compileFile('src/App.tsx'),
-    ).rejects.toThrow(/missing\.Thing/);
+    await expect(compileFile('src/App.tsx')).rejects.toThrow(
+      /Cannot resolve poly imports:[\s\S]*'missing\.Thing'[\s\S]*Publish each missing function or component so it is listed in \/specs, then upload this component again\./,
+    );
   });
 
   test('a react-only file rewrites react to poly:vendor', async () => {

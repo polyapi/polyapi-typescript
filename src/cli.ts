@@ -260,11 +260,6 @@ void yargs
             type: 'string',
             choices: ['server', 'client', 'component'],
           })
-          .option('root', {
-            describe:
-              'Component only - publish this file as a root component',
-            type: 'boolean',
-          })
           .option('logs', {
             describe:
               'Server function only - `--logs=enabled` or `--logs=disabled` to enable to disable logging respectively',
@@ -313,7 +308,6 @@ void yargs
         server,
         component,
         type: functionType,
-        root,
         logs,
         generateContexts,
         skipGenerate,
@@ -349,8 +343,6 @@ void yargs
           ? 'You must specify `--server`, `--client`, or `--type component`.'
           : typeCount > 1
           ? 'Specify exactly one of `--server`, `--client`, or `--type component`.'
-          : root && !isComponent
-          ? 'Option `--root` is only for component functions (--type component).'
           : generateContexts && !isServer
           ? 'Option `generateContexts` is only for server functions (--server).'
           : logs && !isServer
@@ -404,7 +396,6 @@ void yargs
             context || '',
             name,
             file,
-            !!root,
             visibility,
           );
           return;

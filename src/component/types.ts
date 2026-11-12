@@ -1,7 +1,3 @@
-import { ComponentKind } from '../types';
-
-export type { ComponentKind };
-
 export type CompileResult = {
   sourceCode: string;
   code: string;

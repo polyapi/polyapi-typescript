@@ -234,12 +234,9 @@ export interface ExecuteCustomFunctionDescriptionGenerationDto {
   code: string;
 }
 
-export type ComponentKind = 'root' | 'leaf';
-
 export interface CreateComponentFunctionDto {
   name: string;
   context: string;
-  kind: ComponentKind;
   sourceCode: string;
   code: string;
   imports: string[];
@@ -247,7 +244,6 @@ export interface CreateComponentFunctionDto {
 }
 
 export interface ComponentFunctionDetailsDto extends FunctionDetailsDto {
-  kind?: ComponentKind;
   sourceCode?: string;
   vendorCode?: string | null;
   vendorHash?: string | null;

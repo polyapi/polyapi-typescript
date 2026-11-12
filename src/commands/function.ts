@@ -25,7 +25,6 @@ export const addOrUpdateComponentFunction = async (
   context: string,
   name: string,
   file: string,
-  isRoot: boolean,
   visibility?: string,
 ) => {
   loadConfig(polyPath);
@@ -36,7 +35,6 @@ export const addOrUpdateComponentFunction = async (
       context,
       name,
       file,
-      isRoot,
       visibility,
     });
     shell.echo(chalk.green('DONE'));
@@ -44,7 +42,7 @@ export const addOrUpdateComponentFunction = async (
       const polyPathName = result.context
         ? `${result.context}.${result.name}`
         : result.name;
-      shell.echo(`Component ${polyPathName} (${result.kind}) ID: ${result.id}`);
+      shell.echo(`Component ${polyPathName} ID: ${result.id}`);
     }
   } catch (e) {
     shell.echo(chalk.redBright('ERROR\n'));
