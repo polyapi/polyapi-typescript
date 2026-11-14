@@ -365,7 +365,7 @@ const generateGraphQLSubscriptionJSFiles = async (
   );
 };
 
-const generateServerFunctionJSFiles = async (
+export const generateServerFunctionJSFiles = async (
   libPath: string,
   specifications: ServerFunctionSpecification[],
 ) => {
@@ -375,7 +375,12 @@ const generateServerFunctionJSFiles = async (
       `  functions: [`,
 
       specifications
-        .map(s => `    ['${s.contextName}', '${s.id}', ${s.function.arguments.map(a => `'${a.name}'`).join(', ')}]`)
+        .map(s => `    ${JSON.stringify([
+          s.contextName,
+          s.id,
+          !(s.executionMode === 'continuous' && s.continuousInvocation === true),
+          ...s.function.arguments.map(a => a.name),
+        ])}`)
         .join(`,${EOL}`),
 
       `  ]`,

@@ -14,6 +14,8 @@ type PolyFunction = PolyDeployable<{ visibility?: Visibility }>;
 
 export type PolyServerFunction = PolyFunction & { 
   alwaysOn?: boolean;
+  executionMode?: 'request' | 'continuous';
+  continuousInvocation?: boolean;
   logsEnabled?: boolean;
   serverSideAsync?: boolean;
   cachePolyLibrary?: boolean;

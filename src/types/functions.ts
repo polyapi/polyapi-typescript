@@ -63,6 +63,8 @@ export interface FunctionDetailsDto extends FunctionBasicDto {
   language: string;
   logsEnabled?: boolean;
   serverSideAsync?: boolean;
+  executionMode?: 'request' | 'continuous';
+  continuousInvocation?: boolean;
   minScale?: number | null;
   maxScale?: number | null;
   requirements?: string | null;
