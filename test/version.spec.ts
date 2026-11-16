@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { execSync } from 'child_process';
 import fs from 'fs';
 import shell from 'shelljs';
@@ -54,19 +55,21 @@ describe('checkForClientVersionUpdate', () => {
     process.env = originalEnv;
   });
 
-  test('updates when newer instance tag is available and user confirms', async () => {
+  test('warns when a newer instance tag is available', async () => {
     process.env.POLY_INSTANCE_TAG = 'na1';
     execSyncMock.mockReturnValue(
       JSON.stringify({ na1: '0.25.17', latest: '0.25.17' }),
     );
-    confirmMock.mockResolvedValue(true as any);
 
     const { checkForClientVersionUpdate } = await import('../src/version');
     await checkForClientVersionUpdate('node_modules/.poly');
 
-    expect(confirmMock).toHaveBeenCalled();
-    expect(shellExecMock).toHaveBeenCalledWith(
-      'npm install -g polyapi@na1',
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(shellExecMock).not.toHaveBeenCalled();
+    expect(shellEchoMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Instance "na1" uses a later version of the Poly client. Current: 0.25.0, Instance: 0.25.17.',
+      ),
     );
   });
 
@@ -84,34 +87,44 @@ describe('checkForClientVersionUpdate', () => {
     expect(shellExecMock).not.toHaveBeenCalled();
   });
 
-  test('derives instance tag from base URL and continues when user declines', async () => {
+  test('derives instance tag from base URL and warns without updating', async () => {
     loadConfigMock.mockReturnValue({
       POLY_API_BASE_URL: 'https://na2.polyapi.io',
     } as any);
     execSyncMock.mockReturnValue(
       JSON.stringify({ na2: '0.25.9' }),
     );
-    confirmMock.mockResolvedValue(false as any);
 
     const { checkForClientVersionUpdate } = await import('../src/version');
     await checkForClientVersionUpdate('node_modules/.poly');
 
-    expect(confirmMock).toHaveBeenCalled();
+    expect(confirmMock).not.toHaveBeenCalled();
     expect(shellExecMock).not.toHaveBeenCalled();
     expect(shellEchoMock).toHaveBeenCalledWith(
-      expect.stringContaining('Continuing with older Poly client version'),
+      expect.stringContaining(
+        'Instance "na2" uses a later version of the Poly client. Current: 0.25.0, Instance: 0.25.9.',
+      ),
     );
   });
 
-  test('skips check when instance tag cannot be resolved', async () => {
+  test('treats an unrecognized host as na1', async () => {
     loadConfigMock.mockReturnValue({
       POLY_API_BASE_URL: 'https://unknown.polyapi.io',
     } as any);
+    execSyncMock.mockReturnValue(
+      JSON.stringify({ na1: '0.25.17' }),
+    );
 
     const { checkForClientVersionUpdate } = await import('../src/version');
     await checkForClientVersionUpdate('node_modules/.poly');
 
-    expect(execSyncMock).not.toHaveBeenCalled();
+    expect(execSyncMock).toHaveBeenCalledWith(
+      'npm view polyapi dist-tags --json',
+      { encoding: 'utf-8' },
+    );
     expect(confirmMock).not.toHaveBeenCalled();
+    expect(shellEchoMock).toHaveBeenCalledWith(
+      expect.stringContaining('Instance "na1" uses a later version'),
+    );
   });
 });
