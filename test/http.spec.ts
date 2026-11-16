@@ -273,6 +273,39 @@ describe('http client', () => {
       expect(response.data).toEqual({ ok: true });
       expect(undiciRequestMock).toHaveBeenCalledTimes(2);
     });
+
+    test.each(['ECONNRESET', 'UND_ERR_SOCKET'])(
+      'retry false does not replay %s after an accepted effect',
+      async (code) => {
+        let effects = 0;
+        undiciRequestMock.mockImplementation(async () => {
+          effects++;
+          throw Object.assign(new Error('response lost'), { code });
+        });
+
+        await expect(
+          post('https://example.com/execute', { marker: 'once' }, { retry: false }),
+        ).rejects.toMatchObject({ code });
+        expect(effects).toBe(1);
+        expect(undiciRequestMock).toHaveBeenCalledTimes(1);
+        expect(undiciRequestMock.mock.calls[0][1].maxRedirections).toBe(0);
+        expect(undiciRequestMock.mock.calls[0][1].idempotent).toBe(false);
+      },
+    );
+
+    test('retry false returns the first 429 without replaying', async () => {
+      undiciRequestMock.mockResolvedValue(
+        jsonResponse(
+          { error: 'busy' },
+          { statusCode: 429, headers: { 'retry-after': '0' } },
+        ) as any,
+      );
+
+      await expect(
+        post('https://example.com/execute', {}, { retry: false }),
+      ).rejects.toMatchObject({ status: 429 });
+      expect(undiciRequestMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('callable client', () => {

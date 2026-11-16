@@ -117,6 +117,8 @@ export interface ServerFunctionSpecification extends ISpecification {
   function: FunctionSpecification;
   requirements: string[];
   serverSideAsync: boolean;
+  executionMode?: 'request' | 'continuous';
+  continuousInvocation?: boolean;
 }
 
 export interface AuthFunctionSpecification extends ISpecification {

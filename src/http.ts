@@ -45,6 +45,8 @@ export type HttpRequestConfig = {
   baseURL?: string;
   dispatcher?: Dispatcher;
   timeout?: number;
+  /** Set false to disable automatic retries and redirects that could replay a request. */
+  retry?: boolean;
   throttleRetries?: number;
   didRetry?: boolean;
 };
@@ -486,6 +488,7 @@ const send = async <T = unknown>(
       method: method as Dispatcher.HttpMethod,
       headers,
       dispatcher,
+      ...(config.retry === false ? { maxRedirections: 0, idempotent: false } : {}),
       ...(body !== undefined ? { body } : {}),
       ...(timeout > 0
         ? { headersTimeout: timeout, bodyTimeout: timeout }
@@ -545,6 +548,7 @@ export const request = async <T = unknown>(
     return await send<T>(nextConfig);
   } catch (error) {
     if (!isAxiosError(error)) throw error;
+    if (nextConfig.retry === false) throw error;
 
     if (error.response && error.response.status === 429) {
       nextConfig.throttleRetries = (nextConfig.throttleRetries || 0) + 1;

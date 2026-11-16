@@ -3,13 +3,14 @@ const set = require('lodash/set');
 const { functions } = require('./functions');
 
 module.exports = (clientID, polyCustom) => functions.reduce(
-  (acc, [path, id, ...argKeys]) => set(
+  (acc, [path, id, retry, ...argKeys]) => set(
     acc,
     path,
     (...args) => http.post(
       `/functions/server/${id}/execute?clientId=${clientID}`,
       argKeys.reduce((acc, key, index) => set(acc, key, args[index]), {}),
       {
+        retry,
         headers: {
           'x-poly-execution-id': polyCustom.executionId,
         }
