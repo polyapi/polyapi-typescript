@@ -9,7 +9,7 @@ import {
   updateComponentFunction,
 } from '../api';
 import { DEFAULT_POLY_PATH } from '../constants';
-import { getCachedSpecs, getPolyLibPath, writeCachedSpecs } from '../utils';
+import { getPolyLibPath, writeCachedSpecs } from '../utils';
 import { assertComponentIdentifiers } from './identifiers';
 import {
   ComponentFunctionDetailsDto,
@@ -69,11 +69,8 @@ export const componentIdFromSpecs = (
 };
 
 const findComponentId = async (polyPath: string): Promise<string | null> => {
-  const libPath = getPolyLibPath(DEFAULT_POLY_PATH);
-  const cached = componentIdFromSpecs(getCachedSpecs(libPath), polyPath);
-  if (cached) return cached;
   const specs = await getSpecs();
-  writeCachedSpecs(libPath, specs);
+  writeCachedSpecs(getPolyLibPath(DEFAULT_POLY_PATH), specs);
   return componentIdFromSpecs(specs, polyPath);
 };
 
