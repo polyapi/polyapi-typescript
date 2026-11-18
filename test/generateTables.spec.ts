@@ -1,16 +1,23 @@
+/// <reference types="jest" />
 import { EOL } from 'node:os';
 import { __test } from '../src/commands/generate/table';
+import { __test as sharedTest } from '../src/commands/generate/shared';
 import { TableSpecification } from '../src/types';
 
 const {
-  printTableSpecs
+  printTableInterface,
+  printTableNamespace,
 } = __test;
+
+const {
+  printResourceSpecs
+} = sharedTest;
 
 // Utility to make creating multiline strings in more precise way than is possible with template literal strings
 const multiline = (...lines: string[]) => lines.join(EOL);
 
 
-describe('printTableSpecs', () => {
+describe('printResourceSpecs', () => {
 
     test('single spec', () => {
       const specs: TableSpecification[] = [
@@ -51,7 +58,13 @@ describe('printTableSpecs', () => {
         } as TableSpecification
       ];
 
-      const result = printTableSpecs(specs);
+      const result = printResourceSpecs(specs, {
+        namespace: 'tabi',
+        interfaceName: 'Tabi',
+        type: 'table',
+        printResourceInterface: printTableInterface,
+        printResourceNamespace: printTableNamespace,
+      });
 
       expect(result['index.d.ts']).toEqual(
         multiline(
@@ -102,6 +115,7 @@ describe('printTableSpecs', () => {
           '        type QueryResults = PolyQueryResults<Row>;',
           '        type QueryResult = PolyQueryResult<Row>;',
           '        type DeleteResults = PolyDeleteResults;',
+          '        type DeleteResult = PolyDeleteResult;',
           '        type CountResult = PolyCountResult;',
           '      }',
           '    }',
@@ -117,7 +131,9 @@ describe('printTableSpecs', () => {
           '      upsertMany(query: Aaron.Testing.MyTable.InsertManyQuery): Promise<Aaron.Testing.MyTable.QueryResults>;',
           '      upsertOne(query: Aaron.Testing.MyTable.InsertOneQuery): Promise<Aaron.Testing.MyTable.QueryResult>;',
           '      updateMany(query: Aaron.Testing.MyTable.UpdateQuery): Promise<Aaron.Testing.MyTable.QueryResults>;',
+          '      updateOne(id: string, query: Aaron.Testing.MyTable.UpdateQuery): Promise<Aaron.Testing.MyTable.QueryResult>;',
           '      deleteMany(query: Aaron.Testing.MyTable.DeleteQuery): Promise<Aaron.Testing.MyTable.DeleteResults>;',
+          '      deleteOne(id: string, query?: Aaron.Testing.MyTable.DeleteQuery): Promise<Aaron.Testing.MyTable.DeleteResult>;',
           '    }',
           '  }',
           '}',
@@ -199,7 +215,13 @@ describe('printTableSpecs', () => {
         } as TableSpecification
       ];
 
-      const result = printTableSpecs(specs);
+      const result = printResourceSpecs(specs, {
+        namespace: 'tabi',
+        interfaceName: 'Tabi',
+        type: 'table',
+        printResourceInterface: printTableInterface,
+        printResourceNamespace: printTableNamespace,
+      });
 
       expect(result['index.d.ts']).toEqual(
         multiline(
@@ -229,6 +251,7 @@ describe('printTableSpecs', () => {
           '    type QueryResults = PolyQueryResults<Row>;',
           '    type QueryResult = PolyQueryResult<Row>;',
           '    type DeleteResults = PolyDeleteResults;',
+          '    type DeleteResult = PolyDeleteResult;',
           '    type CountResult = PolyCountResult;',
           '  }',
           '',
@@ -243,7 +266,9 @@ describe('printTableSpecs', () => {
           '      upsertMany(query: OtherTable.InsertManyQuery): Promise<OtherTable.QueryResults>;',
           '      upsertOne(query: OtherTable.InsertOneQuery): Promise<OtherTable.QueryResult>;',
           '      updateMany(query: OtherTable.UpdateQuery): Promise<OtherTable.QueryResults>;',
+          '      updateOne(id: string, query: OtherTable.UpdateQuery): Promise<OtherTable.QueryResult>;',
           '      deleteMany(query: OtherTable.DeleteQuery): Promise<OtherTable.DeleteResults>;',
+          '      deleteOne(id: string, query?: OtherTable.DeleteQuery): Promise<OtherTable.DeleteResult>;',
           '    }',
           '  }',
           '}',
@@ -281,6 +306,7 @@ describe('printTableSpecs', () => {
           '        type QueryResults = PolyQueryResults<Row>;',
           '        type QueryResult = PolyQueryResult<Row>;',
           '        type DeleteResults = PolyDeleteResults;',
+          '        type DeleteResult = PolyDeleteResult;',
           '        type CountResult = PolyCountResult;',
           '      }',
           '    }',
@@ -296,7 +322,9 @@ describe('printTableSpecs', () => {
           '      upsertMany(query: Aaron.Testing.MyTable.InsertManyQuery): Promise<Aaron.Testing.MyTable.QueryResults>;',
           '      upsertOne(query: Aaron.Testing.MyTable.InsertOneQuery): Promise<Aaron.Testing.MyTable.QueryResult>;',
           '      updateMany(query: Aaron.Testing.MyTable.UpdateQuery): Promise<Aaron.Testing.MyTable.QueryResults>;',
+          '      updateOne(id: string, query: Aaron.Testing.MyTable.UpdateQuery): Promise<Aaron.Testing.MyTable.QueryResult>;',
           '      deleteMany(query: Aaron.Testing.MyTable.DeleteQuery): Promise<Aaron.Testing.MyTable.DeleteResults>;',
+          '      deleteOne(id: string, query?: Aaron.Testing.MyTable.DeleteQuery): Promise<Aaron.Testing.MyTable.DeleteResult>;',
           '    }',
           '  }',
           '}',

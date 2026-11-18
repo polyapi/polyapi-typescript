@@ -19,7 +19,7 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "rootDir": "src",
-    "outDir": "build",
+    "outDir": "build"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*"]
 }
